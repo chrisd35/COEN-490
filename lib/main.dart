@@ -1,5 +1,5 @@
 import 'package:flutter/material.dart';
-import 'auth_page.dart';
+import 'screens/registration/auth_page.dart';
 
 void main() {
   runApp(MyApp());
