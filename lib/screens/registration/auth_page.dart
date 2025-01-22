@@ -2,6 +2,7 @@
 import 'package:flutter/material.dart';
 import 'register_page.dart';
 import 'login_page.dart';
+import 'package:coen_490/screens/dashboard/dashboard_screen.dart';
 
 class AuthPage extends StatelessWidget {
   @override
@@ -39,6 +40,16 @@ class AuthPage extends StatelessWidget {
                   );
                 },
                 child: Text('Sign Up'),
+              ),
+              SizedBox(height: 20),
+              ElevatedButton(
+                onPressed: () {
+                  Navigator.push(
+                    context,
+                    MaterialPageRoute(builder: (context) => DashboardScreen()),
+                  );
+                },
+                child: Text('Dashboard'),
               ),
             ],
           ),
