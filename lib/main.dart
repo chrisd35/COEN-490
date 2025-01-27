@@ -1,7 +1,13 @@
 import 'package:flutter/material.dart';
 import 'screens/registration/auth_page.dart';
+import 'package:firebase_core/firebase_core.dart';
+import 'firebase_options.dart';
 
-void main() {
+void main() async {
+  WidgetsFlutterBinding.ensureInitialized(); // Ensures Flutter bindings are initialized
+  await Firebase.initializeApp(
+    options: DefaultFirebaseOptions.currentPlatform, // Initializes Firebase
+  );
   runApp(MyApp());
 }
 
