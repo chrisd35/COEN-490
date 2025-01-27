@@ -1,6 +1,5 @@
-// register_page.dart
 import 'package:flutter/material.dart';
-import 'account_profile_page.dart';
+import 'account_profile_page.dart'; // Import AccountProfilePage
 
 class RegisterPage extends StatelessWidget {
   @override
@@ -27,7 +26,7 @@ class RegisterPage extends StatelessWidget {
                   Navigator.push(
                     context,
                     MaterialPageRoute(
-                      builder: (context) => AccountProfilePage(),
+                      builder: (context) => AccountProfilePage(selectedRole: 'Medical Professional'),
                     ),
                   );
                 },
@@ -41,7 +40,7 @@ class RegisterPage extends StatelessWidget {
                   Navigator.push(
                     context,
                     MaterialPageRoute(
-                      builder: (context) => AccountProfilePage(),
+                      builder: (context) => AccountProfilePage(selectedRole: 'Student'),
                     ),
                   );
                 },
