@@ -1,12 +1,12 @@
-// account_profile_page.dart
+// add_patient_screen.dart
 import 'package:flutter/material.dart';
-import '../dashboard/dashboard_screen.dart';
+import '../dashboard/components/patient_card.dart';
 
-class AccountProfilePage extends StatelessWidget {
+class AddPatientScreen extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(title: Text('Account Profile')),
+      appBar: AppBar(title: Text('Create New Patient')),
       body: Padding(
         padding: const EdgeInsets.all(16.0),
         child: SingleChildScrollView(
@@ -15,7 +15,7 @@ class AccountProfilePage extends StatelessWidget {
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               Text(
-                'Account Profile',
+                'Patient Info',
                 style: TextStyle(fontSize: 24, fontWeight: FontWeight.bold),
               ),
               SizedBox(height: 20),
@@ -23,7 +23,7 @@ class AccountProfilePage extends StatelessWidget {
               // Full Name
               TextField(
                 decoration: InputDecoration(
-                  labelText: 'Full Name',
+                  labelText: 'First Name',
                   border: OutlineInputBorder(),
                 ),
               ),
@@ -32,27 +32,17 @@ class AccountProfilePage extends StatelessWidget {
               // Email
               TextField(
                 decoration: InputDecoration(
-                  labelText: 'Email',
+                  labelText: 'Medical Card #',
                   border: OutlineInputBorder(),
                 ),
                 keyboardType: TextInputType.emailAddress,
               ),
               SizedBox(height: 16),
 
-              // Password
+              // Phone Number
               TextField(
                 decoration: InputDecoration(
-                  labelText: 'Password',
-                  border: OutlineInputBorder(),
-                ),
-                obscureText: true,
-              ),
-              SizedBox(height: 16),
-
-              // Confirm Password
-              TextField(
-                decoration: InputDecoration(
-                  labelText: 'Confirm Password',
+                  labelText: 'Phone Number',
                   border: OutlineInputBorder(),
                 ),
                 obscureText: true,
@@ -101,33 +91,18 @@ class AccountProfilePage extends StatelessWidget {
               ),
               SizedBox(height: 16),
 
-              // Role
-              DropdownButtonFormField<String>(
+              // Email
+              TextField(
                 decoration: InputDecoration(
-                  labelText: 'Role',
+                  labelText: 'Email',
                   border: OutlineInputBorder(),
                 ),
-                items: [
-                  DropdownMenuItem(
-                      child: Text('Medical Professional'),
-                      value: 'Medical Professional'),
-                  DropdownMenuItem(child: Text('Student'), value: 'Student'),
-                ],
-                onChanged: (value) {
-                  // Handle role selection
-                },
+                obscureText: true,
               ),
               SizedBox(height: 16),
 
-              // Number
-              TextField(
-                decoration: InputDecoration(
-                  labelText: 'Number',
-                  border: OutlineInputBorder(),
-                ),
-                keyboardType: TextInputType.phone,
-              ),
-              SizedBox(height: 20),
+            // Insert documents
+            // Insert input here
 
               // Save Button
               Center(
@@ -136,7 +111,7 @@ class AccountProfilePage extends StatelessWidget {
                     // Handle save action (e.g., validation, submission)
                     Navigator.push(
                     context,
-                    MaterialPageRoute(builder: (context) => DashboardScreen()),
+                    MaterialPageRoute(builder: (context) => PatientCard()),
                   );
                   },
                   child: Text('Save'),

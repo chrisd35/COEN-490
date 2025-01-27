@@ -1,5 +1,6 @@
 // login_page.dart
 import 'package:flutter/material.dart';
+import '../dashboard/dashboard_screen.dart';
 
 class LoginPage extends StatelessWidget {
   @override
@@ -34,6 +35,10 @@ class LoginPage extends StatelessWidget {
             ElevatedButton(
               onPressed: () {
                 // Add login functionality here
+                Navigator.push(
+                    context,
+                    MaterialPageRoute(builder: (context) => DashboardScreen()),
+                  );
               },
               child: Text('Login'),
             ),
