@@ -1,8 +1,15 @@
+import 'package:coen_490/screens/registration/user_model.dart';
+import 'package:firebase_core/firebase_core.dart';
 import 'package:firebase_database/firebase_database.dart';
-import 'user_model.dart'; // Import the User model
 
 class FirebaseService {
-  final DatabaseReference _database = FirebaseDatabase.instance.ref();
+  final DatabaseReference _database;
+
+  FirebaseService()
+      : _database = FirebaseDatabase.instanceFor(
+          app: Firebase.app(),
+          databaseURL: 'https://respirhythm-default-rtdb.firebaseio.com/', // Add this line
+        ).ref();
 
   // Save user data to Realtime Database
   Future<void> saveUser(User user) async {
