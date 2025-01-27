@@ -1,0 +1,29 @@
+{
+  "project_info": {
+    "project_number": "941856109059",
+    "project_id": "respirhythm",
+    "storage_bucket": "respirhythm.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:941856109059:android:e1903793f439f8ec4f1436",
+        "android_client_info": {
+          "package_name": "com.example.coen_490"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyAOQoNF3FgIDMMIkkdPhHa4xzeB1mJh0wI"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}
