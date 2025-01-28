@@ -1,7 +1,9 @@
 import 'package:flutter/material.dart';
+import 'auth_service.dart'; // Import AuthService
 import 'account_profile_page.dart'; // Import AccountProfilePage
 
 class RegisterPage extends StatelessWidget {
+  final _authService = AuthService();
   @override
   Widget build(BuildContext context) {
     return Scaffold(

@@ -22,9 +22,9 @@ class FirebaseService {
   }
 
   // Fetch user data from Realtime Database
-  Future<User?> getUser(String email) async {
+ Future<User?> getUser(String email) async {
     try {
-      DataSnapshot snapshot = await _database.child('users').child(email.replaceAll('.', ',')).get();
+      DataSnapshot snapshot = await _database.child('users').child(email).get();
       if (snapshot.exists) {
         return User.fromMap(snapshot.value as Map<dynamic, dynamic>);
       } else {
