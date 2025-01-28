@@ -2,7 +2,7 @@ import 'package:flutter/material.dart';
 import '../dashboard/dashboard_screen.dart';
 import 'firebase_service.dart'; // Import FirebaseService
 import 'user_model.dart'; // Import User model
-
+import 'auth_service.dart'; 
 class AccountProfilePage extends StatefulWidget {
   final String? selectedRole; // Add selectedRole as a parameter
 
@@ -15,6 +15,7 @@ class AccountProfilePage extends StatefulWidget {
 class _AccountProfilePageState extends State<AccountProfilePage> {
   final _formKey = GlobalKey<FormState>();
   final _firebaseService = FirebaseService();
+  final _authService = AuthService();
 
   // Controllers for text fields
   final _fullNameController = TextEditingController();
@@ -208,27 +209,45 @@ class _AccountProfilePageState extends State<AccountProfilePage> {
     );
   }
 
-  void _submitForm() async {
+ void _submitForm() async {
     if (_formKey.currentState!.validate()) {
-      // Create a User object
-      User user = User(
-        fullName: _fullNameController.text,
-        email: _emailController.text,
-        password: _passwordController.text,
-        dateOfBirth: _dateOfBirthController.text,
-        gender: _selectedGender!,
-        role: _selectedRole!,
-        phoneNumber: _phoneNumberController.text,
-      );
+      final email = _emailController.text.trim();
+      final password = _passwordController.text.trim();
 
-      // Save the user to Firebase
-      await _firebaseService.saveUser(user);
+      // Register the user with Firebase Authentication
+      final user = await _authService.register(email, password);
 
-      // Clear the form
-      _formKey.currentState!.reset();
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('User saved successfully!')),
-      );
+      if (user != null) {
+        // Create a User object
+        User newUser = User(
+          fullName: _fullNameController.text,
+          email: email,
+          password: password,
+          dateOfBirth: _dateOfBirthController.text,
+          gender: _selectedGender!,
+          role: _selectedRole!,
+          phoneNumber: _phoneNumberController.text,
+        );
+
+        // Save the user to Firebase Realtime Database
+        await _firebaseService.saveUser(newUser);
+
+        // Clear the form
+        _formKey.currentState!.reset();
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('User registered successfully!')),
+        );
+
+        // Navigate to the DashboardScreen
+        Navigator.push(
+          context,
+          MaterialPageRoute(builder: (context) => DashboardScreen()),
+        );
+      } else {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Registration failed. Please try again.')),
+        );
+      }
     }
   }
 }
