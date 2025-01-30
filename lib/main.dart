@@ -1,14 +1,26 @@
 import 'package:flutter/material.dart';
+import 'package:provider/provider.dart';
 import 'screens/registration/auth_page.dart';
 import 'package:firebase_core/firebase_core.dart';
 import 'firebase_options.dart';
+import 'utils/ble_manager.dart';  // Import the BLEManager
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized(); // Ensures Flutter bindings are initialized
   await Firebase.initializeApp(
     options: DefaultFirebaseOptions.currentPlatform, // Initializes Firebase
   );
-  runApp(MyApp());
+  runApp(
+    MultiProvider(
+      providers: [
+        // Provide the BLEManager instance to the app
+        ChangeNotifierProvider<BLEManager>(
+          create: (_) => BLEManager(),
+        ),
+      ],
+      child: MyApp(),
+    ),
+  );
 }
 
 class MyApp extends StatelessWidget {
