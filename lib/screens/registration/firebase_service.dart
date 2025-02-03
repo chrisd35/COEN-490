@@ -18,6 +18,7 @@ class FirebaseService {
     try {
       await _database
           .child('users')
+          .child(user.uid)
           .child(user.email.replaceAll('.', ','))
           .set(user.toMap());
       print('User saved successfully!');
@@ -27,9 +28,9 @@ class FirebaseService {
   }
 
   // Fetch user data from Realtime Database
-  Future<User?> getUser(String email) async {
+  Future<User?> getUser(String uid) async {
     try {
-      DataSnapshot snapshot = await _database.child('users').child(email).get();
+      DataSnapshot snapshot = await _database.child('users').child(uid).get();
       if (snapshot.exists) {
         return User.fromMap(snapshot.value as Map<dynamic, dynamic>);
       } else {
@@ -43,9 +44,11 @@ class FirebaseService {
   }
 
   // Save user data to Realtime Database
-  Future<void> savePatient(Patient patient) async {
+  Future<void> savePatient(String uid, Patient patient) async {
     try {
       await _database
+          .child('users')
+          .child(uid)
           .child('patients')
           .child(patient.medicalCardNumber.replaceAll('/', '_'))
           .set(patient.toMap());
@@ -56,10 +59,15 @@ class FirebaseService {
   }
 
   // Fetch user data from Realtime Database
-  Future<Patient?> getPatient(String medicalCardNumber) async {
+  Future<Patient?> getPatient(String uid, String medicalCardNumber) async {
     try {
-      DataSnapshot snapshot =
-          await _database.child('patients').child(medicalCardNumber).get();
+      DataSnapshot snapshot = await _database
+          .child('users')
+          .child(uid)
+          .child('patients')
+          .child('patients')
+          .child(medicalCardNumber)
+          .get();
       if (snapshot.exists) {
         return Patient.fromMap(snapshot.value as Map<dynamic, dynamic>);
       } else {

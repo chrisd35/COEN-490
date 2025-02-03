@@ -2,7 +2,8 @@ import 'package:flutter/material.dart';
 import '../dashboard/dashboard_screen.dart';
 import 'firebase_service.dart'; // Import FirebaseService
 import 'user_model.dart'; // Import User model
-import 'auth_service.dart'; 
+import 'auth_service.dart';
+
 class AccountProfilePage extends StatefulWidget {
   final String? selectedRole; // Add selectedRole as a parameter
 
@@ -209,7 +210,7 @@ class _AccountProfilePageState extends State<AccountProfilePage> {
     );
   }
 
- void _submitForm() async {
+  void _submitForm() async {
     if (_formKey.currentState!.validate()) {
       final email = _emailController.text.trim();
       final password = _passwordController.text.trim();
@@ -227,6 +228,7 @@ class _AccountProfilePageState extends State<AccountProfilePage> {
           gender: _selectedGender!,
           role: _selectedRole!,
           phoneNumber: _phoneNumberController.text,
+          uid: user.uid,
         );
 
         // Save the user to Firebase Realtime Database

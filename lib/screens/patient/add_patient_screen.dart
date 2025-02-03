@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import '../dashboard/components/patient_card.dart';
 import '../registration/firebase_service.dart'; // Import FirebaseService
 import 'patient_model.dart'; // Import Patient model
+import 'package:firebase_auth/firebase_auth.dart';
 
 class AddPatientScreen extends StatefulWidget {
   @override
@@ -160,6 +161,14 @@ class _AddPatientScreenState extends State<AddPatientScreen> {
 
   void _submitForm() async {
     if (_formKey.currentState!.validate()) {
+      final user = FirebaseAuth.instance.currentUser;
+      if (user == null) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Error: User not logged in!')),
+        );
+        return;
+      }
+
       // Create a Patient object (define Patient model)
       Patient newPatient = Patient(
         fullName: _fullNameController.text,
@@ -171,7 +180,7 @@ class _AddPatientScreenState extends State<AddPatientScreen> {
       );
 
       // Save to Firebase (adapt FirebaseService for patients)
-      await _firebaseService.savePatient(newPatient);
+      await _firebaseService.savePatient(user.uid, newPatient);
 
       // Show feedback
       ScaffoldMessenger.of(context).showSnackBar(
