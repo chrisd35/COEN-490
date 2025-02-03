@@ -1,11 +1,12 @@
 class User {
   final String fullName;
   final String email;
-  final String password; 
+  final String password;
   final String dateOfBirth;
   final String gender;
   final String role;
   final String phoneNumber;
+  final String uid;
 
   User({
     required this.fullName,
@@ -15,6 +16,7 @@ class User {
     required this.gender,
     required this.role,
     required this.phoneNumber,
+    required this.uid,
   });
 
   // Convert User object to a Map for Realtime Database
@@ -27,6 +29,7 @@ class User {
       'gender': gender,
       'role': role,
       'phoneNumber': phoneNumber,
+      'uid': uid,
     };
   }
 
@@ -40,6 +43,7 @@ class User {
       gender: data['gender'],
       role: data['role'],
       phoneNumber: data['phoneNumber'],
+      uid: data['uid'],
     );
   }
 }
