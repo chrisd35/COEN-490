@@ -28,10 +28,15 @@ class FirebaseService {
   }
 
   // Fetch user data from Realtime Database
-  Future<User?> getUser(String uid) async {
+  Future<User?> getUser(String uid, String email) async {
     try {
-      DataSnapshot snapshot = await _database.child('users').child(uid).get();
-      if (snapshot.exists) {
+      DataSnapshot snapshot = await _database
+          .child('users')
+          .child(uid)
+          .child(email.replaceAll('.', ','))
+          .get();
+      
+      if (snapshot.exists && snapshot.value != null) {
         return User.fromMap(snapshot.value as Map<dynamic, dynamic>);
       } else {
         print('User not found');
