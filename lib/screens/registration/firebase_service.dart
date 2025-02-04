@@ -91,8 +91,8 @@ class FirebaseService {
     }
   }
 
-  // Save audio data to Firebase Storage and Realtime Database
-  Future<void> saveAudioData(List<int> data) async {
+   // Save audio recording for a specific patient
+  Future<void> saveAudioRecording(String uid, String medicalCardNumber, List<int> data) async {
     try {
       // Convert data to Uint8List
       Uint8List audioBytes = Uint8List.fromList(data);
@@ -105,32 +105,131 @@ class FirebaseService {
       final snapshot = await uploadTask.whenComplete(() {});
       final downloadUrl = await snapshot.ref.getDownloadURL();
 
-      // Save metadata to Realtime Database
-      await _database.child("audio_recordings").push().set({
-        "url": downloadUrl,
-        "timestamp": DateTime.now().millisecondsSinceEpoch,
-      });
+      // Save metadata to Realtime Database under the patient's node
+      await _database
+          .child('users')
+          .child(uid)
+          .child('patients')
+          .child(medicalCardNumber.replaceAll('/', '_'))
+          .child('audio_recordings')
+          .child(DateTime.now().millisecondsSinceEpoch.toString())
+          .set({
+            'url': downloadUrl,
+            'timestamp': DateTime.now().millisecondsSinceEpoch,
+          });
 
-      print("Audio data saved to Firebase");
+      print('Audio recording saved successfully!');
     } catch (e) {
-      print("Error saving audio data: $e");
+      print('Error saving audio recording: $e');
     }
   }
 
-  // Fetch the latest audio recording URL from Realtime Database
-  Future<String?> getLatestAudioUrl() async {
+  // Fetch audio recordings for a specific patient
+  Future<Map<String, dynamic>?> getAudioRecordings(String uid, String medicalCardNumber) async {
     try {
-      final databaseEvent = await _database.child("audio_recordings").orderByChild("timestamp").limitToLast(1).once();
-      final dataSnapshot = databaseEvent.snapshot;
-
-      if (dataSnapshot.value != null) {
-        // Extract the URL from the latest recording
-        final Map<dynamic, dynamic> recordings = dataSnapshot.value as Map<dynamic, dynamic>;
-        final latestRecording = recordings.values.last;
-        return latestRecording["url"];
+      final snapshot = await _database
+          .child('users')
+          .child(uid)
+          .child('patients')
+          .child(medicalCardNumber.replaceAll('/', '_'))
+          .child('audio_recordings')
+          .get();
+      if (snapshot.exists) {
+        return snapshot.value as Map<String, dynamic>;
       }
     } catch (e) {
-      print("Error fetching audio URL: $e");
+      print('Error fetching audio recordings: $e');
+    }
+    return null;
+  }
+
+  // Save PulseOx data for a specific patient
+  Future<void> savePulseOxData(String uid, String medicalCardNumber, int value) async {
+    try {
+      await _database
+          .child('users')
+          .child(uid)
+          .child('patients')
+          .child(medicalCardNumber.replaceAll('/', '_'))
+          .child('pulseox_data')
+          .child(DateTime.now().millisecondsSinceEpoch.toString())
+          .set({
+            'value': value,
+            'timestamp': DateTime.now().millisecondsSinceEpoch,
+          });
+      print('PulseOx data saved successfully!');
+    } catch (e) {
+      print('Error saving PulseOx data: $e');
+    }
+  }
+
+  // Fetch PulseOx data for a specific patient
+  Future<Map<String, dynamic>?> getPulseOxData(String uid, String medicalCardNumber) async {
+    try {
+      final snapshot = await _database
+          .child('users')
+          .child(uid)
+          .child('patients')
+          .child(medicalCardNumber.replaceAll('/', '_'))
+          .child('pulseox_data')
+          .get();
+      if (snapshot.exists) {
+        return snapshot.value as Map<String, dynamic>;
+      }
+    } catch (e) {
+      print('Error fetching PulseOx data: $e');
+    }
+    return null;
+  }
+
+  // Save ECG data for a specific patient
+  Future<void> saveEcgData(String uid, String medicalCardNumber, List<int> data) async {
+    try {
+      // Convert data to Uint8List
+      Uint8List ecgBytes = Uint8List.fromList(data);
+
+      // Upload to Firebase Storage
+      final storageRef = _storage.ref().child("ecg/${DateTime.now().millisecondsSinceEpoch}.csv");
+      final uploadTask = storageRef.putData(ecgBytes);
+
+      // Wait for the upload to complete
+      final snapshot = await uploadTask.whenComplete(() {});
+      final downloadUrl = await snapshot.ref.getDownloadURL();
+
+      // Save metadata to Realtime Database under the patient's node
+      await _database
+          .child('users')
+          .child(uid)
+          .child('patients')
+          .child(medicalCardNumber.replaceAll('/', '_'))
+          .child('ecg_data')
+          .child(DateTime.now().millisecondsSinceEpoch.toString())
+          .set({
+            'url': downloadUrl,
+            'timestamp': DateTime.now().millisecondsSinceEpoch,
+          });
+
+      print('ECG data saved successfully!');
+    } catch (e) {
+      print('Error saving ECG data: $e');
+    }
+  }
+
+  // Fetch ECG data for a specific patient
+  Future<Map<String, dynamic>?> getEcgData(String uid, String medicalCardNumber) async {
+    try {
+      final snapshot = await _database
+          .child('users')
+          .child(uid)
+          .child('patients')
+          .child(medicalCardNumber.replaceAll('/', '_'))
+          .child('ecg_data')
+          .get();
+      if (snapshot.exists) {
+        return snapshot.value as Map<String, dynamic>;
+      }
+    } catch (e) {
+      print('Error fetching ECG data: $e');
     }
     return null;
   }

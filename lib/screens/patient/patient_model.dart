@@ -39,4 +39,29 @@ class Patient {
       phoneNumber: data['phoneNumber'],
     );
   }
+
+    // Helper method to add audio recording metadata
+  static Map<String, dynamic> addAudioRecording(String url, int timestamp) {
+    return {
+      'url': url,
+      'timestamp': timestamp,
+    };
+  }
+
+  // Helper method to add PulseOx data
+  static Map<String, dynamic> addPulseOxData(int value, int timestamp) {
+    return {
+      'value': value,
+      'timestamp': timestamp,
+    };
+  }
+
+  // Helper method to add ECG data
+  static Map<String, dynamic> addEcgData(String url, int timestamp) {
+    return {
+      'url': url,
+      'timestamp': timestamp,
+    };
+  }
 }
+
