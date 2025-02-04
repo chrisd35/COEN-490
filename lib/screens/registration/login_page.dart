@@ -55,7 +55,7 @@ class _LoginPageState extends State<LoginPage> {
     );
   }
 
-  void _login() async {
+ void _login() async {
     final email = _emailController.text.trim();
     final password = _passwordController.text.trim();
 
@@ -66,28 +66,36 @@ class _LoginPageState extends State<LoginPage> {
       return;
     }
 
-    // Check if the user exists in Firebase
-    final user = await _firebaseService.getUser(email.replaceAll('.', ','));
-
-    if (user == null) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('User not found')),
+    try {
+      // First, authenticate with Firebase Auth
+      final userCredential = await _authService.signInWithEmailAndPassword(
+        email: email,
+        password: password,
       );
-      return;
-    }
 
-    // Verify the password
-    if (user.password != password) {
+      if (userCredential?.user != null) {
+        // If authentication successful, get the user data from Realtime Database
+        final user = await _firebaseService.getUser(
+          userCredential!.user!.uid,
+          email,
+        );
+
+        if (user != null) {
+          // Navigate to dashboard on success
+          Navigator.pushReplacement(
+            context,
+            MaterialPageRoute(builder: (context) => DashboardScreen()),
+          );
+        } else {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(content: Text('User data not found')),
+          );
+        }
+      }
+    } catch (e) {
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Incorrect password')),
+        SnackBar(content: Text('Login failed: ${e.toString()}')),
       );
-      return;
     }
-
-    // Navigate to the DashboardScreen if login is successful
-    Navigator.push(
-      context,
-      MaterialPageRoute(builder: (context) => DashboardScreen()),
-    );
   }
 }
