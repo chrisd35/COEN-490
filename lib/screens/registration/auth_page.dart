@@ -60,7 +60,7 @@ class AuthPage extends StatelessWidget {
                         ),
                         const SizedBox(height: 16),
                         Text(
-                          'Monitor your breathing patterns with ease',
+                          'All-in-one medical tool',
                           textAlign: TextAlign.center,
                           style: TextStyle(
                             fontSize: 16,
