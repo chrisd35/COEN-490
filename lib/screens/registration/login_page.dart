@@ -1,3 +1,4 @@
+import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
 import 'firebase_service.dart'; // Import FirebaseService
 import '../dashboard/dashboard_screen.dart'; // Import DashboardScreen
@@ -11,7 +12,6 @@ class LoginPage extends StatefulWidget {
 class _LoginPageState extends State<LoginPage> {
   final _emailController = TextEditingController();
   final _passwordController = TextEditingController();
-  final _firebaseService = FirebaseService();
   final _authService = AuthService(); // Create an instance of AuthService
 
   @override
@@ -55,47 +55,56 @@ class _LoginPageState extends State<LoginPage> {
     );
   }
 
- void _login() async {
-    final email = _emailController.text.trim();
-    final password = _passwordController.text.trim();
+void _login() async {
+  final email = _emailController.text.trim();
+  final password = _passwordController.text.trim();
 
-    if (email.isEmpty || password.isEmpty) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Please fill in all fields')),
-      );
-      return;
-    }
-
-    try {
-      // First, authenticate with Firebase Auth
-      final userCredential = await _authService.signInWithEmailAndPassword(
-        email: email,
-        password: password,
-      );
-
-      if (userCredential?.user != null) {
-        // If authentication successful, get the user data from Realtime Database
-        final user = await _firebaseService.getUser(
-          userCredential!.user!.uid,
-          email,
-        );
-
-        if (user != null) {
-          // Navigate to dashboard on success
-          Navigator.pushReplacement(
-            context,
-            MaterialPageRoute(builder: (context) => DashboardScreen()),
-          );
-        } else {
-          ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(content: Text('User data not found')),
-          );
-        }
-      }
-    } catch (e) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Login failed: ${e.toString()}')),
-      );
-    }
+  if (email.isEmpty || password.isEmpty) {
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(content: Text('Please fill in all fields')),
+    );
+    return;
   }
-}
+
+  try {
+    final userCredential = await _authService.signInWithEmailAndPassword(
+      email: email,
+      password: password,
+    );
+
+    if (userCredential?.user != null) {
+      Navigator.pushReplacement(
+        context,
+        MaterialPageRoute(builder: (context) => DashboardScreen()),
+      );
+    }
+  } on FirebaseAuthException catch (e) {
+    String errorMessage;
+    switch (e.code) {
+      case 'invalid-credential':
+        errorMessage = 'Wrong email or password.';
+        break;
+      case 'invalid-email':
+        errorMessage = 'The email address is badly formatted.';
+        break;
+      case 'user-disabled':
+        errorMessage = 'This user account has been disabled.';
+        break;
+      case 'too-many-requests':
+        errorMessage = 'Too many attempts. Please try again later.';
+        break;
+      case 'network-request-failed':
+        errorMessage = 'A network error occurred. Please check your connection.';
+        break;
+      default:
+        errorMessage = 'An error occurred. Please try again.';
+    }
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(content: Text(errorMessage)),
+    );
+  } catch (e) {
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(content: Text('An unexpected error occurred. Please try again.')),
+    );
+  }
+}}

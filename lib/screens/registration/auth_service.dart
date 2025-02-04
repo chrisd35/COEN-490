@@ -17,19 +17,18 @@ class AuthService {
     }
   }
 
+  
   // Login with email and password
-   Future<UserCredential?> signInWithEmailAndPassword({
+  Future<UserCredential?> signInWithEmailAndPassword({
     required String email,
     required String password,
   }) async {
     try {
-      final UserCredential userCredential = await _auth.signInWithEmailAndPassword(
-        email: email,
-        password: password,
-      );
-      return userCredential;
+      return await _auth.signInWithEmailAndPassword(email: email, password: password);
     } on FirebaseAuthException catch (e) {
-      throw _handleAuthError(e);
+      rethrow; // Propagate the FirebaseAuthException
+    } catch (e) {
+      throw Exception('An unexpected error occurred. Please try again.');
     }
   }
 
@@ -42,18 +41,6 @@ class AuthService {
   User? getCurrentUser() {
     return _auth.currentUser;
   }
-   String _handleAuthError(FirebaseAuthException e) {
-    switch (e.code) {
-      case 'user-not-found':
-        return 'No user found with this email.';
-      case 'wrong-password':
-        return 'Wrong password provided.';
-      case 'invalid-email':
-        return 'The email address is badly formatted.';
-      case 'user-disabled':
-        return 'This user account has been disabled.';
-      default:
-        return 'An error occurred. Please try again.';
-    }
-  }
+
+
 }
