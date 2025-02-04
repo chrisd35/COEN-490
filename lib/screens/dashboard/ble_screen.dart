@@ -2,7 +2,9 @@ import 'package:flutter/material.dart';
 import 'package:flutter_blue_plus/flutter_blue_plus.dart';
 import 'package:provider/provider.dart';
 import 'package:permission_handler/permission_handler.dart';
+import '../../services/audio_service.dart';
 import '/utils/ble_manager.dart';
+import 'dart:typed_data';
 
 class BLEScreen extends StatefulWidget {
   @override
@@ -12,7 +14,8 @@ class BLEScreen extends StatefulWidget {
 class _BLEScreenState extends State<BLEScreen> {
   List<ScanResult> scanResults = [];
   BluetoothDevice? connectedDevice;
-  bool _isScanning = false; // Track scanning state
+  bool _isScanning = false;
+
 
   @override
   void initState() {
@@ -57,12 +60,33 @@ class _BLEScreenState extends State<BLEScreen> {
     });
   }
 
-  void _connectToDevice(BluetoothDevice device) async {
+void _connectToDevice(BluetoothDevice device) async {
     setState(() {
       _isScanning = true; // Show loading while connecting
     });
     final bleManager = Provider.of<BLEManager>(context, listen: false);
     await bleManager.connectToDevice(device);
+
+    // Discover services
+    List<BluetoothService> services = await bleManager.discoverServices(device);
+    for (BluetoothService service in services) {
+      // Find the audio service
+      if (service.uuid.toString() == "19B10000-E8F2-537E-4F6C-D104768A1214") {
+        for (BluetoothCharacteristic characteristic in service.characteristics) {
+          // Find the audio characteristic
+          if (characteristic.uuid.toString() == "19B10001-E8F2-537E-4F6C-D104768A1214") {
+            // Start listening to the audio characteristic
+            bleManager.listenToCharacteristic(characteristic).listen((data) {
+              // Forward audio data to a dedicated service or database
+              AudioService().saveAudioData(data);
+            });
+            break;
+          }
+        }
+        break;
+      }
+    }
+    
     setState(() {
       connectedDevice = device;
       _isScanning = false; // Stop loading after connection
@@ -79,6 +103,7 @@ class _BLEScreenState extends State<BLEScreen> {
     Navigator.pop(context);
   });
   }
+
 
   void _disconnectDevice() async {
     final bleManager = Provider.of<BLEManager>(context, listen: false);
