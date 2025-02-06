@@ -2,7 +2,6 @@ import 'package:flutter/material.dart';
 import 'package:flutter_blue_plus/flutter_blue_plus.dart';
 import 'package:provider/provider.dart';
 import 'package:permission_handler/permission_handler.dart';
-import '../../services/audio_service.dart';
 import '/utils/ble_manager.dart';
 import 'dart:typed_data';
 
@@ -123,50 +122,53 @@ class _BLEScreenState extends State<BLEScreen> with SingleTickerProviderStateMix
   }
 
   void _connectToDevice(BluetoothDevice device) async {
-    setState(() {
-      _isScanning = true;
-    });
-    
-    try {
-      final bleManager = Provider.of<BLEManager>(context, listen: false);
-      await bleManager.connectToDevice(device);
+  setState(() {
+    _isScanning = true;
+  });
+  
+  try {
+    final bleManager = Provider.of<BLEManager>(context, listen: false);
+    await bleManager.connectToDevice(device);
 
-      List<BluetoothService> services = await bleManager.discoverServices(device);
-      for (BluetoothService service in services) {
-        if (service.uuid.toString() == "19B10000-E8F2-537E-4F6C-D104768A1214") {
-          for (BluetoothCharacteristic characteristic in service.characteristics) {
-            if (characteristic.uuid.toString() == "19B10001-E8F2-537E-4F6C-D104768A1214") {
-              bleManager.listenToCharacteristic(characteristic).listen((data) {
-                AudioService().saveAudioData(data);
-              });
-              break;
-            }
+    List<BluetoothService> services = await bleManager.discoverServices();
+    for (BluetoothService service in services) {
+      if (service.uuid.toString().toUpperCase() == BLEManager.SERVICE_UUID) {
+        for (BluetoothCharacteristic characteristic in service.characteristics) {
+          if (characteristic.uuid.toString().toUpperCase() == BLEManager.AUDIO_CHARACTERISTIC_UUID) {
+            bleManager.listenToCharacteristic(characteristic).listen(
+              (data) {
+                // Handle incoming data
+              },
+              onError: (error) {
+                print('Error listening to characteristic: $error');
+              }
+            );
+            break;
           }
-          break;
         }
+        break;
       }
-
-      setState(() {
-        connectedDevice = device;
-        _isScanning = false;
-      });
-
-      _showSuccessSnackBar("Connected to ${device.name.isEmpty ? "Unknown Device" : device.name}");
-      
-      Future.delayed(Duration(seconds: 2), () {
-        Navigator.pop(context);
-      });
-    } catch (e) {
-      setState(() {
-        _isScanning = false;
-      });
-      _showErrorSnackBar("Connection failed. Please try again.");
     }
+
+    setState(() {
+      connectedDevice = device;
+      _isScanning = false;
+    });
+
+    _showSuccessSnackBar("Connected to ${device.name.isEmpty ? "Unknown Device" : device.name}");
+    
+    Future.delayed(Duration(seconds: 2), () {
+      Navigator.pop(context);
+    });
+  } catch (e) {
+    setState(() {
+      _isScanning = false;
+    });
+    _showErrorSnackBar("Connection failed. Please try again.");
   }
+}
 
-  // Removing _disconnectDevice method as it's no longer needed since we're
-  // not showing the persistent connection status
-
+ 
   void _showSuccessSnackBar(String message) {
     ScaffoldMessenger.of(context).showSnackBar(
       SnackBar(

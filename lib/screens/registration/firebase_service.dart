@@ -90,159 +90,82 @@ class FirebaseService {
       return null;
     }
   }
-
-   // Save audio recording for a specific patient
-  Future<void> saveAudioRecording(String uid, String medicalCardNumber, List<int> data) async {
-    try {
-      // Convert data to Uint8List
-      Uint8List audioBytes = Uint8List.fromList(data);
-
-      // Upload to Firebase Storage
-      final storageRef = _storage.ref().child("audio/${DateTime.now().millisecondsSinceEpoch}.wav");
-      final uploadTask = storageRef.putData(audioBytes);
-
-      // Wait for the upload to complete
-      final snapshot = await uploadTask.whenComplete(() {});
-      final downloadUrl = await snapshot.ref.getDownloadURL();
-
-      // Save metadata to Realtime Database under the patient's node
-      await _database
-          .child('users')
-          .child(uid)
-          .child('patients')
-          .child(medicalCardNumber.replaceAll('/', '_'))
-          .child('audio_recordings')
-          .child(DateTime.now().millisecondsSinceEpoch.toString())
-          .set({
-            'url': downloadUrl,
-            'timestamp': DateTime.now().millisecondsSinceEpoch,
-          });
-
-      print('Audio recording saved successfully!');
-    } catch (e) {
-      print('Error saving audio recording: $e');
-    }
+Future<void> saveRecording(
+  String patientId, 
+  DateTime timestamp, 
+  List<int> audioData,
+  Map<String, dynamic> metadata
+) async {
+  try {
+    // Create WAV file with actual recording parameters
+    final wavData = createWavFile(
+      audioData, 
+      sampleRate: metadata['sampleRate'] ?? 44100,
+      bitsPerSample: metadata['bitsPerSample'] ?? 16,
+      channels: metadata['channels'] ?? 1
+    );
+    
+    // Generate filename
+    String filename = 'recordings/$patientId/${timestamp.millisecondsSinceEpoch}.wav';
+    
+    // Upload to Firebase Storage
+    await _storage.ref(filename).putData(
+      Uint8List.fromList(wavData),
+      SettableMetadata(contentType: 'audio/wav')
+    );
+    
+    // Save metadata to Realtime Database
+    await _database
+      .child('patients')
+      .child(patientId)
+      .child('recordings')
+      .push()
+      .set({
+        'timestamp': timestamp.toIso8601String(),
+        'filename': filename,
+        'duration': metadata['duration'],
+        'sampleRate': metadata['sampleRate'],
+        'peakAmplitude': metadata['peakAmplitude'],
+      });
+  } catch (e) {
+    print('Error saving recording: $e');
+    rethrow;
   }
+}
 
-  // Fetch audio recordings for a specific patient
-  Future<Map<String, dynamic>?> getAudioRecordings(String uid, String medicalCardNumber) async {
-    try {
-      final snapshot = await _database
-          .child('users')
-          .child(uid)
-          .child('patients')
-          .child(medicalCardNumber.replaceAll('/', '_'))
-          .child('audio_recordings')
-          .get();
-      if (snapshot.exists) {
-        return snapshot.value as Map<String, dynamic>;
-      }
-    } catch (e) {
-      print('Error fetching audio recordings: $e');
-    }
-    return null;
-  }
-
-  // Save PulseOx data for a specific patient
-  Future<void> savePulseOxData(String uid, String medicalCardNumber, int value) async {
-    try {
-      await _database
-          .child('users')
-          .child(uid)
-          .child('patients')
-          .child(medicalCardNumber.replaceAll('/', '_'))
-          .child('pulseox_data')
-          .child(DateTime.now().millisecondsSinceEpoch.toString())
-          .set({
-            'value': value,
-            'timestamp': DateTime.now().millisecondsSinceEpoch,
-          });
-      print('PulseOx data saved successfully!');
-    } catch (e) {
-      print('Error saving PulseOx data: $e');
-    }
-  }
-
-  // Fetch PulseOx data for a specific patient
-  Future<Map<String, dynamic>?> getPulseOxData(String uid, String medicalCardNumber) async {
-    try {
-      final snapshot = await _database
-          .child('users')
-          .child(uid)
-          .child('patients')
-          .child(medicalCardNumber.replaceAll('/', '_'))
-          .child('pulseox_data')
-          .get();
-      if (snapshot.exists) {
-        return snapshot.value as Map<String, dynamic>;
-      }
-    } catch (e) {
-      print('Error fetching PulseOx data: $e');
-    }
-    return null;
-  }
-
-  // Save ECG data for a specific patient
-  Future<void> saveEcgData(String uid, String medicalCardNumber, List<int> data) async {
-    try {
-      // Convert data to Uint8List
-      Uint8List ecgBytes = Uint8List.fromList(data);
-
-      // Upload to Firebase Storage
-      final storageRef = _storage.ref().child("ecg/${DateTime.now().millisecondsSinceEpoch}.csv");
-      final uploadTask = storageRef.putData(ecgBytes);
-
-      // Wait for the upload to complete
-      final snapshot = await uploadTask.whenComplete(() {});
-      final downloadUrl = await snapshot.ref.getDownloadURL();
-
-      // Save metadata to Realtime Database under the patient's node
-      await _database
-          .child('users')
-          .child(uid)
-          .child('patients')
-          .child(medicalCardNumber.replaceAll('/', '_'))
-          .child('ecg_data')
-          .child(DateTime.now().millisecondsSinceEpoch.toString())
-          .set({
-            'url': downloadUrl,
-            'timestamp': DateTime.now().millisecondsSinceEpoch,
-          });
-
-      print('ECG data saved successfully!');
-    } catch (e) {
-      print('Error saving ECG data: $e');
-    }
-  }
-
-  // Fetch ECG data for a specific patient
-  Future<Map<String, dynamic>?> getEcgData(String uid, String medicalCardNumber) async {
-    try {
-      final snapshot = await _database
-          .child('users')
-          .child(uid)
-          .child('patients')
-          .child(medicalCardNumber.replaceAll('/', '_'))
-          .child('ecg_data')
-          .get();
-      if (snapshot.exists) {
-        return snapshot.value as Map<String, dynamic>;
-      }
-    } catch (e) {
-      print('Error fetching ECG data: $e');
-    }
-    return null;
-  }
-
-  // Fetch audio data from Firebase Storage
-  Future<Uint8List?> getAudioData(String url) async {
-    try {
-      final ref = _storage.refFromURL(url);
-      final data = await ref.getData();
-      return data;
-    } catch (e) {
-      print("Error fetching audio data: $e");
-    }
-    return null;
-  }
+ List<int> createWavFile(
+  List<int> audioData, {
+  int sampleRate = 44100,
+  int bitsPerSample = 16,
+  int channels = 1,
+}) {
+  // WAV file parameters
+  final int byteRate = sampleRate * channels * (bitsPerSample ~/ 8);
+  final int blockAlign = channels * (bitsPerSample ~/ 8);
+  
+  // Create header with precise calculations
+  ByteData header = ByteData(44);
+  
+  // RIFF chunk descriptor
+  header.setUint32(0, 0x52494646, Endian.big); // 'RIFF'
+  header.setUint32(4, 36 + audioData.length, Endian.little); // File size
+  header.setUint32(8, 0x57415645, Endian.big); // 'WAVE'
+  
+  // fmt sub-chunk
+  header.setUint32(12, 0x666D7420, Endian.big); // 'fmt '
+  header.setUint32(16, 16, Endian.little); // Subchunk1Size
+  header.setUint16(20, 1, Endian.little); // Audio format (PCM)
+  header.setUint16(22, channels, Endian.little);
+  header.setUint32(24, sampleRate, Endian.little);
+  header.setUint32(28, byteRate, Endian.little);
+  header.setUint16(32, blockAlign, Endian.little);
+  header.setUint16(34, bitsPerSample, Endian.little);
+  
+  // data sub-chunk
+  header.setUint32(36, 0x64617461, Endian.big); // 'data'
+  header.setUint32(40, audioData.length, Endian.little); // Subchunk2Size
+  
+  // Combine header and audio data
+  return [...header.buffer.asUint8List(), ...audioData];
+}
 }

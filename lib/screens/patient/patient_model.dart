@@ -5,7 +5,9 @@ class Patient {
   final String dateOfBirth;
   final String gender;
   final String phoneNumber;
-  // final String ID
+  List<Map<String, dynamic>> audioRecordings;
+  List<Map<String, dynamic>> pulseOxData;
+  List<Map<String, dynamic>> ecgData;
 
   Patient({
     required this.fullName,
@@ -14,7 +16,12 @@ class Patient {
     required this.dateOfBirth,
     required this.gender,
     required this.phoneNumber,
-  });
+    List<Map<String, dynamic>>? audioRecordings,
+    List<Map<String, dynamic>>? pulseOxData,
+    List<Map<String, dynamic>>? ecgData,
+  })  : audioRecordings = audioRecordings ?? [],
+        pulseOxData = pulseOxData ?? [],
+        ecgData = ecgData ?? [];
 
   // Convert Patient object to a Map for Realtime Database
   Map<String, dynamic> toMap() {
@@ -25,6 +32,9 @@ class Patient {
       'dateOfBirth': dateOfBirth,
       'gender': gender,
       'phoneNumber': phoneNumber,
+      'audioRecordings': audioRecordings,
+      'pulseOxData': pulseOxData,
+      'ecgData': ecgData,
     };
   }
 
@@ -37,31 +47,33 @@ class Patient {
       dateOfBirth: data['dateOfBirth'],
       gender: data['gender'],
       phoneNumber: data['phoneNumber'],
+      audioRecordings: List<Map<String, dynamic>>.from(data['audioRecordings'] ?? []),
+      pulseOxData: List<Map<String, dynamic>>.from(data['pulseOxData'] ?? []),
+      ecgData: List<Map<String, dynamic>>.from(data['ecgData'] ?? []),
     );
   }
 
-    // Helper method to add audio recording metadata
-  static Map<String, dynamic> addAudioRecording(String url, int timestamp) {
-    return {
+  // Method to add an audio recording
+  void addAudioRecording(String url, int timestamp) {
+    audioRecordings.add({
       'url': url,
       'timestamp': timestamp,
-    };
+    });
   }
 
-  // Helper method to add PulseOx data
-  static Map<String, dynamic> addPulseOxData(int value, int timestamp) {
-    return {
+  // Method to add PulseOx data
+  void addPulseOxData(int value, int timestamp) {
+    pulseOxData.add({
       'value': value,
       'timestamp': timestamp,
-    };
+    });
   }
 
-  // Helper method to add ECG data
-  static Map<String, dynamic> addEcgData(String url, int timestamp) {
-    return {
+  // Method to add ECG data
+  void addEcgData(String url, int timestamp) {
+    ecgData.add({
       'url': url,
       'timestamp': timestamp,
-    };
+    });
   }
 }
-
