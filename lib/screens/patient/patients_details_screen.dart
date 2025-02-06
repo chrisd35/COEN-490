@@ -1,3 +1,4 @@
+import 'package:coen_490/screens/dashboard/dashboard_screen.dart';
 import 'package:flutter/material.dart';
 import '../monitoring/ecg_monitoring_screen.dart';
 import '../monitoring/oxygen_monitoring_screen.dart';
@@ -181,7 +182,7 @@ class PatientDetails extends StatelessWidget {
                       Colors.blue[700]!,
                       () => Navigator.push(
                         context,
-                        MaterialPageRoute(builder: (context) => MurmurRecord()),
+                        MaterialPageRoute(builder: (context) => MurmurRecord(patientId: '',)),
                       ),
                     ),
                   ],
