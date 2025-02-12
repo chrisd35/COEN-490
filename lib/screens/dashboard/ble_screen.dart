@@ -5,6 +5,7 @@ import 'package:permission_handler/permission_handler.dart';
 import '/utils/ble_manager.dart';
 import 'dart:typed_data';
 
+
 class BLEScreen extends StatefulWidget {
   @override
   _BLEScreenState createState() => _BLEScreenState();
@@ -128,28 +129,11 @@ class _BLEScreenState extends State<BLEScreen> with SingleTickerProviderStateMix
   
   try {
     final bleManager = Provider.of<BLEManager>(context, listen: false);
+    print("Attempting to connect to device: ${device.name}");
+    
     await bleManager.connectToDevice(device);
-
-    List<BluetoothService> services = await bleManager.discoverServices();
-    for (BluetoothService service in services) {
-      if (service.uuid.toString().toUpperCase() == BLEManager.SERVICE_UUID) {
-        for (BluetoothCharacteristic characteristic in service.characteristics) {
-          if (characteristic.uuid.toString().toUpperCase() == BLEManager.AUDIO_CHARACTERISTIC_UUID) {
-            bleManager.listenToCharacteristic(characteristic).listen(
-              (data) {
-                // Handle incoming data
-              },
-              onError: (error) {
-                print('Error listening to characteristic: $error');
-              }
-            );
-            break;
-          }
-        }
-        break;
-      }
-    }
-
+    print("Connection attempt completed");
+    
     setState(() {
       connectedDevice = device;
       _isScanning = false;
@@ -161,13 +145,13 @@ class _BLEScreenState extends State<BLEScreen> with SingleTickerProviderStateMix
       Navigator.pop(context);
     });
   } catch (e) {
+    print("Connection error: $e");
     setState(() {
       _isScanning = false;
     });
     _showErrorSnackBar("Connection failed. Please try again.");
   }
 }
-
  
   void _showSuccessSnackBar(String message) {
     ScaffoldMessenger.of(context).showSnackBar(

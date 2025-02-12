@@ -5,7 +5,7 @@ class Patient {
   final String dateOfBirth;
   final String gender;
   final String phoneNumber;
-  List<Map<String, dynamic>> audioRecordings;
+  // Remove the separate audioRecordings list
   List<Map<String, dynamic>> pulseOxData;
   List<Map<String, dynamic>> ecgData;
 
@@ -16,11 +16,9 @@ class Patient {
     required this.dateOfBirth,
     required this.gender,
     required this.phoneNumber,
-    List<Map<String, dynamic>>? audioRecordings,
     List<Map<String, dynamic>>? pulseOxData,
     List<Map<String, dynamic>>? ecgData,
-  })  : audioRecordings = audioRecordings ?? [],
-        pulseOxData = pulseOxData ?? [],
+  })  : pulseOxData = pulseOxData ?? [],
         ecgData = ecgData ?? [];
 
   // Convert Patient object to a Map for Realtime Database
@@ -32,7 +30,6 @@ class Patient {
       'dateOfBirth': dateOfBirth,
       'gender': gender,
       'phoneNumber': phoneNumber,
-      'audioRecordings': audioRecordings,
       'pulseOxData': pulseOxData,
       'ecgData': ecgData,
     };
@@ -47,20 +44,12 @@ class Patient {
       dateOfBirth: data['dateOfBirth'],
       gender: data['gender'],
       phoneNumber: data['phoneNumber'],
-      audioRecordings: List<Map<String, dynamic>>.from(data['audioRecordings'] ?? []),
       pulseOxData: List<Map<String, dynamic>>.from(data['pulseOxData'] ?? []),
       ecgData: List<Map<String, dynamic>>.from(data['ecgData'] ?? []),
     );
   }
 
-  // Method to add an audio recording
-  void addAudioRecording(String url, int timestamp) {
-    audioRecordings.add({
-      'url': url,
-      'timestamp': timestamp,
-    });
-  }
-
+  // Remove the addAudioRecording method
   // Method to add PulseOx data
   void addPulseOxData(int value, int timestamp) {
     pulseOxData.add({
