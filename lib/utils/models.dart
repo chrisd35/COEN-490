@@ -115,7 +115,8 @@ class Recording {
   final String filename;
   final int duration;
   final int sampleRate;
-  final double peakAmplitude;
+  final dynamic peakAmplitude; 
+  String? downloadUrl; // New field for the download URL
 
   Recording({
     required this.timestamp,
@@ -123,6 +124,7 @@ class Recording {
     required this.duration,
     required this.sampleRate,
     required this.peakAmplitude,
+    this.downloadUrl,  // Optional parameter for download URL
   });
 
   Map<String, dynamic> toMap() {
@@ -132,16 +134,21 @@ class Recording {
       'duration': duration,
       'sampleRate': sampleRate,
       'peakAmplitude': peakAmplitude,
+      // We don't save the downloadUrl to the database as it's generated dynamically
     };
   }
 
-  factory Recording.fromMap(Map<dynamic, dynamic> data) {
+ factory Recording.fromMap(Map<dynamic, dynamic> data) {
+    var amplitude = data['peakAmplitude'];
+    // Convert to double if it's an int
+    double peakAmplitude = (amplitude is int) ? amplitude.toDouble() : amplitude;
+    
     return Recording(
       timestamp: DateTime.parse(data['timestamp']),
       filename: data['filename'],
       duration: data['duration'],
       sampleRate: data['sampleRate'],
-      peakAmplitude: data['peakAmplitude'],
+      peakAmplitude: peakAmplitude,
     );
   }
 }

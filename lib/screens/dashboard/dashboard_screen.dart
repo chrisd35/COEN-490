@@ -3,6 +3,8 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:flutter_blue_plus/flutter_blue_plus.dart';
 import 'dart:async';
+import '../registration/login_page.dart';
+import 'components/murmur_playback.dart';
 import 'components/patient_card.dart';
 import 'components/murmur_chart.dart';
 import 'components/murmur_record.dart';
@@ -201,66 +203,107 @@ class _DashboardScreenState extends State<DashboardScreen> {
               mainAxisSpacing: 16,
               crossAxisSpacing: 16,
               children: isGuest 
-                ? [
-                    // Guest user options
-                    _FeatureCard(
-                      title: 'Murmur Record',
-                      icon: Icons.mic_rounded,
-                      color: Colors.orange,
-                      onTap: () => Navigator.push(
-                        context,
-                        MaterialPageRoute(builder: (context) => MurmurRecord()),
-                      ),
-                    ),
-                    _FeatureCard(
-                      title: 'ECG Monitoring',
-                      icon: Icons.monitor_heart_outlined,
-                      color: Colors.green,
-                      onTap: () => Navigator.push(
-                        context,
-                        MaterialPageRoute(builder: (context) => ECGMonitoring()),
-                      ),
-                    ),
-                    _FeatureCard(
-                      title: 'Oxygen Monitoring',
-                      icon: Icons.air,
-                      color: Colors.blue,
-                      onTap: () => Navigator.push(
-                        context,
-                        MaterialPageRoute(builder: (context) => OxygenMonitoring()),
-                      ),
-                    ),
-                  ]
-                : [
-                    // Regular user options
-                    _FeatureCard(
-                      title: 'Patient Folders',
-                      icon: Icons.folder_rounded,
-                      color: Colors.blue,
-                      onTap: () => Navigator.push(
-                        context,
-                        MaterialPageRoute(builder: (context) => PatientCard()),
-                      ),
-                    ),
-                    _FeatureCard(
-                      title: 'AI Murmur',
-                      icon: Icons.analytics_rounded,
-                      color: Colors.purple,
-                      onTap: () => Navigator.push(
-                        context,
-                        MaterialPageRoute(builder: (context) => MurmurChart()),
-                      ),
-                    ),
-                    _FeatureCard(
-                      title: 'Murmur Record',
-                      icon: Icons.mic_rounded,
-                      color: Colors.orange,
-                      onTap: () => Navigator.push(
-                        context,
-                        MaterialPageRoute(builder: (context) => MurmurRecord()),
-                      ),
-                    ),
-                  ],
+               ? [
+    // Guest user options
+    _FeatureCard(
+      title: 'Murmur Record',
+      icon: Icons.mic_rounded,
+      color: Colors.orange,
+      onTap: () => Navigator.push(
+        context,
+        MaterialPageRoute(builder: (context) => MurmurRecord()),
+      ),
+    ),
+    _FeatureCard(
+      title: 'ECG Monitoring',
+      icon: Icons.monitor_heart_outlined,
+      color: Colors.green,
+      onTap: () => Navigator.push(
+        context,
+        MaterialPageRoute(builder: (context) => ECGMonitoring()),
+      ),
+    ),
+    _FeatureCard(
+      title: 'Oxygen Monitoring',
+      icon: Icons.air,
+      color: Colors.blue,
+      onTap: () => Navigator.push(
+        context,
+        MaterialPageRoute(builder: (context) => OxygenMonitoring()),
+      ),
+    ),
+    _FeatureCard(
+      title: 'View Recordings',
+      icon: Icons.playlist_play,
+      color: Colors.purple,
+      onTap: () => _showPlaybackLoginPrompt(),
+    ),
+  ]
+: [
+    // Regular user options
+    _FeatureCard(
+      title: 'Patient Folders',
+      icon: Icons.folder_rounded,
+      color: Colors.blue,
+      onTap: () => Navigator.push(
+        context,
+        MaterialPageRoute(builder: (context) => PatientCard()),
+      ),
+    ),
+    _FeatureCard(
+      title: 'AI Murmur',
+      icon: Icons.analytics_rounded,
+      color: Colors.purple,
+      onTap: () => Navigator.push(
+        context,
+        MaterialPageRoute(builder: (context) => MurmurChart()),
+      ),
+    ),
+    _FeatureCard(
+      title: 'Murmur Record',
+      icon: Icons.mic_rounded,
+      color: Colors.orange,
+      onTap: () => Navigator.push(
+        context,
+        MaterialPageRoute(builder: (context) => MurmurRecord()),
+      ),
+    ),
+    _FeatureCard(
+      title: 'View Recordings',
+      icon: Icons.playlist_play,
+      color: Colors.teal,
+      onTap: () async {
+        try {
+          final uid = FirebaseAuth.instance.currentUser!.uid;
+          final patients = await _firebaseService.getPatientsForUser(uid);
+          
+          if (patients.isEmpty) {
+            ScaffoldMessenger.of(context).showSnackBar(
+              SnackBar(
+                content: Text('Create a patient and save a recording to access playback history'),
+                duration: Duration(seconds: 4),
+              ),
+            );
+            return;
+          }
+          
+          Navigator.push(
+            context,
+            MaterialPageRoute(
+              builder: (context) => RecordingPlaybackScreen(),
+            ),
+          );
+        } catch (e) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Text('Failed to check recordings: $e'),
+              backgroundColor: Colors.red,
+            ),
+          );
+        }
+      },
+    ),
+  ],
             );
           },
         ),
@@ -467,6 +510,55 @@ void _showLogoutDialog() async {
         ),
       ],
     ),
+  );
+}
+void _showPlaybackLoginPrompt() {
+  showDialog(
+    context: context,
+    builder: (BuildContext context) {
+      return AlertDialog(
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(16),
+        ),
+        title: Text('Login Required'),
+        content: Text('You need to be logged in to view recorded murmurs.'),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context),
+            child: Text(
+              'Cancel',
+              style: TextStyle(color: Colors.grey[700]),
+            ),
+          ),
+          ElevatedButton(
+            onPressed: () {
+              Navigator.pop(context);
+              Navigator.push(
+                context,
+                MaterialPageRoute(
+                  builder: (context) => LoginPage(),
+                  settings: RouteSettings(
+                    arguments: {
+                      'returnRoute': 'recording_playback',
+                      'pendingAction': 'view_recordings',
+                    },
+                  ),
+                ),
+              );
+            },
+            style: ElevatedButton.styleFrom(
+              backgroundColor: Theme.of(context).primaryColor,
+              foregroundColor: Colors.white,
+              elevation: 0,
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(12),
+              ),
+            ),
+            child: Text('Login'),
+          ),
+        ],
+      );
+    },
   );
 }
 }

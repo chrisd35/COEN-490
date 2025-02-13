@@ -197,4 +197,52 @@ Future<List<Patient>> getPatientsForUser(String uid) async {
     
     return [...header.buffer.asUint8List(), ...audioData];
   }
+Future<List<Recording>> getRecordingsForPatient(String uid, String medicalCardNumber) async {
+    try {
+      String sanitizedMedicalCard = medicalCardNumber.replaceAll('/', '_');
+      
+      // Get recordings metadata from Realtime Database
+      DataSnapshot snapshot = await _database
+          .child('users')
+          .child(uid)
+          .child('patients')
+          .child(sanitizedMedicalCard)
+          .child('recordings')
+          .get();
+
+      if (!snapshot.exists || snapshot.value == null) {
+        return [];
+      }
+
+      Map<dynamic, dynamic> recordingsMap = snapshot.value as Map<dynamic, dynamic>;
+      List<Recording> recordings = [];
+
+      // For each recording, create Recording object and get download URL
+      for (var entry in recordingsMap.entries) {
+        Map<dynamic, dynamic> recordingData = entry.value as Map<dynamic, dynamic>;
+        Recording recording = Recording.fromMap(recordingData);
+        
+        try {
+          // Get download URL from Storage
+          String downloadUrl = await _storage.ref(recording.filename).getDownloadURL();
+          recording.downloadUrl = downloadUrl;
+        } catch (e) {
+          print('Error getting download URL for recording ${recording.filename}: $e');
+          // Continue with next recording if this one fails
+          continue;
+        }
+        
+        recordings.add(recording);
+      }
+
+      // Sort recordings by timestamp, newest first
+      recordings.sort((a, b) => b.timestamp.compareTo(a.timestamp));
+
+      return recordings;
+    } catch (e) {
+      print('Error fetching recordings: $e');
+      rethrow;
+    }
+  }
+  
 }

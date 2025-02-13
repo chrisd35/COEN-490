@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'dart:typed_data';
 import 'package:coen_490/screens/registration/auth_service.dart';
 import 'package:flutter/material.dart';
 import 'package:audioplayers/audioplayers.dart';
@@ -11,6 +12,7 @@ import '../dashboard_screen.dart';
 import '/utils/ble_manager.dart';
 import '../../registration/firebase_service.dart';
 import '/utils/models.dart';
+import '../components/murmur_playback.dart';
 
 class MurmurRecord extends StatefulWidget {
   final String? preselectedPatientId;
@@ -114,6 +116,36 @@ class _MurmurRecordState extends State<MurmurRecord> {
       _showErrorSnackBar("Failed to stop recording: $e");
     }
   }
+  Future<void> _playPreviewRecording() async {
+  if (_recordedAudioData == null) return;
+
+  try {
+    if (_isPlaying) {
+      await _audioPlayer.pause();
+      setState(() {
+        _isPlaying = false;
+      });
+    } else {
+      // Convert the raw audio data to WAV format
+      final wavData = _firebaseService.createWavFile(
+        _recordedAudioData!,
+        sampleRate: BLEManager.SAMPLE_RATE,
+        bitsPerSample: 16,
+        channels: 1,
+      );
+
+      // Create a temporary file or use in-memory playback
+      await _audioPlayer.play(
+        BytesSource(Uint8List.fromList(wavData)),
+      );
+      setState(() {
+        _isPlaying = true;
+      });
+    }
+  } catch (e) {
+    _showErrorSnackBar("Failed to play recording: $e");
+  }
+}
 
   void _showSaveRecordingDialog() async {
     final authService = Provider.of<AuthService>(context, listen: false);
@@ -381,6 +413,7 @@ void _navigateToCreatePatient() {
   );
 }
 
+
   void _showLoadingDialog(String message) {
     showDialog(
       context: context,
@@ -619,7 +652,7 @@ void _navigateToCreatePatient() {
     );
   }
 
-  Widget _buildRecordingCompleteContent() {
+ Widget _buildRecordingCompleteContent() {
     return Column(
       mainAxisSize: MainAxisSize.min,
       children: [
@@ -653,11 +686,19 @@ void _navigateToCreatePatient() {
             color: Colors.grey[600],
           ),
         ),
+        SizedBox(height: 16),
+        IconButton(
+          icon: Icon(
+            _isPlaying ? Icons.pause_circle : Icons.play_circle,
+            size: 48,
+            color: Colors.blue[700],
+          ),
+          onPressed: () => _playPreviewRecording(),
+        ),
       ],
     );
   }
-
-  Widget _buildInitialContent() {
+Widget _buildInitialContent() {
     return Column(
       mainAxisSize: MainAxisSize.min,
       children: [
@@ -685,6 +726,7 @@ void _navigateToCreatePatient() {
       ],
     );
   }
+
 
   Widget _buildFloatingActionButton() {
     if (_isRecording) {
