@@ -7,6 +7,9 @@ class RegisterPage extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    // Get the route arguments
+    final args = ModalRoute.of(context)?.settings.arguments as Map<String, dynamic>?;
+    
     return Scaffold(
       backgroundColor: Colors.grey[50],
       body: SafeArea(
@@ -31,7 +34,6 @@ class RegisterPage extends StatelessWidget {
                       textAlign: TextAlign.center,
                     ),
                   ),
-                  // Placeholder for symmetry
                   SizedBox(width: 48),
                 ],
               ),
@@ -66,38 +68,54 @@ class RegisterPage extends StatelessWidget {
                       const SizedBox(height: 48),
 
                       // Medical Professional Card
-                      _RoleCard(
-                        title: 'Medical Professional',
-                        description: 'Healthcare providers, doctors, and medical staff',
-                        icon: Icons.medical_services_rounded,
-                        onTap: () => Navigator.push(
-                          context,
-                          MaterialPageRoute(
-                            builder: (context) => AccountProfilePage(
-                              selectedRole: 'Medical Professional',
-                            ),
-                          ),
-                        ),
-                      ),
-                      
-                      const SizedBox(height: 16),
-                      
-                      // Student Card
-                      _RoleCard(
-                        title: 'Student',
-                        description: 'Medical students and healthcare learners',
-                        icon: Icons.school_rounded,
-                        onTap: () => Navigator.push(
-                          context,
-                          MaterialPageRoute(
-                            builder: (context) => AccountProfilePage(
-                              selectedRole: 'Student',
-                            ),
-                          ),
-                        ),
-                      ),
-                      
-                      const SizedBox(height: 24),
+                    _RoleCard(
+  title: 'Medical Professional',
+  description: 'Healthcare providers, doctors, and medical staff',
+  icon: Icons.medical_services_rounded,
+onTap: () async {
+  final result = await Navigator.push(
+    context,
+    MaterialPageRoute(
+      builder: (context) => AccountProfilePage(
+        selectedRole: 'Medical Professional',  // or 'Student' for the other card
+        returnRoute: args?['returnRoute'],
+        pendingAction: args?['pendingAction'],
+      ),
+    ),
+  );
+  
+  // If registration was successful and we're returning to murmur record
+  if (result == true && args?['returnRoute'] == 'murmur_record') {
+    if (context.mounted) {
+      Navigator.pop(context, true);  // Return success to MurmurRecord
+    }
+  }
+},
+),
+
+// Student Card
+_RoleCard(
+  title: 'Student',
+  description: 'Medical students and healthcare learners',
+  icon: Icons.school_rounded,
+  onTap: () async {  // Make onTap async
+    final result = await Navigator.push(
+      context,
+      MaterialPageRoute(
+        builder: (context) => AccountProfilePage(
+          selectedRole: 'Student',
+          returnRoute: args?['returnRoute'],
+          pendingAction: args?['pendingAction'],
+        ),
+      ),
+    );
+    
+    // If registration was successful and we're returning to murmur record
+    if (result == true && args?['returnRoute'] == 'murmur_record') {
+      Navigator.pop(context, true);  // Pop RegisterPage with success
+    }
+  },
+),
                     ],
                   ),
                 ),

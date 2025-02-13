@@ -1,4 +1,6 @@
 import 'package:flutter/material.dart';
+import 'package:provider/provider.dart';
+import 'auth_service.dart';
 import 'register_page.dart';
 import 'login_page.dart';
 import 'package:coen_490/screens/dashboard/dashboard_screen.dart';
@@ -133,24 +135,40 @@ class AuthPage extends StatelessWidget {
                         ),
                         const SizedBox(height: 24),
                         // Guest Button
-                        TextButton(
-                          onPressed: () => Navigator.push(
-                            context,
-                            MaterialPageRoute(builder: (context) => DashboardScreen()),
-                          ),
-                          style: TextButton.styleFrom(
-                            foregroundColor: Colors.white,
-                            padding: EdgeInsets.symmetric(horizontal: 24, vertical: 12),
-                          ),
-                          child: Text(
-                            'Continue as Guest',
-                            style: TextStyle(
-                              fontSize: 16,
-                              decoration: TextDecoration.underline,
-                              decorationColor: Colors.white.withOpacity(0.5),
-                            ),
-                          ),
-                        ),
+                       TextButton(
+  onPressed: () async {
+    try {
+      final authService = Provider.of<AuthService>(context, listen: false);
+      await authService.signInAsGuest();
+      Navigator.pushReplacement(
+        context,
+        MaterialPageRoute(builder: (context) => DashboardScreen()),
+      );
+    } catch (e) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('Error accessing guest mode. Please try again.'),
+          backgroundColor: Colors.red[400],
+          behavior: SnackBarBehavior.floating,
+          margin: EdgeInsets.all(16),
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+        ),
+      );
+    }
+  },
+  style: TextButton.styleFrom(
+    foregroundColor: Colors.white,
+    padding: EdgeInsets.symmetric(horizontal: 24, vertical: 12),
+  ),
+  child: Text(
+    'Continue as Guest',
+    style: TextStyle(
+      fontSize: 16,
+      decoration: TextDecoration.underline,
+      decorationColor: Colors.white.withOpacity(0.5),
+    ),
+  ),
+),
                       ],
                     ),
                   ),
