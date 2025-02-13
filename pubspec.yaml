@@ -45,8 +45,9 @@ dependencies:
   audioplayers: ^6.1.1 
   open_file: ^3.3.0
   path_provider: ^2.0.15
-  intl: ^0.17.0
-  fl_chart: ^0.65.0 
+  intl: ^0.20.2
+  fl_chart: ^0.70.2 
+  shared_preferences: ^2.5.2
   
 
 dev_dependencies:

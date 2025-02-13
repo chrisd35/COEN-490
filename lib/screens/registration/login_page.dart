@@ -148,30 +148,40 @@ class _LoginPageState extends State<LoginPage> {
     );
   }
 
-  void _login() async {
-    setState(() => _isLoading = true);
-    
-    final email = _emailController.text.trim();
-    final password = _passwordController.text.trim();
+void _login() async {
+  setState(() => _isLoading = true);
+  
+  final email = _emailController.text.trim();
+  final password = _passwordController.text.trim();
 
-    if (email.isEmpty || password.isEmpty) {
-      _showErrorSnackBar('Please fill in all fields');
-      setState(() => _isLoading = false);
-      return;
-    }
+  if (email.isEmpty || password.isEmpty) {
+    _showErrorSnackBar('Please fill in all fields');
+    setState(() => _isLoading = false);
+    return;
+  }
 
-    try {
-      final userCredential = await _authService.signInWithEmailAndPassword(
-        email: email,
-        password: password,
-      );
+  try {
+    final userCredential = await _authService.signInWithEmailAndPassword(
+      email: email,
+      password: password,
+    );
 
-      if (userCredential?.user != null) {
-        Navigator.pushReplacement(
+    if (userCredential?.user != null) {
+      // Get the route arguments
+      final args = ModalRoute.of(context)?.settings.arguments as Map<String, dynamic>?;
+      
+      if (args != null && args['returnRoute'] == 'murmur_record') {
+        // Return to previous screen if coming from murmur record
+        Navigator.pop(context, true);
+      } else {
+        // Normal login flow - Refresh the dashboard
+        Navigator.pushAndRemoveUntil(
           context,
           MaterialPageRoute(builder: (context) => DashboardScreen()),
+          (Route<dynamic> route) => false,
         );
       }
+    }
     } on FirebaseAuthException catch (e) {
       String errorMessage;
       switch (e.code) {

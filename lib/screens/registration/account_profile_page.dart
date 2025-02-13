@@ -6,7 +6,14 @@ import 'auth_service.dart';
 
 class AccountProfilePage extends StatefulWidget {
   final String? selectedRole;
-  AccountProfilePage({this.selectedRole});
+  final String? returnRoute;
+  final String? pendingAction;
+
+  AccountProfilePage({
+    this.selectedRole,
+    this.returnRoute,
+    this.pendingAction,
+  });
 
   @override
   _AccountProfilePageState createState() => _AccountProfilePageState();
@@ -363,45 +370,61 @@ class _AccountProfilePageState extends State<AccountProfilePage> {
   }
 
   // Submit form logic
-  void _submitForm() async {
-    if (_formKey.currentState!.validate()) {
-      setState(() => _isLoading = true);
-      
-      try {
-        final email = _emailController.text.trim();
-        final password = _passwordController.text.trim();
+void _submitForm() async {
+  if (_formKey.currentState!.validate()) {
+    setState(() => _isLoading = true);
+    
+    try {
+      final email = _emailController.text.trim();
+      final password = _passwordController.text.trim();
 
-        final user = await _authService.register(email, password);
+      final user = await _authService.register(email, password);
 
-        if (user != null) {
-          User newUser = User(
-            fullName: _fullNameController.text,
-            email: email,
-            password: password,
-            dateOfBirth: _dateOfBirthController.text,
-            gender: _selectedGender!,
-            role: _selectedRole!,
-            phoneNumber: _phoneNumberController.text,
-            uid: user.uid,
-          );
+      if (user != null) {
+        User newUser = User(
+          fullName: _fullNameController.text,
+          email: email,
+          password: password,
+          dateOfBirth: _dateOfBirthController.text,
+          gender: _selectedGender!,
+          role: _selectedRole!,
+          phoneNumber: _phoneNumberController.text,
+          uid: user.uid,
+        );
 
-          await _firebaseService.saveUser(newUser);
+        await _firebaseService.saveUser(newUser);
 
-          _formKey.currentState!.reset();
-          _showSuccessMessage('Account created successfully!');
+        _formKey.currentState!.reset();
+        _showSuccessMessage('Account created successfully!');
 
-          Navigator.pushReplacement(
+        // Important: Check mounted before accessing context
+        if (!mounted) return;
+
+        // Check if we need to return to murmur record
+        final returnToMurmurRecord = widget.returnRoute == 'murmur_record';
+        
+        if (returnToMurmurRecord) {
+          // Pop back through the navigation stack with success result
+          Navigator.of(context).pop(true);  // Pop AccountProfilePage
+        } else {
+          // Normal registration flow
+          Navigator.pushAndRemoveUntil(
             context,
             MaterialPageRoute(builder: (context) => DashboardScreen()),
+            (Route<dynamic> route) => false,
           );
         }
-      } catch (e) {
-        _showErrorMessage('Registration failed. Please try again.');
-      } finally {
+      }
+    } catch (e) {
+      if (!mounted) return;
+      _showErrorMessage('Registration failed. Please try again.');
+    } finally {
+      if (mounted) {
         setState(() => _isLoading = false);
       }
     }
   }
+}
 
   void _showSuccessMessage(String message) {
     ScaffoldMessenger.of(context).showSnackBar(

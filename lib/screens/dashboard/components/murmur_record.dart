@@ -5,6 +5,9 @@ import 'package:audioplayers/audioplayers.dart';
 import 'package:provider/provider.dart';
 import 'package:fl_chart/fl_chart.dart';
 import '../../patient/add_patient_screen.dart';
+import '../../registration/login_page.dart';
+import '../../registration/register_page.dart';
+import '../dashboard_screen.dart';
 import '/utils/ble_manager.dart';
 import '../../registration/firebase_service.dart';
 import '/utils/models.dart';
@@ -186,12 +189,15 @@ class _MurmurRecordState extends State<MurmurRecord> {
   }
 
 void _navigateToCreatePatient() {
+  if (!mounted) return;
+  
   Navigator.push<Patient>(
     context,
     MaterialPageRoute(
       builder: (context) => AddPatientScreen(fromMurmurRecord: true),
     ),
   ).then((newPatient) {
+    if (!mounted) return;
     if (newPatient != null) {
       final authService = Provider.of<AuthService>(context, listen: false);
       final uid = authService.getCurrentUser()!.uid;
@@ -235,30 +241,32 @@ void _navigateToCreatePatient() {
     );
   }
 
-  void _showNoPatientDialog() {
-    showDialog(
-      context: context,
-      builder: (BuildContext context) {
-        return AlertDialog(
-          title: Text('No Patients Found'),
-          content: Text('Would you like to create a new patient?'),
-          actions: [
-            TextButton(
-              child: Text('Cancel'),
-              onPressed: () => Navigator.pop(context),
-            ),
-            TextButton(
-              child: Text('Create Patient'),
-              onPressed: () {
-                Navigator.pop(context);
+ void _showNoPatientDialog() {
+  showDialog(
+    context: context,
+    builder: (BuildContext dialogContext) { // Use dialogContext instead of context
+      return AlertDialog(
+        title: Text('No Patients Found'),
+        content: Text('Would you like to create a new patient?'),
+        actions: [
+          TextButton(
+            child: Text('Cancel'),
+            onPressed: () => Navigator.pop(dialogContext),
+          ),
+          TextButton(
+            child: Text('Create Patient'),
+            onPressed: () {
+              Navigator.pop(dialogContext);
+              if (mounted) { // Check if still mounted
                 _navigateToCreatePatient();
-              },
-            ),
-          ],
-        );
-      },
-    );
-  }
+              }
+            },
+          ),
+        ],
+      );
+    },
+  );
+}
 
   Future<void> _saveRecordingToPatient(String uid, String patientId) async {
     if (_recordedAudioData == null) return;
@@ -292,30 +300,86 @@ void _navigateToCreatePatient() {
     }
   }
 
-  void _showLoginPrompt() {
-    showDialog(
-      context: context,
-      builder: (BuildContext context) {
-        return AlertDialog(
-          title: Text('Login Required'),
-          content: Text('You need to be logged in to save recordings.'),
-          actions: [
-            TextButton(
-              child: Text('Cancel'),
-              onPressed: () => Navigator.pop(context),
+ void _showLoginPrompt() {
+  showDialog(
+    context: context,
+    builder: (BuildContext context) {
+      return AlertDialog(
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(16),
+        ),
+        title: Text('Login Required'),
+        content: Text('You need to be logged in to save recordings. Do you have an account?'),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context),
+            child: Text(
+              'Cancel',
+              style: TextStyle(color: Colors.grey[700]),
             ),
-            TextButton(
-              child: Text('Login'),
-              onPressed: () {
-                Navigator.pop(context);
-                Navigator.pushNamed(context, '/login');
-              },
+          ),
+          TextButton(
+            onPressed: () {
+              Navigator.pop(context);
+              Navigator.push(
+                context,
+                MaterialPageRoute(
+                  builder: (context) => LoginPage(),
+                  settings: RouteSettings(
+                    arguments: {
+                      'returnRoute': 'murmur_record',
+                      'pendingAction': 'save_recording',
+                    },
+                  ),
+                ),
+              ).then((value) {
+                if (value == true) {
+                  // User has successfully logged in, show save dialog again
+                  _showSaveRecordingDialog();
+                }
+              });
+            },
+            child: Text(
+              'Yes, I have an account',
+              style: TextStyle(color: Theme.of(context).primaryColor),
             ),
-          ],
-        );
-      },
-    );
-  }
+          ),
+          ElevatedButton(
+            onPressed: () {
+              Navigator.pop(context);
+              Navigator.push(
+                context,
+                MaterialPageRoute(
+                  builder: (context) => RegisterPage(),
+                  settings: RouteSettings(
+                    arguments: {
+                      'returnRoute': 'murmur_record',
+                      'pendingAction': 'save_recording',
+                    },
+                  ),
+                ),
+              ).then((value) {
+                if (value == true) {
+                  // User has successfully registered, show save dialog again
+                  _showSaveRecordingDialog();
+                }
+              });
+            },
+            style: ElevatedButton.styleFrom(
+              backgroundColor: Theme.of(context).primaryColor,
+              foregroundColor: Colors.white,
+              elevation: 0,
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(12),
+              ),
+            ),
+            child: Text('Create New Account'),
+          ),
+        ],
+      );
+    },
+  );
+}
 
   void _showLoadingDialog(String message) {
     showDialog(
@@ -426,23 +490,39 @@ void _navigateToCreatePatient() {
     return Scaffold(
       backgroundColor: Colors.grey[50],
       appBar: AppBar(
-        title: Text(
-          widget.preselectedPatientId != null 
-              ? "Record Patient Murmur"
-              : "Murmur Analysis",
-          style: TextStyle(
-            fontWeight: FontWeight.w600,
-            color: Colors.black87,
-          ),
-        ),
-        elevation: 0,
-        backgroundColor: Colors.white,
-        foregroundColor: Colors.black87,
-        leading: IconButton(
-          icon: Icon(Icons.arrow_back_ios, size: 20),
-          onPressed: () => Navigator.pop(context),
-        ),
-      ),
+  title: Text(
+    widget.preselectedPatientId != null 
+        ? "Record Patient Murmur"
+        : "Murmur Analysis",
+    style: TextStyle(
+      fontWeight: FontWeight.w600,
+      color: Colors.black87,
+    ),
+  ),
+  elevation: 0,
+  backgroundColor: Colors.white,
+  foregroundColor: Colors.black87,
+  leading: IconButton(
+    icon: Icon(Icons.arrow_back_ios, size: 20),
+    onPressed: () async {
+      // Check if user is logged in before navigating back
+      final authService = Provider.of<AuthService>(context, listen: false);
+      final isGuest = await authService.isGuest();
+      
+      if (!isGuest) {
+        // If logged in, refresh dashboard
+        Navigator.pushAndRemoveUntil(
+          context,
+          MaterialPageRoute(builder: (context) => DashboardScreen()),
+          (Route<dynamic> route) => false,
+        );
+      } else {
+        // If guest, just pop back
+        Navigator.pop(context);
+      }
+    },
+  ),
+),
       body: SafeArea(
         child: Column(
           children: [
