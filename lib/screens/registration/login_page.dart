@@ -1,6 +1,7 @@
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
 import 'firebase_service.dart';
+import '../dashboard/components/murmur_playback.dart';
 import '../dashboard/dashboard_screen.dart';
 import 'auth_service.dart';
 
@@ -170,9 +171,19 @@ void _login() async {
       // Get the route arguments
       final args = ModalRoute.of(context)?.settings.arguments as Map<String, dynamic>?;
       
-      if (args != null && args['returnRoute'] == 'murmur_record') {
-        // Return to previous screen if coming from murmur record
-        Navigator.pop(context, true);
+      if (args != null) {
+        if (args['returnRoute'] == 'murmur_record' && args['pendingAction'] == 'save_recording') {
+          // Return to previous screen if coming from murmur record save
+          Navigator.pop(context, true);
+        } else if (args['returnRoute'] == 'recording_playback' && args['pendingAction'] == 'view_recordings') {
+  // Navigate to dashboard after login from playback prompt
+  Navigator.pushAndRemoveUntil(
+    context,
+    MaterialPageRoute(builder: (context) => DashboardScreen()),
+    (Route<dynamic> route) => false,
+  );
+
+        }
       } else {
         // Normal login flow - Refresh the dashboard
         Navigator.pushAndRemoveUntil(
