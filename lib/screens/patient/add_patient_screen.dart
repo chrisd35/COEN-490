@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
 import '../dashboard/components/patient_card.dart';
 import '../registration/firebase_service.dart';
-import 'patient_model.dart';
+import '/utils/models.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 
 class AddPatientScreen extends StatefulWidget {

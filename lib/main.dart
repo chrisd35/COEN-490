@@ -3,19 +3,24 @@ import 'package:provider/provider.dart';
 import 'screens/registration/auth_page.dart';
 import 'package:firebase_core/firebase_core.dart';
 import 'firebase_options.dart';
-import 'utils/ble_manager.dart';  // Import the BLEManager
+import 'utils/ble_manager.dart';  
+import 'screens/registration/auth_service.dart';  
 
 void main() async {
-  WidgetsFlutterBinding.ensureInitialized(); // Ensures Flutter bindings are initialized
+  WidgetsFlutterBinding.ensureInitialized();
   await Firebase.initializeApp(
-    options: DefaultFirebaseOptions.currentPlatform, // Initializes Firebase
+    options: DefaultFirebaseOptions.currentPlatform,
   );
   runApp(
     MultiProvider(
       providers: [
-        // Provide the BLEManager instance to the app
+        // Provide the BLEManager instance
         ChangeNotifierProvider<BLEManager>(
           create: (_) => BLEManager(),
+        ),
+        // Add AuthService provider
+        Provider<AuthService>(
+          create: (_) => AuthService(),
         ),
       ],
       child: MyApp(),
