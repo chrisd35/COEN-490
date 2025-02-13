@@ -4,6 +4,7 @@ import 'package:flutter/material.dart';
 import 'package:audioplayers/audioplayers.dart';
 import 'package:provider/provider.dart';
 import 'package:fl_chart/fl_chart.dart';
+import '../../patient/add_patient_screen.dart';
 import '/utils/ble_manager.dart';
 import '../../registration/firebase_service.dart';
 import '/utils/models.dart';
@@ -184,17 +185,20 @@ class _MurmurRecordState extends State<MurmurRecord> {
     }
   }
 
-  void _navigateToCreatePatient() {
-    // Navigate to patient creation page
-    Navigator.pushNamed(context, '/create-patient').then((newPatient) {
-      if (newPatient != null && newPatient is Patient) {
-        final authService = Provider.of<AuthService>(context, listen: false);
-        final uid = authService.getCurrentUser()!.uid;
-        _saveRecordingToPatient(uid, newPatient.medicalCardNumber);
-      }
-    });
-  }
-
+void _navigateToCreatePatient() {
+  Navigator.push<Patient>(
+    context,
+    MaterialPageRoute(
+      builder: (context) => AddPatientScreen(fromMurmurRecord: true),
+    ),
+  ).then((newPatient) {
+    if (newPatient != null) {
+      final authService = Provider.of<AuthService>(context, listen: false);
+      final uid = authService.getCurrentUser()!.uid;
+      _saveRecordingToPatient(uid, newPatient.medicalCardNumber);
+    }
+  });
+}
   void _showPatientSelectionDialog(String uid, List<Patient> patients) {
     showDialog(
       context: context,
