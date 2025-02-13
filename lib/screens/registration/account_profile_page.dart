@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
 import '../dashboard/dashboard_screen.dart';
 import 'firebase_service.dart';
-import 'user_model.dart';
+import '../../utils/models.dart';
 import 'auth_service.dart';
 
 class AccountProfilePage extends StatefulWidget {

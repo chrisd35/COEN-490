@@ -3,7 +3,7 @@ import 'package:firebase_database/firebase_database.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import '../../patient/add_patient_screen.dart';
 import '../../patient/patients_details_screen.dart';
-import '../../patient/patient_model.dart';
+import '/utils/models.dart';
 
 class PatientCard extends StatelessWidget {
   final DatabaseReference _database = FirebaseDatabase.instance.ref();

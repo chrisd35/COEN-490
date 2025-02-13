@@ -3,7 +3,7 @@ import 'package:flutter/material.dart';
 import '../monitoring/ecg_monitoring_screen.dart';
 import '../monitoring/oxygen_monitoring_screen.dart';
 import '../dashboard/components/murmur_record.dart';
-import './patient_model.dart';
+import '/utils/models.dart';
 
 class PatientDetails extends StatelessWidget {
   final Patient patient;
@@ -176,15 +176,19 @@ class PatientDetails extends StatelessWidget {
                     SizedBox(height: 16),
 
                     _buildMonitoringButton(
-                      context,
-                      'Murmur Analysis',
-                      Icons.volume_up,
-                      Colors.blue[700]!,
-                      () => Navigator.push(
-                        context,
-                        MaterialPageRoute(builder: (context) => MurmurRecord(patientId: '',)),
-                      ),
-                    ),
+  context,
+  'Murmur Analysis',
+  Icons.volume_up,
+  Colors.blue[700]!,
+  () => Navigator.push(
+    context,
+    MaterialPageRoute(
+      builder: (context) => MurmurRecord(
+        preselectedPatientId: patient.medicalCardNumber, // Pass the medical card number
+      ),
+    ),
+  ),
+),
                   ],
                 ),
               ),

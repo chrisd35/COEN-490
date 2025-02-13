@@ -188,7 +188,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
                           color: Colors.orange,
                           onTap: () => Navigator.push(
                             context,
-                            MaterialPageRoute(builder: (context) => MurmurRecord(patientId: '',)),
+                            MaterialPageRoute(builder: (context) => MurmurRecord()),
                           ),
                         ),
                       ],
