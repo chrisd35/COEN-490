@@ -12,7 +12,7 @@ import '../dashboard_screen.dart';
 import '/utils/ble_manager.dart';
 import '../../registration/firebase_service.dart';
 import '/utils/models.dart';
-import '../components/murmur_playback.dart';
+
 
 class MurmurRecord extends StatefulWidget {
   final String? preselectedPatientId;
@@ -57,7 +57,7 @@ class _MurmurRecordState extends State<MurmurRecord> {
     });
   }
 
-  void _startRecording() async {
+ void _startRecording() async {
     final bleManager = Provider.of<BLEManager>(context, listen: false);
     if (bleManager.connectedDevice != null) {
       try {
@@ -70,9 +70,13 @@ class _MurmurRecordState extends State<MurmurRecord> {
         });
 
         _startBufferSizeMonitoring();
-        _recordingTimer = Timer.periodic(Duration(seconds: 1), (timer) {
+        
+        // Use a more precise timer
+        _recordingTimer = Timer.periodic(Duration(milliseconds: 100), (timer) {
           setState(() {
-            _recordingDuration += Duration(seconds: 1);
+            // Round to nearest second for display
+            int totalMs = timer.tick * 100;
+            _recordingDuration = Duration(milliseconds: totalMs);
           });
         });
       } catch (e) {
@@ -94,10 +98,14 @@ class _MurmurRecordState extends State<MurmurRecord> {
     });
   }
 
-  void _stopRecording() async {
+    void _stopRecording() async {
     final bleManager = Provider.of<BLEManager>(context, listen: false);
     try {
       _recordingTimer?.cancel();
+
+      // Get the final duration in whole seconds
+      int durationSeconds = ((_recordingDuration.inMilliseconds + 500) / 1000).floor();
+      print("Final recording duration: $durationSeconds seconds");
 
       List<int> audioData = await bleManager.stopRecording();
 
@@ -116,6 +124,7 @@ class _MurmurRecordState extends State<MurmurRecord> {
       _showErrorSnackBar("Failed to stop recording: $e");
     }
   }
+  
   Future<void> _playPreviewRecording() async {
   if (_recordedAudioData == null) return;
 
@@ -307,14 +316,20 @@ void _navigateToCreatePatient() {
 
     try {
       final bleManager = Provider.of<BLEManager>(context, listen: false);
+      
+      // Round the duration to nearest second
+      int durationSeconds = ((_recordingDuration.inMilliseconds + 500) / 1000).floor();
+      
       await _firebaseService.saveRecording(
         uid,
         patientId,
         DateTime.now(),
         _recordedAudioData!,
         {
-          'duration': _recordingDuration.inSeconds,
+          'duration': durationSeconds,
           'sampleRate': BLEManager.SAMPLE_RATE,
+          'bitsPerSample': BLEManager.BITS_PER_SAMPLE,
+          'channels': BLEManager.CHANNELS,
           'peakAmplitude': bleManager.peakAmplitude,
         },
       );
@@ -327,10 +342,10 @@ void _navigateToCreatePatient() {
         _recordedAudioData = null;
       });
     } catch (e) {
-      Navigator.pop(context); // Close loading dialog
+      Navigator.pop(context);
       _showErrorSnackBar("Failed to save recording: $e");
     }
-  }
+}
 
  void _showLoginPrompt() {
   showDialog(
@@ -505,8 +520,10 @@ void _navigateToCreatePatient() {
         SizedBox(height: 8),
         Consumer<BLEManager>(
           builder: (context, bleManager, child) {
+            // Calculate percentage but clamp it to 100%
+            double amplitudePercentage = (bleManager.peakAmplitude * 100).clamp(0.0, 100.0);
             return Text(
-              'Peak Amplitude: ${(bleManager.peakAmplitude * 100).toStringAsFixed(1)}%',
+              'Peak Amplitude: ${amplitudePercentage.toStringAsFixed(1)}%',
               style: TextStyle(
                 fontSize: 16,
                 color: Colors.grey[600],
@@ -516,7 +533,7 @@ void _navigateToCreatePatient() {
         ),
       ],
     );
-  }
+}
 
   @override
   Widget build(BuildContext context) {
