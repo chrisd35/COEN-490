@@ -18,6 +18,10 @@ class BLEManager extends ChangeNotifier {
   double _peakAmplitude = 0;
   List<double> _recentAmplitudes = [];
 
+  // Recording timing control
+  DateTime? _recordingStartTime;
+  int _expectedSamples = 0;
+
   // Constants
   static const int SAMPLE_RATE = 4000;
   static const int BITS_PER_SAMPLE = 16;
@@ -50,6 +54,8 @@ class BLEManager extends ChangeNotifier {
     _recentAmplitudes.clear();
     _currentAmplitude = 0;
     _peakAmplitude = 0;
+    _recordingStartTime = null;
+    _expectedSamples = 0;
     notifyListeners();
   }
 
@@ -62,7 +68,6 @@ class BLEManager extends ChangeNotifier {
     try {
       print("Attempting to connect to device: ${device.name}");
 
-      // Add retry mechanism
       int retryCount = 0;
       bool connected = false;
 
@@ -82,11 +87,7 @@ class BLEManager extends ChangeNotifier {
       }
 
       _connectedDevice = device;
-
-      // Add delay after connection
       await Future.delayed(Duration(milliseconds: 2000));
-
-      // Setup services and characteristics
       await _setupAudioService();
 
       notifyListeners();
@@ -97,147 +98,138 @@ class BLEManager extends ChangeNotifier {
     }
   }
 
-  // Helper function to normalize UUIDs
   String normalizeUuid(String uuid) {
-    // Remove dashes and curly braces, and convert to uppercase
     return uuid.replaceAll(RegExp(r'[{}-\s]', caseSensitive: false), '').toUpperCase();
   }
 
-Future<void> _setupAudioService() async {
-  if (_connectedDevice == null) return;
+  Future<void> _setupAudioService() async {
+    if (_connectedDevice == null) return;
 
-  try {
-    print("Starting service discovery...");
-    await Future.delayed(Duration(milliseconds: 1000));
+    try {
+      print("Starting service discovery...");
+      await Future.delayed(Duration(milliseconds: 1000));
 
-    bool characteristicsFound = false;
-    int retryCount = 0;
-    const int maxRetries = 3;
+      bool characteristicsFound = false;
+      int retryCount = 0;
+      const int maxRetries = 3;
 
-    while (!characteristicsFound && retryCount < maxRetries) {
-      List<BluetoothService> services = await _connectedDevice!.discoverServices();
-      print("\nAttempt ${retryCount + 1}: Found ${services.length} services");
+      while (!characteristicsFound && retryCount < maxRetries) {
+        List<BluetoothService> services = await _connectedDevice!.discoverServices();
+        print("\nAttempt ${retryCount + 1}: Found ${services.length} services");
 
-      for (var service in services) {
-        String serviceUuid = normalizeUuid(service.uuid.toString());
-        print("\nExamining Service: $serviceUuid");
-        print("Number of characteristics: ${service.characteristics.length}");
+        for (var service in services) {
+          String serviceUuid = normalizeUuid(service.uuid.toString());
+          print("\nExamining Service: $serviceUuid");
 
-        if (serviceUuid == normalizeUuid(SERVICE_UUID)) {
-          print("\nFound target service!");
+          if (serviceUuid == normalizeUuid(SERVICE_UUID)) {
+            print("\nFound target service!");
 
-          // Look for control characteristic
-          for (var char in service.characteristics) {
-            String charUuid = normalizeUuid(char.uuid.toString());
-            print("Looking for control characteristic with UUID: ${normalizeUuid(CONTROL_CHARACTERISTIC_UUID)}");
-            print("Found characteristic UUID: $charUuid");
-
-            if (charUuid == normalizeUuid(CONTROL_CHARACTERISTIC_UUID)) {
-              _controlCharacteristic = char;
-              print("Found control characteristic");
-            } else if (charUuid == normalizeUuid(AUDIO_CHARACTERISTIC_UUID)) {
-              _audioCharacteristic = char;
-              print("Found audio characteristic");
+            for (var char in service.characteristics) {
+              String charUuid = normalizeUuid(char.uuid.toString());
+              if (charUuid == normalizeUuid(CONTROL_CHARACTERISTIC_UUID)) {
+                _controlCharacteristic = char;
+                print("Found control characteristic");
+              } else if (charUuid == normalizeUuid(AUDIO_CHARACTERISTIC_UUID)) {
+                _audioCharacteristic = char;
+                print("Found audio characteristic");
+              }
             }
-          }
 
-          // Check if both characteristics are found
-          characteristicsFound = _audioCharacteristic != null && _controlCharacteristic != null;
-          if (characteristicsFound) {
-            print("Both characteristics found successfully!");
-          } else {
-            print("\nMissing characteristics:");
-            print("Audio characteristic: ${_audioCharacteristic != null}");
-            print("Control characteristic: ${_controlCharacteristic != null}");
+            characteristicsFound = _audioCharacteristic != null && _controlCharacteristic != null;
+          }
+        }
+
+        if (!characteristicsFound) {
+          retryCount++;
+          if (retryCount < maxRetries) {
+            await Future.delayed(Duration(seconds: 1));
           }
         }
       }
 
       if (!characteristicsFound) {
-        retryCount++;
-        if (retryCount < maxRetries) {
-          print("\nRetrying service discovery in 1 second...");
-          await Future.delayed(Duration(seconds: 1));
-        }
+        throw Exception("Failed to find all required characteristics");
       }
-    }
-
-    if (!characteristicsFound) {
-      throw Exception("Failed to find all required characteristics after $maxRetries attempts");
-    }
-  } catch (e) {
-    print("Error in _setupAudioService: $e");
-    rethrow;
-  }
-}
-
-  void _processAudioData(List<int> data) {
-    if (data.isEmpty) return;
-
-    try {
-      Int16List samples = Int16List.fromList(
-        List.generate(data.length ~/ 2, (i) {
-          return (data[i * 2] | (data[i * 2 + 1] << 8));
-        }),
-      );
-
-      double maxAmp = 0;
-      for (int sample in samples) {
-        double amplitude = sample.abs() / 32768.0;
-        maxAmp = maxAmp < amplitude ? amplitude : maxAmp;
-      }
-
-      _currentAmplitude = maxAmp;
-      _peakAmplitude = _peakAmplitude < maxAmp ? maxAmp : _peakAmplitude;
-
-      _recentAmplitudes.add(maxAmp);
-      if (_recentAmplitudes.length > 100) {
-        _recentAmplitudes.removeAt(0);
-      }
-
-      _audioBuffer.addAll(data);
-      notifyListeners();
     } catch (e) {
-      print("Error processing audio data: $e");
-    }
-  }
-
-  Future<List<BluetoothService>> discoverServices() async {
-    if (_connectedDevice == null) {
-      throw Exception("No device connected");
-    }
-    return await _connectedDevice!.discoverServices();
-  }
-
-  Stream<List<int>> listenToCharacteristic(BluetoothCharacteristic characteristic) async* {
-    try {
-      print("Setting up listener for characteristic: ${characteristic.uuid}");
-      await characteristic.setNotifyValue(true);
-      yield* characteristic.value;
-    } catch (e) {
-      print("Error setting up characteristic listener: $e");
+      print("Error in _setupAudioService: $e");
       rethrow;
     }
   }
 
-  Future<void> startRecording() async {
-    if (_connectedDevice == null) {
-      throw Exception("No device connected");
-    }
+void _processAudioData(List<int> data) {
+    if (data.isEmpty || !_isRecording) return;
 
+    try {
+        // Calculate precise expected buffer size
+        Duration elapsed = DateTime.now().difference(_recordingStartTime!);
+        int totalExpectedSamples = (SAMPLE_RATE * elapsed.inMilliseconds) ~/ 1000;
+        int expectedBufferSize = totalExpectedSamples * 2; // 2 bytes per sample
+
+        // Check if adding this data would exceed our expected size
+        if (_audioBuffer.length >= expectedBufferSize) {
+            print("Buffer full, skipping new data");
+            return;
+        }
+
+        // Calculate how many bytes we can still add
+        int remainingSpace = expectedBufferSize - _audioBuffer.length;
+        int bytesToAdd = data.length;
+        if (bytesToAdd > remainingSpace) {
+            bytesToAdd = remainingSpace;
+            print("Truncating incoming data to fit buffer");
+        }
+
+        // Process only the bytes we're going to keep
+        Int16List samples = Int16List(bytesToAdd ~/ 2);
+        ByteData bytes = ByteData.sublistView(Uint8List.fromList(data.sublist(0, bytesToAdd)));
+        
+        for (int i = 0; i < bytesToAdd ~/ 2; i++) {
+            samples[i] = bytes.getInt16(i * 2, Endian.little);
+            double amplitude = samples[i].abs() / 32768.0;
+            
+            _currentAmplitude = amplitude;
+            if (amplitude > _peakAmplitude) {
+                _peakAmplitude = amplitude;
+            }
+            
+            _recentAmplitudes.add(amplitude);
+            if (_recentAmplitudes.length > 100) {
+                _recentAmplitudes.removeAt(0);
+            }
+        }
+        
+        // Add only the processed data
+        _audioBuffer.addAll(data.sublist(0, bytesToAdd));
+
+        // Debug info
+        if (_audioBuffer.length % (SAMPLE_RATE * 2) == 0) { // Log every second
+            print("Buffer status: ${_audioBuffer.length} bytes / $expectedBufferSize expected");
+            print("Current time: ${elapsed.inSeconds} seconds");
+        }
+
+        notifyListeners();
+    } catch (e) {
+        print("Error processing audio data: $e");
+    }
+}
+
+  Future<void> startRecording() async {
     try {
       print("Starting recording...");
       clearAudioBuffer();
+      _recordingStartTime = DateTime.now();
+
+      if (_connectedDevice == null) {
+        throw Exception("No device connected");
+      }
 
       if (_controlCharacteristic == null || _audioCharacteristic == null) {
         throw Exception("Required characteristics not found");
       }
 
-      // Send start command
       await _controlCharacteristic!.write([0x01], withoutResponse: true);
       print("Sent start command to control characteristic");
 
-      // Setup audio listener
       await _audioCharacteristic!.setNotifyValue(true);
       _audioSubscription = _audioCharacteristic!.value.listen(
         (value) {
@@ -259,36 +251,60 @@ Future<void> _setupAudioService() async {
     }
   }
 
-  Future<List<int>> stopRecording() async {
+ Future<List<int>> stopRecording() async {
     if (_connectedDevice == null) {
       throw Exception("No device connected");
     }
 
     try {
-      print("Stopping recording...");
+        print("Stopping recording...");
+        
+        // Calculate exact duration in whole seconds
+        Duration totalDuration = DateTime.now().difference(_recordingStartTime!);
+        int durationSeconds = ((totalDuration.inMilliseconds + 500) / 1000).floor();
+        int expectedSamples = SAMPLE_RATE * durationSeconds;
+        int expectedBytes = expectedSamples * 2;
+        
+        print("Recording summary:");
+        print("Duration: $durationSeconds seconds");
+        print("Expected samples: $expectedSamples");
+        print("Expected bytes: $expectedBytes");
+        print("Current buffer size: ${_audioBuffer.length}");
 
-      await _audioSubscription?.cancel();
-      _audioSubscription = null;
+        // Stop BLE operations first
+        await _audioSubscription?.cancel();
+        _audioSubscription = null;
 
-      if (_controlCharacteristic != null) {
-        await _controlCharacteristic!.write([0x00], withoutResponse: true);
-      }
+        if (_controlCharacteristic != null) {
+            await _controlCharacteristic!.write([0x00], withoutResponse: true);
+        }
 
-      if (_audioCharacteristic != null) {
-        await _audioCharacteristic!.setNotifyValue(false);
-      }
+        if (_audioCharacteristic != null) {
+            await _audioCharacteristic!.setNotifyValue(false);
+        }
 
-      _isRecording = false;
-      List<int> recordedData = getAudioBuffer();
-      clearAudioBuffer();
+        _isRecording = false;
 
-      print("Recording stopped successfully");
-      return recordedData;
+        // Ensure exact buffer size
+        if (_audioBuffer.length > expectedBytes) {
+            print("Trimming buffer from ${_audioBuffer.length} to $expectedBytes bytes");
+            _audioBuffer = _audioBuffer.sublist(0, expectedBytes);
+        }
+
+        List<int> recordedData = List<int>.from(_audioBuffer);
+        
+        print("Final recording stats:");
+        print("Buffer size: ${recordedData.length} bytes");
+        print("Sample count: ${recordedData.length ~/ 2}");
+        print("Actual duration: ${recordedData.length / (2 * SAMPLE_RATE)} seconds");
+
+        clearAudioBuffer();
+        return recordedData;
     } catch (e) {
-      print("Error in stopRecording: $e");
-      rethrow;
+        print("Error in stopRecording: $e");
+        rethrow;
     }
-  }
+}
 
   Future<void> disconnectDevice() async {
     if (_connectedDevice != null) {
