@@ -1,9 +1,8 @@
 import numpy as np
 import tensorflow as tf
-from tflite_runtime.interpreter import Interpreter
 
 # Load the TensorFlow Lite model
-interpreter = Interpreter(model_path="heart_murmur.tflite")
+interpreter = tf.lite.Interpreter(model_path="heart_murmur.tflite")
 interpreter.allocate_tensors()
 
 # Get input and output tensors
@@ -16,7 +15,7 @@ print("Output details:", output_details)
 
 # Create a sample input data (replace with actual data)
 # Ensure the input data shape matches the model's input shape
-sample_input = np.random.rand(1, len(input_details[0]['shape'][1:])).astype(np.float32)
+sample_input = np.random.rand(1, input_details[0]['shape'][1]).astype(np.float32)
 
 # Set the tensor to point to the input data to be inferred
 interpreter.set_tensor(input_details[0]['index'], sample_input)
