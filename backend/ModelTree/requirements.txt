@@ -3,3 +3,5 @@ numpy
 scikit-learn
 joblib
 tensorflow
+# To download tflife runtime for tensorflow model run the following command locally
+# pip install tflite-runtime
