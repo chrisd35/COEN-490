@@ -10,8 +10,12 @@ plugins {
 
 android {
     namespace = "com.example.coen_490"
-    compileSdk = flutter.compileSdkVersion
-    ndkVersion = flutter.ndkVersion
+    // compileSdk = flutter.compileSdkVersion
+    // compileSdk = 34
+    compileSdkVersion 34
+
+    // ndkVersion = flutter.ndkVersion
+    ndkVersion = "25.1.8937393"
 
     compileOptions {
         sourceCompatibility = JavaVersion.VERSION_1_8
@@ -27,12 +31,14 @@ android {
         applicationId = "com.example.coen_490"
         // You can update the following values to match your application needs.
         // For more information, see: https://flutter.dev/to/review-gradle-config.
-        minSdk = flutter.minSdkVersion
-        targetSdk = flutter.targetSdkVersion
+        // minSdk = flutter.minSdkVersion
+        // targetSdk = flutter.targetSdkVersion
         versionCode = flutter.versionCode
         versionName = flutter.versionName
         minSdkVersion 23 
-
+        targetSdkVersion 34
+        // minSdk = 23
+        // targetSdk = 34
     }
 
     buildTypes {
@@ -40,6 +46,8 @@ android {
             // TODO: Add your own signing config for the release build.
             // Signing with the debug keys for now, so `flutter run --release` works.
             signingConfig = signingConfigs.debug
+            minifyEnabled true
+            proguardFiles getDefaultProguardFile('proguard-android-optimize.txt'), 'proguard-rules.pro'
         }
     }
 }
@@ -49,6 +57,13 @@ flutter {
 }
 
 dependencies {
-        implementation 'org.tensorflow:tensorflow-lite:+'
-        implementation 'org.tensorflow:tensorflow-lite-gpu:+'
+    implementation 'org.tensorflow:tensorflow-lite:2.13.0'
+    implementation 'org.tensorflow:tensorflow-lite-gpu:2.13.0'
+}
+
+task printVersions {
+    doLast {
+        println "Compile SDK Version: $android.compileSdkVersion"
+        println "Target SDK Version: $android.defaultConfig.targetSdkVersion"
     }
+}
