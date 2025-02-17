@@ -69,13 +69,53 @@ class PulseOxSession {
   }
 
   factory PulseOxSession.fromMap(Map<dynamic, dynamic> data) {
+    // Convert averages map
+    Map<String, double> parseAverages() {
+      var averagesData = data['averages'];
+      if (averagesData == null) return {};
+      
+      Map<String, double> result = {};
+      (averagesData as Map).forEach((key, value) {
+        if (value is num) {
+          result[key.toString()] = value.toDouble();
+        }
+      });
+      return result;
+    }
+
+    // Convert readings list
+    List<Map<String, dynamic>> parseReadings() {
+      var readingsData = data['readings'];
+      if (readingsData == null) return [];
+      
+      if (readingsData is List) {
+        return readingsData.map((reading) {
+          if (reading is Map) {
+            return Map<String, dynamic>.from(reading);
+          }
+          return <String, dynamic>{};
+        }).toList();
+      } else if (readingsData is Map) {
+        return readingsData.values.map((reading) {
+          if (reading is Map) {
+            return Map<String, dynamic>.from(reading);
+          }
+          return <String, dynamic>{};
+        }).toList();
+      }
+      return [];
+    }
+
     return PulseOxSession(
-      timestamp: DateTime.parse(data['timestamp']),
-      averages: Map<String, double>.from(data['averages']),
-      readings: List<Map<String, dynamic>>.from(data['readings']),
-      readingCount: data['readingCount'],
+      timestamp: DateTime.parse(data['timestamp'] ?? DateTime.now().toIso8601String()),
+      averages: parseAverages(),
+      readings: parseReadings(),
+      readingCount: (data['readingCount'] as num?)?.toInt() ?? 0,
     );
   }
+
+
+
 
   // Helper methods to get specific readings
   List<double> get heartRateReadings {
@@ -94,7 +134,41 @@ class PulseOxSession {
     return readings.map((r) => r['timestamp'] as int).toList();
   }
 }
+extension PulseOxSessionExtension on PulseOxSession {
+  List<double> get heartRateReadings {
+    return readings.map((r) {
+      final value = r['heartRate'];
+      if (value is int) {
+        return value.toDouble();
+      } else if (value is double) {
+        return value;
+      }
+      return 0.0;
+    }).toList();
+  }
 
+  List<double> get spO2Readings {
+    return readings.map((r) {
+      final value = r['spO2'];
+      if (value is int) {
+        return value.toDouble();
+      } else if (value is double) {
+        return value;
+      }
+      return 0.0;
+    }).toList();
+  }
+
+  List<int> get timestamps {
+    return readings.map((r) {
+      final value = r['timestamp'];
+      if (value is int) {
+        return value;
+      }
+      return 0;
+    }).toList();
+  }
+}
 class ECGReading {
   final DateTime timestamp;
   final String filename;
@@ -139,7 +213,7 @@ class Patient {
   final String gender;
   final String phoneNumber;
   List<Recording> recordings;
-  List<PulseOxSession> pulseOxSessions;  // Changed from pulseOxReadings
+  List<PulseOxSession> pulseOxSessions;
   List<ECGReading> ecgReadings;
 
   Patient({
@@ -150,10 +224,10 @@ class Patient {
     required this.gender,
     required this.phoneNumber,
     List<Recording>? recordings,
-    List<PulseOxSession>? pulseOxSessions,  // Updated parameter
+    List<PulseOxSession>? pulseOxSessions,
     List<ECGReading>? ecgReadings,
   })  : recordings = recordings ?? [],
-        pulseOxSessions = pulseOxSessions ?? [],  // Updated initialization
+        pulseOxSessions = pulseOxSessions ?? [],
         ecgReadings = ecgReadings ?? [];
 
   Map<String, dynamic> toMap() {
@@ -164,34 +238,72 @@ class Patient {
       'dateOfBirth': dateOfBirth,
       'gender': gender,
       'phoneNumber': phoneNumber,
-      'recordings': recordings.map((r) => r.toMap()).toList(),
-      'pulseOxSessions': pulseOxSessions.map((s) => s.toMap()).toList(),  // Updated
-      'ecgReadings': ecgReadings.map((r) => r.toMap()).toList(),
     };
   }
 
   factory Patient.fromMap(Map<dynamic, dynamic> data) {
+    // Handle optional fields that might be null or in different formats
+    List<Recording> parseRecordings() {
+      var recordingsData = data['recordings'];
+      if (recordingsData == null) return [];
+      
+      if (recordingsData is List) {
+        return recordingsData
+            .map((x) => Recording.fromMap(x as Map<dynamic, dynamic>))
+            .toList();
+      } else if (recordingsData is Map) {
+        return recordingsData.values
+            .map((x) => Recording.fromMap(x as Map<dynamic, dynamic>))
+            .toList();
+      }
+      return [];
+    }
+
+    List<PulseOxSession> parsePulseOxSessions() {
+      var sessionsData = data['pulseOxSessions'];
+      if (sessionsData == null) return [];
+      
+      if (sessionsData is List) {
+        return sessionsData
+            .map((x) => PulseOxSession.fromMap(x as Map<dynamic, dynamic>))
+            .toList();
+      } else if (sessionsData is Map) {
+        return sessionsData.values
+            .map((x) => PulseOxSession.fromMap(x as Map<dynamic, dynamic>))
+            .toList();
+      }
+      return [];
+    }
+
+    List<ECGReading> parseECGReadings() {
+      var readingsData = data['ecgReadings'];
+      if (readingsData == null) return [];
+      
+      if (readingsData is List) {
+        return readingsData
+            .map((x) => ECGReading.fromMap(x as Map<dynamic, dynamic>))
+            .toList();
+      } else if (readingsData is Map) {
+        return readingsData.values
+            .map((x) => ECGReading.fromMap(x as Map<dynamic, dynamic>))
+            .toList();
+      }
+      return [];
+    }
+
     return Patient(
-      fullName: data['fullName'],
-      email: data['email'],
-      medicalCardNumber: data['medicalCardNumber'],
-      dateOfBirth: data['dateOfBirth'],
-      gender: data['gender'],
-      phoneNumber: data['phoneNumber'],
-      recordings: data['recordings'] != null
-          ? List<Recording>.from(
-              (data['recordings'] as List).map((x) => Recording.fromMap(x)))
-          : [],
-      pulseOxSessions: data['pulseOxSessions'] != null  // Updated
-          ? List<PulseOxSession>.from(
-              (data['pulseOxSessions'] as List).map((x) => PulseOxSession.fromMap(x)))
-          : [],
-      ecgReadings: data['ecgReadings'] != null
-          ? List<ECGReading>.from(
-              (data['ecgReadings'] as List).map((x) => ECGReading.fromMap(x)))
-          : [],
+      fullName: data['fullName'] ?? '',
+      email: data['email'] ?? '',
+      medicalCardNumber: data['medicalCardNumber'] ?? '',
+      dateOfBirth: data['dateOfBirth'] ?? '',
+      gender: data['gender'] ?? '',
+      phoneNumber: data['phoneNumber'] ?? '',
+      recordings: parseRecordings(),
+      pulseOxSessions: parsePulseOxSessions(),
+      ecgReadings: parseECGReadings(),
     );
   }
+
 
   void addRecording(Recording recording) {
     recordings.add(recording);
