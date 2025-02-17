@@ -1,4 +1,3 @@
-
 class User {
   final String fullName;
   final String email;
@@ -47,6 +46,91 @@ class User {
   }
 }
 
+class PulseOxSession {
+  final DateTime timestamp;
+  final Map<String, double> averages;
+  final List<Map<String, dynamic>> readings;
+  final int readingCount;
+
+  PulseOxSession({
+    required this.timestamp,
+    required this.averages,
+    required this.readings,
+    required this.readingCount,
+  });
+
+  Map<String, dynamic> toMap() {
+    return {
+      'timestamp': timestamp.toIso8601String(),
+      'averages': averages,
+      'readings': readings,
+      'readingCount': readingCount,
+    };
+  }
+
+  factory PulseOxSession.fromMap(Map<dynamic, dynamic> data) {
+    return PulseOxSession(
+      timestamp: DateTime.parse(data['timestamp']),
+      averages: Map<String, double>.from(data['averages']),
+      readings: List<Map<String, dynamic>>.from(data['readings']),
+      readingCount: data['readingCount'],
+    );
+  }
+
+  // Helper methods to get specific readings
+  List<double> get heartRateReadings {
+    return readings.map((r) => r['heartRate'] as double).toList();
+  }
+
+  List<double> get spO2Readings {
+    return readings.map((r) => r['spO2'] as double).toList();
+  }
+
+  List<double> get temperatureReadings {
+    return readings.map((r) => r['temperature'] as double).toList();
+  }
+
+  List<int> get timestamps {
+    return readings.map((r) => r['timestamp'] as int).toList();
+  }
+}
+
+class ECGReading {
+  final DateTime timestamp;
+  final String filename;
+  final int duration;
+  final int sampleRate;
+  String? downloadUrl;
+
+  ECGReading({
+    required this.timestamp,
+    required this.filename,
+    required this.duration,
+    required this.sampleRate,
+    this.downloadUrl,
+  });
+
+  Map<String, dynamic> toMap() {
+    return {
+      'timestamp': timestamp.toIso8601String(),
+      'filename': filename,
+      'duration': duration,
+      'sampleRate': sampleRate,
+      'downloadUrl': downloadUrl,
+    };
+  }
+
+  factory ECGReading.fromMap(Map<dynamic, dynamic> data) {
+    return ECGReading(
+      timestamp: DateTime.parse(data['timestamp']),
+      filename: data['filename'],
+      duration: data['duration'],
+      sampleRate: data['sampleRate'],
+      downloadUrl: data['downloadUrl'],
+    );
+  }
+}
+
 class Patient {
   final String fullName;
   final String email;
@@ -54,8 +138,9 @@ class Patient {
   final String dateOfBirth;
   final String gender;
   final String phoneNumber;
-  List<Map<String, dynamic>> pulseOxData;
-  List<Map<String, dynamic>> ecgData;
+  List<Recording> recordings;
+  List<PulseOxSession> pulseOxSessions;  // Changed from pulseOxReadings
+  List<ECGReading> ecgReadings;
 
   Patient({
     required this.fullName,
@@ -64,10 +149,12 @@ class Patient {
     required this.dateOfBirth,
     required this.gender,
     required this.phoneNumber,
-    List<Map<String, dynamic>>? pulseOxData,
-    List<Map<String, dynamic>>? ecgData,
-  })  : pulseOxData = pulseOxData ?? [],
-        ecgData = ecgData ?? [];
+    List<Recording>? recordings,
+    List<PulseOxSession>? pulseOxSessions,  // Updated parameter
+    List<ECGReading>? ecgReadings,
+  })  : recordings = recordings ?? [],
+        pulseOxSessions = pulseOxSessions ?? [],  // Updated initialization
+        ecgReadings = ecgReadings ?? [];
 
   Map<String, dynamic> toMap() {
     return {
@@ -77,8 +164,9 @@ class Patient {
       'dateOfBirth': dateOfBirth,
       'gender': gender,
       'phoneNumber': phoneNumber,
-      'pulseOxData': pulseOxData,
-      'ecgData': ecgData,
+      'recordings': recordings.map((r) => r.toMap()).toList(),
+      'pulseOxSessions': pulseOxSessions.map((s) => s.toMap()).toList(),  // Updated
+      'ecgReadings': ecgReadings.map((r) => r.toMap()).toList(),
     };
   }
 
@@ -90,23 +178,31 @@ class Patient {
       dateOfBirth: data['dateOfBirth'],
       gender: data['gender'],
       phoneNumber: data['phoneNumber'],
-      pulseOxData: List<Map<String, dynamic>>.from(data['pulseOxData'] ?? []),
-      ecgData: List<Map<String, dynamic>>.from(data['ecgData'] ?? []),
+      recordings: data['recordings'] != null
+          ? List<Recording>.from(
+              (data['recordings'] as List).map((x) => Recording.fromMap(x)))
+          : [],
+      pulseOxSessions: data['pulseOxSessions'] != null  // Updated
+          ? List<PulseOxSession>.from(
+              (data['pulseOxSessions'] as List).map((x) => PulseOxSession.fromMap(x)))
+          : [],
+      ecgReadings: data['ecgReadings'] != null
+          ? List<ECGReading>.from(
+              (data['ecgReadings'] as List).map((x) => ECGReading.fromMap(x)))
+          : [],
     );
   }
 
-  void addPulseOxData(int value, int timestamp) {
-    pulseOxData.add({
-      'value': value,
-      'timestamp': timestamp,
-    });
+  void addRecording(Recording recording) {
+    recordings.add(recording);
   }
 
-  void addEcgData(String url, int timestamp) {
-    ecgData.add({
-      'url': url,
-      'timestamp': timestamp,
-    });
+void addPulseOxSession(PulseOxSession session) {  // Updated method
+    pulseOxSessions.add(session);
+  }
+
+  void addECGReading(ECGReading reading) {
+    ecgReadings.add(reading);
   }
 }
 
@@ -115,8 +211,8 @@ class Recording {
   final String filename;
   final int duration;
   final int sampleRate;
-  final dynamic peakAmplitude; 
-  String? downloadUrl; // New field for the download URL
+  final dynamic peakAmplitude;
+  String? downloadUrl;
 
   Recording({
     required this.timestamp,
@@ -124,7 +220,7 @@ class Recording {
     required this.duration,
     required this.sampleRate,
     required this.peakAmplitude,
-    this.downloadUrl,  // Optional parameter for download URL
+    this.downloadUrl,
   });
 
   Map<String, dynamic> toMap() {
@@ -134,13 +230,11 @@ class Recording {
       'duration': duration,
       'sampleRate': sampleRate,
       'peakAmplitude': peakAmplitude,
-      // We don't save the downloadUrl to the database as it's generated dynamically
     };
   }
 
- factory Recording.fromMap(Map<dynamic, dynamic> data) {
+  factory Recording.fromMap(Map<dynamic, dynamic> data) {
     var amplitude = data['peakAmplitude'];
-    // Convert to double if it's an int
     double peakAmplitude = (amplitude is int) ? amplitude.toDouble() : amplitude;
     
     return Recording(
