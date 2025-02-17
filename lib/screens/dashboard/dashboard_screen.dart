@@ -197,12 +197,13 @@ class _DashboardScreenState extends State<DashboardScreen> {
             final isGuest = snapshot.data ?? false;
 
             return GridView.count(
-              shrinkWrap: true,
-              physics: NeverScrollableScrollPhysics(),
-              crossAxisCount: 2,
-              mainAxisSpacing: 16,
-              crossAxisSpacing: 16,
-              children: isGuest 
+            shrinkWrap: true,
+  physics: NeverScrollableScrollPhysics(),
+  crossAxisCount: 2,
+  mainAxisSpacing: 16,
+  crossAxisSpacing: 16,
+  childAspectRatio: 1.1, // Adjusted for better fit with 6 items
+  children: isGuest 
                ? [
     // Guest user options
     _FeatureCard(
@@ -241,7 +242,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
   ]
 : [
     // Regular user options
-    _FeatureCard(
+   _FeatureCard(
       title: 'Patient Folders',
       icon: Icons.folder_rounded,
       color: Colors.blue,
@@ -302,6 +303,24 @@ class _DashboardScreenState extends State<DashboardScreen> {
           );
         }
       },
+    ),
+    _FeatureCard(
+      title: 'ECG Monitoring',
+      icon: Icons.monitor_heart_outlined,
+      color: Colors.green,
+      onTap: () => Navigator.push(
+        context,
+        MaterialPageRoute(builder: (context) => ECGMonitoring()),
+      ),
+    ),
+    _FeatureCard(
+      title: 'Oxygen Monitoring',
+      icon: Icons.air,
+      color: Colors.blue[700] ?? Colors.blue,
+      onTap: () => Navigator.push(
+        context,
+        MaterialPageRoute(builder: (context) => OxygenMonitoring()),
+      ),
     ),
   ],
             );

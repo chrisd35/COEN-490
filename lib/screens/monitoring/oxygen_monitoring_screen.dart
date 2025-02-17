@@ -4,6 +4,8 @@ import 'package:provider/provider.dart';
 import '../../utils/ble_manager.dart';
 import '../registration/firebase_service.dart';
 import '../../utils/models.dart';
+import 'package:firebase_auth/firebase_auth.dart';
+import '../monitoring/pusleox_history.dart';
 
 class OxygenMonitoring extends StatefulWidget {
   @override
@@ -13,39 +15,146 @@ class OxygenMonitoring extends StatefulWidget {
 class _OxygenMonitoringState extends State<OxygenMonitoring> {
   List<FlSpot> heartRateSpots = [];
   List<FlSpot> spO2Spots = [];
-  double maxX = 20; // Show last 20 seconds of data
+  double maxX = 3.0; // Changed to 3 seconds
   Patient? selectedPatient;
+  double? firstTimestamp;
+  int lastReadingIndex = 0;
+  bool isActive = false; // Add state to track if monitoring is active
+
+  @override
+  void initState() {
+    super.initState();
+    _startPeriodicUpdate();
+  }
+
+  void _startPeriodicUpdate() {
+    Future.doWhile(() async {
+      await Future.delayed(Duration(milliseconds: 100));
+      if (mounted && isActive) {
+        final bleManager = Provider.of<BLEManager>(context, listen: false);
+        _updateGraphData(bleManager);
+      }
+      return mounted;
+    });
+  }
+
+  void _updateGraphData(BLEManager bleManager) {
+    if (!isActive) return;
+
+    final readings = bleManager.currentSessionReadings;
+    if (readings.isEmpty) {
+      setState(() {
+        heartRateSpots.clear();
+        spO2Spots.clear();
+        firstTimestamp = null;
+        lastReadingIndex = 0;
+      });
+      return;
+    }
+
+    // Initialize firstTimestamp if not set
+    if (firstTimestamp == null && readings.isNotEmpty) {
+      firstTimestamp = readings[0]['timestamp'] / 1000;
+      lastReadingIndex = 0; // Reset index when starting new session
+    }
+
+    // Process new readings
+    for (var i = lastReadingIndex; i < readings.length; i++) {
+      var reading = readings[i];
+      double currentTime = (reading['timestamp'] / 1000) - firstTimestamp!;
+
+      if (currentTime <= maxX) {
+        setState(() {
+          heartRateSpots.add(FlSpot(currentTime, reading['heartRate'].toDouble()));
+          spO2Spots.add(FlSpot(currentTime, reading['spO2'].toDouble()));
+        });
+      }
+    }
+
+    lastReadingIndex = readings.length;
+  }
+
+  void _resetGraph() {
+    final bleManager = Provider.of<BLEManager>(context, listen: false);
+    setState(() {
+      isActive = false;
+      heartRateSpots.clear();
+      spO2Spots.clear();
+      firstTimestamp = null;
+      lastReadingIndex = 0;
+    });
+    
+    // Reset BLE Manager state
+    bleManager.clearPulseOxReadings();
+    
+    // Start a new session after a brief delay
+    Future.delayed(Duration(milliseconds: 500), () {
+      if (mounted) {
+        setState(() {
+          isActive = true;
+        });
+      }
+    });
+  }
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
-        title: Text('Oxygen Monitoring'),
-        actions: [
-          IconButton(
-            icon: Icon(Icons.save),
-            onPressed: () => _showSaveDialog(context),
+  title: Text('Oxygen Monitoring'),
+  actions: [
+   IconButton(
+  icon: Icon(Icons.history),
+  onPressed: () async {
+    final currentUser = FirebaseAuth.instance.currentUser;
+    final firebaseService = FirebaseService();
+
+    if (currentUser == null) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('User not logged in')),
+      );
+      return;
+    }
+
+    // Show patient selection dialog first
+    final selectedPatient = await showDialog<Patient>(
+      context: context,
+      builder: (context) => PatientSelectionDialog(),
+    );
+
+    if (selectedPatient != null) {
+      // Navigate to history screen with selected patient
+      Navigator.push(
+        context,
+        MaterialPageRoute(
+          builder: (context) => PulseOxHistory(
+            preselectedPatientId: selectedPatient.medicalCardNumber,
           ),
-        ],
-      ),
+        ),
+      );
+    }
+  },
+),
+    IconButton(
+      icon: Icon(Icons.refresh),
+      onPressed: _resetGraph,
+    ),
+    IconButton(
+      icon: Icon(Icons.save),
+      onPressed: () => _showSaveDialog(context),
+    ),
+  ],
+),
       body: Consumer<BLEManager>(
         builder: (context, bleManager, child) {
-          // Add new data points
-          if (bleManager.pulseOxReadings.isNotEmpty) {
-            _updateGraphData(bleManager);
-          }
-
           return Padding(
             padding: const EdgeInsets.all(16.0),
             child: SingleChildScrollView(
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  // Current Values Cards
                   _buildValueCards(bleManager),
                   SizedBox(height: 20),
-
-                  // Heart Rate Graph
                   _buildGraphCard(
                     'Heart Rate',
                     heartRateSpots,
@@ -55,8 +164,6 @@ class _OxygenMonitoringState extends State<OxygenMonitoring> {
                     'BPM',
                   ),
                   SizedBox(height: 20),
-
-                  // SpO2 Graph
                   _buildGraphCard(
                     'SpO2',
                     spO2Spots,
@@ -169,12 +276,24 @@ class _OxygenMonitoringState extends State<OxygenMonitoring> {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Text(
-              title,
-              style: TextStyle(
-                fontSize: 18,
-                fontWeight: FontWeight.bold,
-              ),
+            Row(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              children: [
+                Text(
+                  title,
+                  style: TextStyle(
+                    fontSize: 18,
+                    fontWeight: FontWeight.bold,
+                  ),
+                ),
+                Text(
+                  'Points: ${spots.length}',
+                  style: TextStyle(
+                    fontSize: 12,
+                    color: Colors.grey,
+                  ),
+                ),
+              ],
             ),
             SizedBox(height: 16),
             Container(
@@ -185,23 +304,67 @@ class _OxygenMonitoringState extends State<OxygenMonitoring> {
                   maxX: maxX,
                   minY: minY,
                   maxY: maxY,
-                  gridData: FlGridData(show: true),
+                  gridData: FlGridData(
+                    show: true,
+                    drawVerticalLine: true,
+                    horizontalInterval: title == 'Heart Rate' ? 20 : 5, // Different intervals for HR and SpO2
+                    verticalInterval: 0.5, // Show tick every 0.5 seconds
+                    getDrawingHorizontalLine: (value) {
+                      return FlLine(
+                        color: Colors.grey[300]!,
+                        strokeWidth: 1,
+                      );
+                    },
+                    getDrawingVerticalLine: (value) {
+                      return FlLine(
+                        color: Colors.grey[300]!,
+                        strokeWidth: 1,
+                      );
+                    },
+                  ),
                   titlesData: FlTitlesData(
                     leftTitles: AxisTitles(
                       sideTitles: SideTitles(
                         showTitles: true,
                         reservedSize: 40,
+                        interval: title == 'Heart Rate' ? 20 : 5, // Different intervals for HR and SpO2
                         getTitlesWidget: (value, meta) {
-                          return Text('${value.toInt()}$unit');
+                          return Padding(
+                            padding: const EdgeInsets.only(right: 8.0),
+                            child: Text(
+                              value.toInt().toString(),
+                              style: TextStyle(
+                                fontSize: 12,
+                                color: Colors.grey[600],
+                              ),
+                            ),
+                          );
                         },
                       ),
                     ),
                     bottomTitles: AxisTitles(
+                      axisNameWidget: Text(
+                        'Time (seconds)',
+                        style: TextStyle(
+                          fontSize: 12,
+                          color: Colors.grey[600],
+                        ),
+                      ),
                       sideTitles: SideTitles(
                         showTitles: true,
                         reservedSize: 30,
+                        interval: 0.5, // Show tick every 0.5 seconds
                         getTitlesWidget: (value, meta) {
-                          return Text('${value.toInt()}s');
+                          return Padding(
+                            padding: const EdgeInsets.only(top: 8.0),
+                            child: Text(
+                              value.toStringAsFixed(1),
+                              style: TextStyle(
+                                fontSize: 12,
+                                color: Colors.grey[600],
+                              ),
+                            ),
+                          );
                         },
                       ),
                     ),
@@ -209,7 +372,33 @@ class _OxygenMonitoringState extends State<OxygenMonitoring> {
                       sideTitles: SideTitles(showTitles: false),
                     ),
                     topTitles: AxisTitles(
+                      axisNameWidget: Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          Text(
+                            title,
+                            style: TextStyle(
+                              fontSize: 12,
+                              color: Colors.grey[600],
+                            ),
+                          ),
+                          Text(
+                            ' ($unit)',
+                            style: TextStyle(
+                              fontSize: 12,
+                              color: Colors.grey[600],
+                            ),
+                          ),
+                        ],
+                      ),
                       sideTitles: SideTitles(showTitles: false),
+                    ),
+                  ),
+                  borderData: FlBorderData(
+                    show: true,
+                    border: Border(
+                      left: BorderSide(color: Colors.grey[400]!),
+                      bottom: BorderSide(color: Colors.grey[400]!),
                     ),
                   ),
                   lineBarsData: [
@@ -234,53 +423,31 @@ class _OxygenMonitoringState extends State<OxygenMonitoring> {
     );
   }
 
-  void _updateGraphData(BLEManager bleManager) {
-    final now = DateTime.now().millisecondsSinceEpoch / 1000; // Convert to seconds
-    
-    if (heartRateSpots.isEmpty) {
-      // Initialize with current value if empty
-      heartRateSpots.add(FlSpot(0, bleManager.currentHeartRate));
-      spO2Spots.add(FlSpot(0, bleManager.currentSpO2));
-    } else {
-      final lastTime = heartRateSpots.last.x;
-      final newTime = lastTime + 1; // Add point every second
-      
-      heartRateSpots.add(FlSpot(newTime, bleManager.currentHeartRate));
-      spO2Spots.add(FlSpot(newTime, bleManager.currentSpO2));
-
-      // Remove old points
-      if (newTime > maxX) {
-        heartRateSpots.removeAt(0);
-        spO2Spots.removeAt(0);
-        
-        // Shift all points left
-        heartRateSpots = heartRateSpots.map((spot) => 
-          FlSpot(spot.x - 1, spot.y)).toList();
-        spO2Spots = spO2Spots.map((spot) => 
-          FlSpot(spot.x - 1, spot.y)).toList();
-      }
-    }
-  }
 
   Future<void> _showSaveDialog(BuildContext context) async {
     final bleManager = Provider.of<BLEManager>(context, listen: false);
-    final firebaseService = Provider.of<FirebaseService>(context, listen: false);
-    
-    // Show patient selection dialog
+    final firebaseService = FirebaseService();
+    final currentUser = FirebaseAuth.instance.currentUser;
+
+    if (currentUser == null) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('User not logged in')),
+      );
+      return;
+    }
+
     selectedPatient = await showDialog<Patient>(
       context: context,
       builder: (context) => PatientSelectionDialog(),
     );
 
-    if (selectedPatient != null) {
+    if (selectedPatient != null && bleManager.currentSessionReadings.isNotEmpty) {
       try {
         await firebaseService.savePulseOxSession(
-          'your_uid_here', // Replace with actual user ID
+          currentUser.uid,
           selectedPatient!.medicalCardNumber,
-          bleManager.pulseOxReadings,
+          List<Map<String, dynamic>>.from(bleManager.currentSessionReadings),
           bleManager.sessionAverages,
-      
-          
         );
         
         ScaffoldMessenger.of(context).showSnackBar(
@@ -291,20 +458,23 @@ class _OxygenMonitoringState extends State<OxygenMonitoring> {
           SnackBar(content: Text('Error saving data: $e')),
         );
       }
+    } else if (bleManager.currentSessionReadings.isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('No data to save')),
+      );
     }
   }
 }
 
-// Add this as a separate widget
 class PatientSelectionDialog extends StatefulWidget {
   @override
   _PatientSelectionDialogState createState() => _PatientSelectionDialogState();
 }
 
 class _PatientSelectionDialogState extends State<PatientSelectionDialog> {
-  Patient? selectedPatient;
   List<Patient> patients = [];
   bool isLoading = true;
+  String? error;
 
   @override
   void initState() {
@@ -313,15 +483,26 @@ class _PatientSelectionDialogState extends State<PatientSelectionDialog> {
   }
 
   Future<void> _loadPatients() async {
-    final firebaseService = Provider.of<FirebaseService>(context, listen: false);
-    try {
-      patients = await firebaseService.getPatientsForUser('your_uid_here');
+    final firebaseService = FirebaseService();
+    final currentUser = FirebaseAuth.instance.currentUser;
+
+    if (currentUser == null) {
       setState(() {
+        error = 'User not logged in';
+        isLoading = false;
+      });
+      return;
+    }
+
+    try {
+      final loadedPatients = await firebaseService.getPatientsForUser(currentUser.uid);
+      setState(() {
+        patients = loadedPatients;
         isLoading = false;
       });
     } catch (e) {
-      print('Error loading patients: $e');
       setState(() {
+        error = 'Error loading patients: $e';
         isLoading = false;
       });
     }
@@ -331,25 +512,34 @@ class _PatientSelectionDialogState extends State<PatientSelectionDialog> {
   Widget build(BuildContext context) {
     return AlertDialog(
       title: Text('Select Patient'),
-      content: isLoading
-          ? CircularProgressIndicator()
-          : Container(
-              width: double.maxFinite,
-              child: ListView.builder(
-                shrinkWrap: true,
-                itemCount: patients.length,
-                itemBuilder: (context, index) {
-                  final patient = patients[index];
-                  return ListTile(
-                    title: Text(patient.fullName),
-                    subtitle: Text(patient.medicalCardNumber),
-                    onTap: () {
-                      Navigator.of(context).pop(patient);
-                    },
-                  );
-                },
-              ),
-            ),
+      content: Container(
+        width: double.maxFinite,
+        height: 300,
+        child: isLoading
+            ? Center(child: CircularProgressIndicator())
+            : error != null
+                ? Center(child: Text(error!, style: TextStyle(color: Colors.red)))
+                : patients.isEmpty
+                    ? Center(child: Text('No patients found'))
+                    : ListView.builder(
+                        itemCount: patients.length,
+                        itemBuilder: (context, index) {
+                          final patient = patients[index];
+                          return ListTile(
+                            leading: CircleAvatar(
+                              backgroundColor: Theme.of(context).primaryColor,
+                              child: Text(
+                                patient.fullName[0].toUpperCase(),
+                                style: TextStyle(color: Colors.white),
+                              ),
+                            ),
+                            title: Text(patient.fullName),
+                            subtitle: Text(patient.medicalCardNumber),
+                            onTap: () => Navigator.of(context).pop(patient),
+                          );
+                        },
+                      ),
+      ),
       actions: [
         TextButton(
           child: Text('Cancel'),

@@ -285,75 +285,91 @@ class FirebaseService {
     }
   }
    Future<void> savePulseOxSession(
-    String uid,
-    String medicalCardNumber,
-    List<Map<String, dynamic>> sessionReadings,
-    Map<String, double> averages,
-  ) async {
-    try {
-      String sanitizedMedicalCard = medicalCardNumber.replaceAll('/', '_');
-      
-      // Save session data
-      await _database
-          .child('users')
-          .child(uid)
-          .child('patients')
-          .child(sanitizedMedicalCard)
-          .child('pulseOxSessions')
-          .push()
-          .set({
-            'timestamp': DateTime.now().toIso8601String(),
-            'averages': {
-              'heartRate': averages['heartRate'],
-              'spO2': averages['spO2'],
-              'temperature': averages['temperature'],
-            },
-            'readings': sessionReadings,
-            'readingCount': sessionReadings.length,
-          });
+  String uid,
+  String medicalCardNumber,
+  List<Map<String, dynamic>> sessionReadings,
+  Map<String, double> averages,
+) async {
+  try {
+    String sanitizedMedicalCard = medicalCardNumber.replaceAll('/', '_');
+    
+    // Ensure readings are in the correct format
+    List<Map<String, dynamic>> formattedReadings = sessionReadings.map((reading) {
+      return {
+        'heartRate': reading['heartRate'],
+        'spO2': reading['spO2'],
+        'temperature': reading['temperature'],
+        'timestamp': reading['timestamp'],
+      };
+    }).toList();
+    
+    // Save session data
+    await _database
+        .child('users')
+        .child(uid)
+        .child('patients')
+        .child(sanitizedMedicalCard)
+        .child('pulseOxSessions')
+        .push()
+        .set({
+          'timestamp': DateTime.now().toIso8601String(),
+          'averages': {
+            'heartRate': averages['heartRate'] ?? 0.0,
+            'spO2': averages['spO2'] ?? 0.0,
+            'temperature': averages['temperature'] ?? 0.0,
+          },
+          'readings': formattedReadings,
+          'readingCount': formattedReadings.length,
+        });
 
-      print('PulseOx session saved successfully');
-    } catch (e) {
-      print('Error saving PulseOx session: $e');
-      rethrow;
-    }
+    print('PulseOx session saved successfully');
+  } catch (e) {
+    print('Error saving PulseOx session: $e');
+    rethrow;
   }
+}
 
-   Future<List<PulseOxSession>> getPulseOxSessions(
-    String uid,
-    String medicalCardNumber,
-  ) async {
-    try {
-      String sanitizedMedicalCard = medicalCardNumber.replaceAll('/', '_');
-      
-      DataSnapshot snapshot = await _database
-          .child('users')
-          .child(uid)
-          .child('patients')
-          .child(sanitizedMedicalCard)
-          .child('pulseOxSessions')
-          .get();
+Future<List<PulseOxSession>> getPulseOxSessions(
+  String uid,
+  String medicalCardNumber,
+) async {
+  try {
+    String sanitizedMedicalCard = medicalCardNumber.replaceAll('/', '_');
+    
+    DataSnapshot snapshot = await _database
+        .child('users')
+        .child(uid)
+        .child('patients')
+        .child(sanitizedMedicalCard)
+        .child('pulseOxSessions')
+        .get();
 
-      if (!snapshot.exists || snapshot.value == null) {
-        return [];
-      }
+    if (!snapshot.exists || snapshot.value == null) {
+      return [];
+    }
 
-      Map<dynamic, dynamic> sessionsMap = snapshot.value as Map<dynamic, dynamic>;
-      List<PulseOxSession> sessions = [];
+    Map<dynamic, dynamic> sessionsMap = snapshot.value as Map<dynamic, dynamic>;
+    List<PulseOxSession> sessions = [];
 
-      sessionsMap.forEach((key, value) {
+    sessionsMap.forEach((key, value) {
+      if (value is Map) {
+        // Ensure readings is treated as a List
+        if (value['readings'] is Map) {
+          value['readings'] = (value['readings'] as Map).values.toList();
+        }
         sessions.add(PulseOxSession.fromMap(value as Map<dynamic, dynamic>));
-      });
+      }
+    });
 
-      // Sort by timestamp, newest first
-      sessions.sort((a, b) => b.timestamp.compareTo(a.timestamp));
+    // Sort by timestamp, newest first
+    sessions.sort((a, b) => b.timestamp.compareTo(a.timestamp));
 
-      return sessions;
-    } catch (e) {
-      print('Error fetching PulseOx sessions: $e');
-      rethrow;
-    }
+    return sessions;
+  } catch (e) {
+    print('Error fetching PulseOx sessions: $e');
+    rethrow;
   }
+}
 
   Future<void> saveECGReading(
     String uid,

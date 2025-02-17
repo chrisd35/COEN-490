@@ -116,8 +116,8 @@ class BLEManager extends ChangeNotifier {
     notifyListeners();
   }
 
-  void clearPulseOxReadings() {
-    _pulseOxReadings.clear();
+ void clearPulseOxReadings() {
+    _currentSessionReadings.clear();
     _currentHeartRate = 0;
     _currentSpO2 = 0;
     _currentTemperature = 0;
