@@ -1,6 +1,7 @@
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
 import 'firebase_service.dart';
+import '../dashboard/components/murmur_playback.dart';
 import '../dashboard/dashboard_screen.dart';
 import 'auth_service.dart';
 
@@ -148,30 +149,50 @@ class _LoginPageState extends State<LoginPage> {
     );
   }
 
-  void _login() async {
-    setState(() => _isLoading = true);
-    
-    final email = _emailController.text.trim();
-    final password = _passwordController.text.trim();
+void _login() async {
+  setState(() => _isLoading = true);
+  
+  final email = _emailController.text.trim();
+  final password = _passwordController.text.trim();
 
-    if (email.isEmpty || password.isEmpty) {
-      _showErrorSnackBar('Please fill in all fields');
-      setState(() => _isLoading = false);
-      return;
-    }
+  if (email.isEmpty || password.isEmpty) {
+    _showErrorSnackBar('Please fill in all fields');
+    setState(() => _isLoading = false);
+    return;
+  }
 
-    try {
-      final userCredential = await _authService.signInWithEmailAndPassword(
-        email: email,
-        password: password,
-      );
+  try {
+    final userCredential = await _authService.signInWithEmailAndPassword(
+      email: email,
+      password: password,
+    );
 
-      if (userCredential?.user != null) {
-        Navigator.pushReplacement(
+    if (userCredential?.user != null) {
+      // Get the route arguments
+      final args = ModalRoute.of(context)?.settings.arguments as Map<String, dynamic>?;
+      
+      if (args != null) {
+        if (args['returnRoute'] == 'murmur_record' && args['pendingAction'] == 'save_recording') {
+          // Return to previous screen if coming from murmur record save
+          Navigator.pop(context, true);
+        } else if (args['returnRoute'] == 'recording_playback' && args['pendingAction'] == 'view_recordings') {
+  // Navigate to dashboard after login from playback prompt
+  Navigator.pushAndRemoveUntil(
+    context,
+    MaterialPageRoute(builder: (context) => DashboardScreen()),
+    (Route<dynamic> route) => false,
+  );
+
+        }
+      } else {
+        // Normal login flow - Refresh the dashboard
+        Navigator.pushAndRemoveUntil(
           context,
           MaterialPageRoute(builder: (context) => DashboardScreen()),
+          (Route<dynamic> route) => false,
         );
       }
+    }
     } on FirebaseAuthException catch (e) {
       String errorMessage;
       switch (e.code) {

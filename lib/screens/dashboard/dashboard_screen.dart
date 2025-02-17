@@ -1,7 +1,10 @@
+import 'package:coen_490/screens/registration/auth_service.dart';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:flutter_blue_plus/flutter_blue_plus.dart';
 import 'dart:async';
+import '../registration/login_page.dart';
+import 'components/murmur_playback.dart';
 import 'components/patient_card.dart';
 import 'components/murmur_chart.dart';
 import 'components/murmur_record.dart';
@@ -9,6 +12,9 @@ import 'ble_screen.dart';
 import '/utils/ble_manager.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import '..//registration/firebase_service.dart';
+import '../registration/auth_page.dart';
+import '../monitoring/ecg_monitoring_screen.dart';
+import '../monitoring/oxygen_monitoring_screen.dart';
 
 class DashboardScreen extends StatefulWidget {
   @override
@@ -26,9 +32,28 @@ class _DashboardScreenState extends State<DashboardScreen> {
     _loadUserName();
   }
 
-  Future<void> _loadUserName() async {
+    @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    // Refresh state when the screen becomes visible
+    _loadUserName();
+  }
+
+ Future<void> _loadUserName() async {
     try {
+      final authService = Provider.of<AuthService>(context, listen: false);
       final user = FirebaseAuth.instance.currentUser;
+      
+      // Check if in guest mode
+      final isGuest = await authService.isGuest();
+      
+      if (isGuest) {
+        setState(() {
+          _userName = 'Guest';
+        });
+        return;
+      }
+
       if (user != null) {
         final userData = await _firebaseService.getUser(user.uid, user.email ?? '');
         if (userData != null) {
@@ -53,38 +78,44 @@ class _DashboardScreenState extends State<DashboardScreen> {
         child: Column(
           children: [
             // Custom App Bar
-            Container(
-              padding: EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-              decoration: BoxDecoration(
-                color: Colors.white,
-                boxShadow: [
-                  BoxShadow(
-                    color: Colors.black.withOpacity(0.05),
-                    blurRadius: 10,
-                    offset: Offset(0, 2),
-                  ),
-                ],
-              ),
-              child: Row(
-                children: [
-                  Text(
-                    'Dashboard',
-                    style: TextStyle(
-                      fontSize: 24,
-                      fontWeight: FontWeight.bold,
-                    ),
-                  ),
-                  Spacer(),
-                  IconButton(
-                    icon: Icon(Icons.bluetooth, color: Theme.of(context).primaryColor),
-                    onPressed: () => Navigator.push(
-                      context,
-                      MaterialPageRoute(builder: (context) => BLEScreen()),
-                    ),
-                  ),
-                ],
-              ),
-            ),
+           Container(
+  padding: EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+  decoration: BoxDecoration(
+    color: Colors.white,
+    boxShadow: [
+      BoxShadow(
+        color: Colors.black.withOpacity(0.05),
+        blurRadius: 10,
+        offset: Offset(0, 2),
+      ),
+    ],
+  ),
+  child: Row(
+    children: [
+      Text(
+        'Dashboard',
+        style: TextStyle(
+          fontSize: 24,
+          fontWeight: FontWeight.bold,
+        ),
+      ),
+      Spacer(),
+      // Bluetooth Connection Button
+      IconButton(
+        icon: Icon(Icons.bluetooth, color: Theme.of(context).primaryColor),
+        onPressed: () => Navigator.push(
+          context,
+          MaterialPageRoute(builder: (context) => BLEScreen()),
+        ),
+      ),
+      // Logout Button
+      IconButton(
+        icon: Icon(Icons.logout_rounded, color: Colors.grey[700]),
+        onPressed: () => _showLogoutDialog(),
+      ),
+    ],
+  ),
+),
 
             // Main Content
             Expanded(
@@ -156,47 +187,130 @@ class _DashboardScreenState extends State<DashboardScreen> {
                     ),
                     SizedBox(height: 32),
 
-                    // Feature Cards Grid
-                    GridView.count(
-                      shrinkWrap: true,
-                      physics: NeverScrollableScrollPhysics(),
-                      crossAxisCount: 2,
-                      mainAxisSpacing: 16,
-                      crossAxisSpacing: 16,
-                      children: [
-                        _FeatureCard(
-                          title: 'Patient Folders',
-                          icon: Icons.folder_rounded,
-                          color: Colors.blue,
-                          onTap: () => Navigator.push(
-                            context,
-                            MaterialPageRoute(builder: (context) => PatientCard()),
-                          ),
-                        ),
-                        _FeatureCard(
-                          title: 'AI Murmur',
-                          icon: Icons.analytics_rounded,
-                          color: Colors.purple,
-                          onTap: () => Navigator.push(
-                            context,
-                            MaterialPageRoute(builder: (context) => MurmurChart()),
-                          ),
-                        ),
-                        _FeatureCard(
-                          title: 'Murmur Record',
-                          icon: Icons.mic_rounded,
-                          color: Colors.orange,
-                          onTap: () => Navigator.push(
-                            context,
-                            MaterialPageRoute(builder: (context) => MurmurRecord(patientId: '',)),
-                          ),
-                        ),
-                      ],
-                    ),
-                  ],
-                ),
+        FutureBuilder<bool>(
+          future: Provider.of<AuthService>(context, listen: false).isGuest(),
+          builder: (context, snapshot) {
+            if (snapshot.connectionState == ConnectionState.waiting) {
+              return CircularProgressIndicator();
+            }
+
+            final isGuest = snapshot.data ?? false;
+
+            return GridView.count(
+              shrinkWrap: true,
+              physics: NeverScrollableScrollPhysics(),
+              crossAxisCount: 2,
+              mainAxisSpacing: 16,
+              crossAxisSpacing: 16,
+              children: isGuest 
+               ? [
+    // Guest user options
+    _FeatureCard(
+      title: 'Murmur Record',
+      icon: Icons.mic_rounded,
+      color: Colors.orange,
+      onTap: () => Navigator.push(
+        context,
+        MaterialPageRoute(builder: (context) => MurmurRecord()),
+      ),
+    ),
+    _FeatureCard(
+      title: 'ECG Monitoring',
+      icon: Icons.monitor_heart_outlined,
+      color: Colors.green,
+      onTap: () => Navigator.push(
+        context,
+        MaterialPageRoute(builder: (context) => ECGMonitoring()),
+      ),
+    ),
+    _FeatureCard(
+      title: 'Oxygen Monitoring',
+      icon: Icons.air,
+      color: Colors.blue,
+      onTap: () => Navigator.push(
+        context,
+        MaterialPageRoute(builder: (context) => OxygenMonitoring()),
+      ),
+    ),
+    _FeatureCard(
+      title: 'View Recordings',
+      icon: Icons.playlist_play,
+      color: Colors.purple,
+      onTap: () => _showPlaybackLoginPrompt(),
+    ),
+  ]
+: [
+    // Regular user options
+    _FeatureCard(
+      title: 'Patient Folders',
+      icon: Icons.folder_rounded,
+      color: Colors.blue,
+      onTap: () => Navigator.push(
+        context,
+        MaterialPageRoute(builder: (context) => PatientCard()),
+      ),
+    ),
+    _FeatureCard(
+      title: 'AI Murmur',
+      icon: Icons.analytics_rounded,
+      color: Colors.purple,
+      onTap: () => Navigator.push(
+        context,
+        MaterialPageRoute(builder: (context) => MurmurChart()),
+      ),
+    ),
+    _FeatureCard(
+      title: 'Murmur Record',
+      icon: Icons.mic_rounded,
+      color: Colors.orange,
+      onTap: () => Navigator.push(
+        context,
+        MaterialPageRoute(builder: (context) => MurmurRecord()),
+      ),
+    ),
+    _FeatureCard(
+      title: 'View Recordings',
+      icon: Icons.playlist_play,
+      color: Colors.teal,
+      onTap: () async {
+        try {
+          final uid = FirebaseAuth.instance.currentUser!.uid;
+          final patients = await _firebaseService.getPatientsForUser(uid);
+          
+          if (patients.isEmpty) {
+            ScaffoldMessenger.of(context).showSnackBar(
+              SnackBar(
+                content: Text('Create a patient and save a recording to access playback history'),
+                duration: Duration(seconds: 4),
               ),
+            );
+            return;
+          }
+          
+          Navigator.push(
+            context,
+            MaterialPageRoute(
+              builder: (context) => RecordingPlaybackScreen(),
             ),
+          );
+        } catch (e) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Text('Failed to check recordings: $e'),
+              backgroundColor: Colors.red,
+            ),
+          );
+        }
+      },
+    ),
+  ],
+            );
+          },
+        ),
+      ],
+    ),
+  ),
+),
           ],
         ),
       ),
@@ -328,6 +442,125 @@ class _DashboardScreenState extends State<DashboardScreen> {
       ),
     );
   }
+
+void _showLogoutDialog() async {
+  final authService = Provider.of<AuthService>(context, listen: false);
+  final isGuest = await authService.isGuest();
+
+  showDialog(
+    context: context,
+    builder: (context) => AlertDialog(
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.circular(16),
+      ),
+      title: Text(isGuest ? 'Exit Guest Mode' : 'Logout'),
+      content: Text(isGuest 
+        ? 'Are you sure you want to exit guest mode?' 
+        : 'Are you sure you want to logout?'
+      ),
+      actions: [
+        TextButton(
+          onPressed: () => Navigator.pop(context),
+          child: Text(
+            'Cancel',
+            style: TextStyle(color: Colors.grey[700]),
+          ),
+        ),
+        ElevatedButton(
+          onPressed: () async {
+            try {
+              Navigator.pop(context); // Close dialog
+              if (isGuest) {
+                // Simply navigate back to auth page for guests
+                Navigator.of(context).pushAndRemoveUntil(
+                  MaterialPageRoute(builder: (context) => AuthPage()),
+                  (Route<dynamic> route) => false,
+                );
+              } else {
+                // Full logout for registered users
+                await authService.logout();
+                Navigator.of(context).pushAndRemoveUntil(
+                  MaterialPageRoute(builder: (context) => AuthPage()),
+                  (Route<dynamic> route) => false,
+                );
+              }
+            } catch (e) {
+              ScaffoldMessenger.of(context).showSnackBar(
+                SnackBar(
+                  content: Text('Error logging out. Please try again.'),
+                  backgroundColor: Colors.red[400],
+                  behavior: SnackBarBehavior.floating,
+                  margin: EdgeInsets.all(16),
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(8),
+                  ),
+                ),
+              );
+            }
+          },
+          style: ElevatedButton.styleFrom(
+            backgroundColor: Theme.of(context).primaryColor,
+            foregroundColor: Colors.white,
+            elevation: 0,
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(12),
+            ),
+          ),
+          child: Text(isGuest ? 'Exit' : 'Logout'),
+        ),
+      ],
+    ),
+  );
+}
+void _showPlaybackLoginPrompt() {
+  showDialog(
+    context: context,
+    builder: (BuildContext context) {
+      return AlertDialog(
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(16),
+        ),
+        title: Text('Login Required'),
+        content: Text('You need to be logged in to view recorded murmurs.'),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context),
+            child: Text(
+              'Cancel',
+              style: TextStyle(color: Colors.grey[700]),
+            ),
+          ),
+          ElevatedButton(
+            onPressed: () {
+              Navigator.pop(context);
+              Navigator.push(
+                context,
+                MaterialPageRoute(
+                  builder: (context) => LoginPage(),
+                  settings: RouteSettings(
+                    arguments: {
+                      'returnRoute': 'recording_playback',
+                      'pendingAction': 'view_recordings',
+                    },
+                  ),
+                ),
+              );
+            },
+            style: ElevatedButton.styleFrom(
+              backgroundColor: Theme.of(context).primaryColor,
+              foregroundColor: Colors.white,
+              elevation: 0,
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(12),
+              ),
+            ),
+            child: Text('Login'),
+          ),
+        ],
+      );
+    },
+  );
+}
 }
 
 class _FeatureCard extends StatelessWidget {
@@ -342,6 +575,9 @@ class _FeatureCard extends StatelessWidget {
     required this.color,
     required this.onTap,
   });
+
+ 
+  
 
   @override
   Widget build(BuildContext context) {

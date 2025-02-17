@@ -1,10 +1,16 @@
 import 'package:flutter/material.dart';
 import '../dashboard/components/patient_card.dart';
 import '../registration/firebase_service.dart';
-import 'patient_model.dart';
+import '/utils/models.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 
 class AddPatientScreen extends StatefulWidget {
+   final bool fromMurmurRecord;
+
+  AddPatientScreen({
+    Key? key,
+    this.fromMurmurRecord = false,
+  }) : super(key: key);
   @override
   _AddPatientScreenState createState() => _AddPatientScreenState();
 }
@@ -216,37 +222,42 @@ class _AddPatientScreenState extends State<AddPatientScreen> {
     );
   }
 
-  void _submitForm() async {
-    if (_formKey.currentState!.validate()) {
-      final user = FirebaseAuth.instance.currentUser;
-      if (user == null) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text('Error: User not logged in!'),
-            backgroundColor: Colors.red[400],
-          ),
-        );
-        return;
-      }
-
-      Patient newPatient = Patient(
-        fullName: _fullNameController.text,
-        email: _emailController.text,
-        medicalCardNumber: _medicalCardController.text,
-        dateOfBirth: _dateOfBirthController.text,
-        gender: _selectedGender!,
-        phoneNumber: _phoneNumberController.text,
-      );
-
-      await _firebaseService.savePatient(user.uid, newPatient);
-
+void _submitForm() async {
+  if (_formKey.currentState!.validate()) {
+    final user = FirebaseAuth.instance.currentUser;
+    if (user == null) {
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
-          content: Text('Patient saved successfully!'),
-          backgroundColor: Colors.green[400],
+          content: Text('Error: User not logged in!'),
+          backgroundColor: Colors.red[400],
         ),
       );
+      return;
+    }
 
+    Patient newPatient = Patient(
+      fullName: _fullNameController.text,
+      email: _emailController.text,
+      medicalCardNumber: _medicalCardController.text,
+      dateOfBirth: _dateOfBirthController.text,
+      gender: _selectedGender!,
+      phoneNumber: _phoneNumberController.text,
+    );
+
+    await _firebaseService.savePatient(user.uid, newPatient);
+
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Text('Patient saved successfully!'),
+        backgroundColor: Colors.green[400],
+      ),
+    );
+
+    if (widget.fromMurmurRecord) {
+      // If we came from MurmurRecord, pop and return the new patient
+      Navigator.pop(context, newPatient);
+    } else {
+      // Original navigation to patient list
       Navigator.push(
         context,
         MaterialPageRoute(
@@ -255,4 +266,5 @@ class _AddPatientScreenState extends State<AddPatientScreen> {
       );
     }
   }
+}
 }
