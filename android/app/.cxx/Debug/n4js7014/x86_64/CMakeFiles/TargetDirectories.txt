@@ -1,0 +1,2 @@
+C:/Users/krupe/Documents/GitHub/COEN-490/android/app/.cxx/Debug/n4js7014/x86_64/CMakeFiles/edit_cache.dir
+C:/Users/krupe/Documents/GitHub/COEN-490/android/app/.cxx/Debug/n4js7014/x86_64/CMakeFiles/rebuild_cache.dir

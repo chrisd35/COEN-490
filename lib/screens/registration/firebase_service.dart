@@ -284,4 +284,218 @@ class FirebaseService {
       rethrow;
     }
   }
+   Future<void> savePulseOxSession(
+    String uid,
+    String medicalCardNumber,
+    List<Map<String, dynamic>> sessionReadings,
+    Map<String, double> averages,
+  ) async {
+    try {
+      String sanitizedMedicalCard = medicalCardNumber.replaceAll('/', '_');
+      
+      // Save session data
+      await _database
+          .child('users')
+          .child(uid)
+          .child('patients')
+          .child(sanitizedMedicalCard)
+          .child('pulseOxSessions')
+          .push()
+          .set({
+            'timestamp': DateTime.now().toIso8601String(),
+            'averages': {
+              'heartRate': averages['heartRate'],
+              'spO2': averages['spO2'],
+              'temperature': averages['temperature'],
+            },
+            'readings': sessionReadings,
+            'readingCount': sessionReadings.length,
+          });
+
+      print('PulseOx session saved successfully');
+    } catch (e) {
+      print('Error saving PulseOx session: $e');
+      rethrow;
+    }
+  }
+
+   Future<List<PulseOxSession>> getPulseOxSessions(
+    String uid,
+    String medicalCardNumber,
+  ) async {
+    try {
+      String sanitizedMedicalCard = medicalCardNumber.replaceAll('/', '_');
+      
+      DataSnapshot snapshot = await _database
+          .child('users')
+          .child(uid)
+          .child('patients')
+          .child(sanitizedMedicalCard)
+          .child('pulseOxSessions')
+          .get();
+
+      if (!snapshot.exists || snapshot.value == null) {
+        return [];
+      }
+
+      Map<dynamic, dynamic> sessionsMap = snapshot.value as Map<dynamic, dynamic>;
+      List<PulseOxSession> sessions = [];
+
+      sessionsMap.forEach((key, value) {
+        sessions.add(PulseOxSession.fromMap(value as Map<dynamic, dynamic>));
+      });
+
+      // Sort by timestamp, newest first
+      sessions.sort((a, b) => b.timestamp.compareTo(a.timestamp));
+
+      return sessions;
+    } catch (e) {
+      print('Error fetching PulseOx sessions: $e');
+      rethrow;
+    }
+  }
+
+  Future<void> saveECGReading(
+    String uid,
+    String medicalCardNumber,
+    List<int> ecgData,
+    Map<String, dynamic> metadata,
+  ) async {
+    try {
+      String sanitizedMedicalCard = medicalCardNumber.replaceAll('/', '_');
+      
+      // Create binary file from ECG data
+      final processedData = ByteData(ecgData.length);
+      for (var i = 0; i < ecgData.length; i++) {
+        processedData.setInt8(i, ecgData[i]);
+      }
+
+      // Generate filename and timestamp
+      DateTime timestamp = DateTime.now();
+      String filename = 'users/$uid/patients/$sanitizedMedicalCard/ecg/${timestamp.millisecondsSinceEpoch}.ecg';
+
+      // Upload to Firebase Storage
+      await _storage.ref(filename).putData(
+        Uint8List.fromList(ecgData),
+        SettableMetadata(
+          contentType: 'application/octet-stream',
+          customMetadata: {
+            'sampleRate': (metadata['sampleRate'] ?? 4000).toString(),
+            'duration': metadata['duration'].toString(),
+            'timestamp': timestamp.toIso8601String(),
+          },
+        ),
+      );
+
+      // Get download URL
+      String downloadUrl = await _storage.ref(filename).getDownloadURL();
+
+      // Save metadata to Realtime Database
+      await _database
+          .child('users')
+          .child(uid)
+          .child('patients')
+          .child(sanitizedMedicalCard)
+          .child('ecgData')
+          .push()
+          .set({
+            'timestamp': timestamp.toIso8601String(),
+            'filename': filename,
+            'downloadUrl': downloadUrl,
+            'duration': metadata['duration'],
+            'sampleRate': metadata['sampleRate'] ?? 4000,
+          });
+
+      print('ECG reading saved successfully');
+    } catch (e) {
+      print('Error saving ECG reading: $e');
+      rethrow;
+    }
+  }
+  Future<List<Map<String, dynamic>>> getPulseOxReadings(
+    String uid,
+    String medicalCardNumber,
+  ) async {
+    try {
+      String sanitizedMedicalCard = medicalCardNumber.replaceAll('/', '_');
+      
+      DataSnapshot snapshot = await _database
+          .child('users')
+          .child(uid)
+          .child('patients')
+          .child(sanitizedMedicalCard)
+          .child('pulseOxData')
+          .get();
+
+      if (!snapshot.exists || snapshot.value == null) {
+        return [];
+      }
+
+      Map<dynamic, dynamic> readingsMap = snapshot.value as Map<dynamic, dynamic>;
+      List<Map<String, dynamic>> readings = [];
+
+      readingsMap.forEach((key, value) {
+        readings.add(Map<String, dynamic>.from(value as Map));
+      });
+
+      readings.sort((a, b) => 
+        DateTime.parse(b['timestamp']).compareTo(DateTime.parse(a['timestamp']))
+      );
+
+      return readings;
+    } catch (e) {
+      print('Error fetching PulseOx readings: $e');
+      rethrow;
+    }
+  }
+
+  Future<List<Map<String, dynamic>>> getECGReadings(
+    String uid,
+    String medicalCardNumber,
+  ) async {
+    try {
+      String sanitizedMedicalCard = medicalCardNumber.replaceAll('/', '_');
+      
+      DataSnapshot snapshot = await _database
+          .child('users')
+          .child(uid)
+          .child('patients')
+          .child(sanitizedMedicalCard)
+          .child('ecgData')
+          .get();
+
+      if (!snapshot.exists || snapshot.value == null) {
+        return [];
+      }
+
+      Map<dynamic, dynamic> readingsMap = snapshot.value as Map<dynamic, dynamic>;
+      List<Map<String, dynamic>> readings = [];
+
+      for (var entry in readingsMap.entries) {
+        Map<dynamic, dynamic> readingData = entry.value as Map<dynamic, dynamic>;
+        Map<String, dynamic> reading = Map<String, dynamic>.from(readingData);
+        
+        try {
+          // Ensure the download URL is still valid
+          if (!reading.containsKey('downloadUrl') || reading['downloadUrl'] == null) {
+            String downloadUrl = await _storage.ref(reading['filename']).getDownloadURL();
+            reading['downloadUrl'] = downloadUrl;
+          }
+          readings.add(reading);
+        } catch (e) {
+          print('Error getting download URL for ECG ${reading['filename']}: $e');
+          continue;
+        }
+      }
+
+      readings.sort((a, b) => 
+        DateTime.parse(b['timestamp']).compareTo(DateTime.parse(a['timestamp']))
+      );
+
+      return readings;
+    } catch (e) {
+      print('Error fetching ECG readings: $e');
+      rethrow;
+    }
+  }
 }
