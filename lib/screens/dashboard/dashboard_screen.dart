@@ -32,21 +32,21 @@ class _DashboardScreenState extends State<DashboardScreen> {
     _loadUserName();
   }
 
-    @override
+  @override
   void didChangeDependencies() {
     super.didChangeDependencies();
     // Refresh state when the screen becomes visible
     _loadUserName();
   }
 
- Future<void> _loadUserName() async {
+  Future<void> _loadUserName() async {
     try {
       final authService = Provider.of<AuthService>(context, listen: false);
       final user = FirebaseAuth.instance.currentUser;
-      
+
       // Check if in guest mode
       final isGuest = await authService.isGuest();
-      
+
       if (isGuest) {
         setState(() {
           _userName = 'Guest';
@@ -55,7 +55,8 @@ class _DashboardScreenState extends State<DashboardScreen> {
       }
 
       if (user != null) {
-        final userData = await _firebaseService.getUser(user.uid, user.email ?? '');
+        final userData =
+            await _firebaseService.getUser(user.uid, user.email ?? '');
         if (userData != null) {
           setState(() {
             _userName = userData.fullName.split(' ')[0];
@@ -78,44 +79,45 @@ class _DashboardScreenState extends State<DashboardScreen> {
         child: Column(
           children: [
             // Custom App Bar
-           Container(
-  padding: EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-  decoration: BoxDecoration(
-    color: Colors.white,
-    boxShadow: [
-      BoxShadow(
-        color: Colors.black.withOpacity(0.05),
-        blurRadius: 10,
-        offset: Offset(0, 2),
-      ),
-    ],
-  ),
-  child: Row(
-    children: [
-      Text(
-        'Dashboard',
-        style: TextStyle(
-          fontSize: 24,
-          fontWeight: FontWeight.bold,
-        ),
-      ),
-      Spacer(),
-      // Bluetooth Connection Button
-      IconButton(
-        icon: Icon(Icons.bluetooth, color: Theme.of(context).primaryColor),
-        onPressed: () => Navigator.push(
-          context,
-          MaterialPageRoute(builder: (context) => BLEScreen()),
-        ),
-      ),
-      // Logout Button
-      IconButton(
-        icon: Icon(Icons.logout_rounded, color: Colors.grey[700]),
-        onPressed: () => _showLogoutDialog(),
-      ),
-    ],
-  ),
-),
+            Container(
+              padding: EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+              decoration: BoxDecoration(
+                color: Colors.white,
+                boxShadow: [
+                  BoxShadow(
+                    color: Colors.black.withOpacity(0.05),
+                    blurRadius: 10,
+                    offset: Offset(0, 2),
+                  ),
+                ],
+              ),
+              child: Row(
+                children: [
+                  Text(
+                    'Dashboard',
+                    style: TextStyle(
+                      fontSize: 24,
+                      fontWeight: FontWeight.bold,
+                    ),
+                  ),
+                  Spacer(),
+                  // Bluetooth Connection Button
+                  IconButton(
+                    icon: Icon(Icons.bluetooth,
+                        color: Theme.of(context).primaryColor),
+                    onPressed: () => Navigator.push(
+                      context,
+                      MaterialPageRoute(builder: (context) => BLEScreen()),
+                    ),
+                  ),
+                  // Logout Button
+                  IconButton(
+                    icon: Icon(Icons.logout_rounded, color: Colors.grey[700]),
+                    onPressed: () => _showLogoutDialog(),
+                  ),
+                ],
+              ),
+            ),
 
             // Main Content
             Expanded(
@@ -140,12 +142,15 @@ class _DashboardScreenState extends State<DashboardScreen> {
                       ),
                       child: connectedDevice != null
                           ? StreamBuilder<BluetoothConnectionState>(
-                              stream: bleManager.getDeviceState(connectedDevice),
+                              stream:
+                                  bleManager.getDeviceState(connectedDevice),
                               builder: (context, snapshot) {
-                                final isConnected = snapshot.data == BluetoothConnectionState.connected;
+                                final isConnected = snapshot.data ==
+                                    BluetoothConnectionState.connected;
 
                                 if (!isConnected && _wasConnected) {
-                                  WidgetsBinding.instance.addPostFrameCallback((_) {
+                                  WidgetsBinding.instance
+                                      .addPostFrameCallback((_) {
                                     _showDisconnectionDialog();
                                   });
                                   _wasConnected = false;
@@ -187,156 +192,197 @@ class _DashboardScreenState extends State<DashboardScreen> {
                     ),
                     SizedBox(height: 32),
 
-        FutureBuilder<bool>(
-          future: Provider.of<AuthService>(context, listen: false).isGuest(),
-          builder: (context, snapshot) {
-            if (snapshot.connectionState == ConnectionState.waiting) {
-              return CircularProgressIndicator();
-            }
+                    FutureBuilder<bool>(
+                      future: Provider.of<AuthService>(context, listen: false)
+                          .isGuest(),
+                      builder: (context, snapshot) {
+                        if (snapshot.connectionState ==
+                            ConnectionState.waiting) {
+                          return CircularProgressIndicator();
+                        }
 
-            final isGuest = snapshot.data ?? false;
+                        final isGuest = snapshot.data ?? false;
 
-            return GridView.count(
-            shrinkWrap: true,
-  physics: NeverScrollableScrollPhysics(),
-  crossAxisCount: 2,
-  mainAxisSpacing: 16,
-  crossAxisSpacing: 16,
-  childAspectRatio: 1.1, // Adjusted for better fit with 6 items
-  children: isGuest 
-               ? [
-    // Guest user options
-    _FeatureCard(
-      title: 'Murmur Record',
-      icon: Icons.mic_rounded,
-      color: Colors.orange,
-      onTap: () => Navigator.push(
-        context,
-        MaterialPageRoute(builder: (context) => MurmurRecord()),
-      ),
-    ),
-    _FeatureCard(
-      title: 'ECG Monitoring',
-      icon: Icons.monitor_heart_outlined,
-      color: Colors.green,
-      onTap: () => Navigator.push(
-        context,
-        MaterialPageRoute(builder: (context) => ECGMonitoring()),
-      ),
-    ),
-    _FeatureCard(
-      title: 'Oxygen Monitoring',
-      icon: Icons.air,
-      color: Colors.blue,
-      onTap: () => Navigator.push(
-        context,
-        MaterialPageRoute(builder: (context) => OxygenMonitoring()),
-      ),
-    ),
-    _FeatureCard(
-      title: 'View Recordings',
-      icon: Icons.playlist_play,
-      color: Colors.purple,
-      onTap: () => _showPlaybackLoginPrompt(),
-    ),
-  ]
-: [
-    // Regular user options
-   _FeatureCard(
-      title: 'Patient Folders',
-      icon: Icons.folder_rounded,
-      color: Colors.blue,
-      onTap: () => Navigator.push(
-        context,
-        MaterialPageRoute(builder: (context) => PatientCard()),
-      ),
-    ),
-    _FeatureCard(
-      title: 'AI Murmur',
-      icon: Icons.analytics_rounded,
-      color: Colors.purple,
-      onTap: () => Navigator.push(
-        context,
-        MaterialPageRoute(builder: (context) => MurmurChart()),
-      ),
-    ),
-    _FeatureCard(
-      title: 'Murmur Record',
-      icon: Icons.mic_rounded,
-      color: Colors.orange,
-      onTap: () => Navigator.push(
-        context,
-        MaterialPageRoute(builder: (context) => MurmurRecord()),
-      ),
-    ),
-    _FeatureCard(
-      title: 'View Recordings',
-      icon: Icons.playlist_play,
-      color: Colors.teal,
-      onTap: () async {
-        try {
-          final uid = FirebaseAuth.instance.currentUser!.uid;
-          final patients = await _firebaseService.getPatientsForUser(uid);
-          
-          if (patients.isEmpty) {
-            ScaffoldMessenger.of(context).showSnackBar(
-              SnackBar(
-                content: Text('Create a patient and save a recording to access playback history'),
-                duration: Duration(seconds: 4),
+                        return GridView.count(
+                          shrinkWrap: true,
+                          physics: NeverScrollableScrollPhysics(),
+                          crossAxisCount: 2,
+                          mainAxisSpacing: 16,
+                          crossAxisSpacing: 16,
+                          childAspectRatio:
+                              1.1, // Adjusted for better fit with 6 items
+                          children: isGuest
+                              ? [
+                                  // Guest user options
+                                  _FeatureCard(
+                                    title: 'Murmur Record',
+                                    icon: Icons.mic_rounded,
+                                    color: Colors.orange,
+                                    onTap: () => Navigator.push(
+                                      context,
+                                      MaterialPageRoute(
+                                          builder: (context) => MurmurRecord()),
+                                    ),
+                                  ),
+                                  _FeatureCard(
+                                    title: 'ECG Monitoring',
+                                    icon: Icons.monitor_heart_outlined,
+                                    color: Colors.green,
+                                    onTap: () => Navigator.push(
+                                      context,
+                                      MaterialPageRoute(
+                                          builder: (context) =>
+                                              ECGMonitoring()),
+                                    ),
+                                  ),
+                                  _FeatureCard(
+                                    title: 'Oxygen Monitoring',
+                                    icon: Icons.air,
+                                    color: Colors.blue,
+                                    onTap: () => Navigator.push(
+                                      context,
+                                      MaterialPageRoute(
+                                          builder: (context) =>
+                                              OxygenMonitoring()),
+                                    ),
+                                  ),
+                                  _FeatureCard(
+                                    title: 'View Recordings',
+                                    icon: Icons.playlist_play,
+                                    color: Colors.purple,
+                                    onTap: () => _showPlaybackLoginPrompt(),
+                                  ),
+                                ]
+                              : [
+                                  // Regular user options
+                                  _FeatureCard(
+                                    title: 'Patient Folders',
+                                    icon: Icons.folder_rounded,
+                                    color: Colors.blue,
+                                    onTap: () => Navigator.push(
+                                      context,
+                                      MaterialPageRoute(
+                                          builder: (context) => PatientCard()),
+                                    ),
+                                  ),
+                                  _FeatureCard(
+                                    title: 'AI Murmur',
+                                    icon: Icons.analytics_rounded,
+                                    color: Colors.purple,
+                                    onTap: () {
+                                      final currentUserId = FirebaseAuth
+                                          .instance.currentUser?.uid;
+                                      if (currentUserId != null) {
+                                        Navigator.push(
+                                          context,
+                                          MaterialPageRoute(
+                                            builder: (context) => MurmurChart(
+                                              uid: currentUserId,
+                                            ),
+                                          ),
+                                        );
+                                      } else {
+                                        ScaffoldMessenger.of(context)
+                                            .showSnackBar(
+                                          SnackBar(
+                                            content:
+                                                Text('User not authenticated'),
+                                            backgroundColor: Colors.red,
+                                          ),
+                                        );
+                                      }
+                                    },
+                                  ),
+                                  _FeatureCard(
+                                    title: 'Murmur Record',
+                                    icon: Icons.mic_rounded,
+                                    color: Colors.orange,
+                                    onTap: () => Navigator.push(
+                                      context,
+                                      MaterialPageRoute(
+                                          builder: (context) => MurmurRecord()),
+                                    ),
+                                  ),
+                                  _FeatureCard(
+                                    title: 'View Recordings',
+                                    icon: Icons.playlist_play,
+                                    color: Colors.teal,
+                                    onTap: () async {
+                                      try {
+                                        final uid = FirebaseAuth
+                                            .instance.currentUser!.uid;
+                                        final patients = await _firebaseService
+                                            .getPatientsForUser(uid);
+
+                                        if (patients.isEmpty) {
+                                          ScaffoldMessenger.of(context)
+                                              .showSnackBar(
+                                            SnackBar(
+                                              content: Text(
+                                                  'Create a patient and save a recording to access playback history'),
+                                              duration: Duration(seconds: 4),
+                                            ),
+                                          );
+                                          return;
+                                        }
+
+                                        Navigator.push(
+                                          context,
+                                          MaterialPageRoute(
+                                            builder: (context) =>
+                                                RecordingPlaybackScreen(),
+                                          ),
+                                        );
+                                      } catch (e) {
+                                        ScaffoldMessenger.of(context)
+                                            .showSnackBar(
+                                          SnackBar(
+                                            content: Text(
+                                                'Failed to check recordings: $e'),
+                                            backgroundColor: Colors.red,
+                                          ),
+                                        );
+                                      }
+                                    },
+                                  ),
+                                  _FeatureCard(
+                                    title: 'ECG Monitoring',
+                                    icon: Icons.monitor_heart_outlined,
+                                    color: Colors.green,
+                                    onTap: () => Navigator.push(
+                                      context,
+                                      MaterialPageRoute(
+                                          builder: (context) =>
+                                              ECGMonitoring()),
+                                    ),
+                                  ),
+                                  _FeatureCard(
+                                    title: 'Oxygen Monitoring',
+                                    icon: Icons.air,
+                                    color: Colors.blue[700] ?? Colors.blue,
+                                    onTap: () => Navigator.push(
+                                      context,
+                                      MaterialPageRoute(
+                                          builder: (context) =>
+                                              OxygenMonitoring()),
+                                    ),
+                                  ),
+                                ],
+                        );
+                      },
+                    ),
+                  ],
+                ),
               ),
-            );
-            return;
-          }
-          
-          Navigator.push(
-            context,
-            MaterialPageRoute(
-              builder: (context) => RecordingPlaybackScreen(),
             ),
-          );
-        } catch (e) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(
-              content: Text('Failed to check recordings: $e'),
-              backgroundColor: Colors.red,
-            ),
-          );
-        }
-      },
-    ),
-    _FeatureCard(
-      title: 'ECG Monitoring',
-      icon: Icons.monitor_heart_outlined,
-      color: Colors.green,
-      onTap: () => Navigator.push(
-        context,
-        MaterialPageRoute(builder: (context) => ECGMonitoring()),
-      ),
-    ),
-    _FeatureCard(
-      title: 'Oxygen Monitoring',
-      icon: Icons.air,
-      color: Colors.blue[700] ?? Colors.blue,
-      onTap: () => Navigator.push(
-        context,
-        MaterialPageRoute(builder: (context) => OxygenMonitoring()),
-      ),
-    ),
-  ],
-            );
-          },
-        ),
-      ],
-    ),
-  ),
-),
           ],
         ),
       ),
     );
   }
 
-  Widget _buildConnectionStatus({required bool isConnected, required String deviceName}) {
+  Widget _buildConnectionStatus(
+      {required bool isConnected, required String deviceName}) {
     return Row(
       children: [
         Container(
@@ -462,85 +508,20 @@ class _DashboardScreenState extends State<DashboardScreen> {
     );
   }
 
-void _showLogoutDialog() async {
-  final authService = Provider.of<AuthService>(context, listen: false);
-  final isGuest = await authService.isGuest();
+  void _showLogoutDialog() async {
+    final authService = Provider.of<AuthService>(context, listen: false);
+    final isGuest = await authService.isGuest();
 
-  showDialog(
-    context: context,
-    builder: (context) => AlertDialog(
-      shape: RoundedRectangleBorder(
-        borderRadius: BorderRadius.circular(16),
-      ),
-      title: Text(isGuest ? 'Exit Guest Mode' : 'Logout'),
-      content: Text(isGuest 
-        ? 'Are you sure you want to exit guest mode?' 
-        : 'Are you sure you want to logout?'
-      ),
-      actions: [
-        TextButton(
-          onPressed: () => Navigator.pop(context),
-          child: Text(
-            'Cancel',
-            style: TextStyle(color: Colors.grey[700]),
-          ),
-        ),
-        ElevatedButton(
-          onPressed: () async {
-            try {
-              Navigator.pop(context); // Close dialog
-              if (isGuest) {
-                // Simply navigate back to auth page for guests
-                Navigator.of(context).pushAndRemoveUntil(
-                  MaterialPageRoute(builder: (context) => AuthPage()),
-                  (Route<dynamic> route) => false,
-                );
-              } else {
-                // Full logout for registered users
-                await authService.logout();
-                Navigator.of(context).pushAndRemoveUntil(
-                  MaterialPageRoute(builder: (context) => AuthPage()),
-                  (Route<dynamic> route) => false,
-                );
-              }
-            } catch (e) {
-              ScaffoldMessenger.of(context).showSnackBar(
-                SnackBar(
-                  content: Text('Error logging out. Please try again.'),
-                  backgroundColor: Colors.red[400],
-                  behavior: SnackBarBehavior.floating,
-                  margin: EdgeInsets.all(16),
-                  shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(8),
-                  ),
-                ),
-              );
-            }
-          },
-          style: ElevatedButton.styleFrom(
-            backgroundColor: Theme.of(context).primaryColor,
-            foregroundColor: Colors.white,
-            elevation: 0,
-            shape: RoundedRectangleBorder(
-              borderRadius: BorderRadius.circular(12),
-            ),
-          ),
-          child: Text(isGuest ? 'Exit' : 'Logout'),
-        ),
-      ],
-    ),
-  );
-}
-void _showPlaybackLoginPrompt() {
-  showDialog(
-    context: context,
-    builder: (BuildContext context) {
-      return AlertDialog(
+    showDialog(
+      context: context,
+      builder: (context) => AlertDialog(
         shape: RoundedRectangleBorder(
           borderRadius: BorderRadius.circular(16),
         ),
-        title: Text('Login Required'),
-        content: Text('You need to be logged in to view recorded murmurs.'),
+        title: Text(isGuest ? 'Exit Guest Mode' : 'Logout'),
+        content: Text(isGuest
+            ? 'Are you sure you want to exit guest mode?'
+            : 'Are you sure you want to logout?'),
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(context),
@@ -550,20 +531,36 @@ void _showPlaybackLoginPrompt() {
             ),
           ),
           ElevatedButton(
-            onPressed: () {
-              Navigator.pop(context);
-              Navigator.push(
-                context,
-                MaterialPageRoute(
-                  builder: (context) => LoginPage(),
-                  settings: RouteSettings(
-                    arguments: {
-                      'returnRoute': 'recording_playback',
-                      'pendingAction': 'view_recordings',
-                    },
+            onPressed: () async {
+              try {
+                Navigator.pop(context); // Close dialog
+                if (isGuest) {
+                  // Simply navigate back to auth page for guests
+                  Navigator.of(context).pushAndRemoveUntil(
+                    MaterialPageRoute(builder: (context) => AuthPage()),
+                    (Route<dynamic> route) => false,
+                  );
+                } else {
+                  // Full logout for registered users
+                  await authService.logout();
+                  Navigator.of(context).pushAndRemoveUntil(
+                    MaterialPageRoute(builder: (context) => AuthPage()),
+                    (Route<dynamic> route) => false,
+                  );
+                }
+              } catch (e) {
+                ScaffoldMessenger.of(context).showSnackBar(
+                  SnackBar(
+                    content: Text('Error logging out. Please try again.'),
+                    backgroundColor: Colors.red[400],
+                    behavior: SnackBarBehavior.floating,
+                    margin: EdgeInsets.all(16),
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(8),
+                    ),
                   ),
-                ),
-              );
+                );
+              }
             },
             style: ElevatedButton.styleFrom(
               backgroundColor: Theme.of(context).primaryColor,
@@ -573,13 +570,62 @@ void _showPlaybackLoginPrompt() {
                 borderRadius: BorderRadius.circular(12),
               ),
             ),
-            child: Text('Login'),
+            child: Text(isGuest ? 'Exit' : 'Logout'),
           ),
         ],
-      );
-    },
-  );
-}
+      ),
+    );
+  }
+
+  void _showPlaybackLoginPrompt() {
+    showDialog(
+      context: context,
+      builder: (BuildContext context) {
+        return AlertDialog(
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(16),
+          ),
+          title: Text('Login Required'),
+          content: Text('You need to be logged in to view recorded murmurs.'),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(context),
+              child: Text(
+                'Cancel',
+                style: TextStyle(color: Colors.grey[700]),
+              ),
+            ),
+            ElevatedButton(
+              onPressed: () {
+                Navigator.pop(context);
+                Navigator.push(
+                  context,
+                  MaterialPageRoute(
+                    builder: (context) => LoginPage(),
+                    settings: RouteSettings(
+                      arguments: {
+                        'returnRoute': 'recording_playback',
+                        'pendingAction': 'view_recordings',
+                      },
+                    ),
+                  ),
+                );
+              },
+              style: ElevatedButton.styleFrom(
+                backgroundColor: Theme.of(context).primaryColor,
+                foregroundColor: Colors.white,
+                elevation: 0,
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(12),
+                ),
+              ),
+              child: Text('Login'),
+            ),
+          ],
+        );
+      },
+    );
+  }
 }
 
 class _FeatureCard extends StatelessWidget {
@@ -594,9 +640,6 @@ class _FeatureCard extends StatelessWidget {
     required this.color,
     required this.onTap,
   });
-
- 
-  
 
   @override
   Widget build(BuildContext context) {

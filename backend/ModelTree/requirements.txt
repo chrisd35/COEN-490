@@ -1,0 +1,8 @@
+pandas
+numpy
+scikit-learn
+joblib
+tensorflow
+librosa
+# To download tflife runtime for tensorflow model run the following command locally
+# pip install tflite-runtime

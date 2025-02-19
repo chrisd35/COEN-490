@@ -73,7 +73,7 @@ class PulseOxSession {
     Map<String, double> parseAverages() {
       var averagesData = data['averages'];
       if (averagesData == null) return {};
-      
+
       Map<String, double> result = {};
       (averagesData as Map).forEach((key, value) {
         if (value is num) {
@@ -87,7 +87,7 @@ class PulseOxSession {
     List<Map<String, dynamic>> parseReadings() {
       var readingsData = data['readings'];
       if (readingsData == null) return [];
-      
+
       if (readingsData is List) {
         return readingsData.map((reading) {
           if (reading is Map) {
@@ -107,15 +107,13 @@ class PulseOxSession {
     }
 
     return PulseOxSession(
-      timestamp: DateTime.parse(data['timestamp'] ?? DateTime.now().toIso8601String()),
+      timestamp:
+          DateTime.parse(data['timestamp'] ?? DateTime.now().toIso8601String()),
       averages: parseAverages(),
       readings: parseReadings(),
       readingCount: (data['readingCount'] as num?)?.toInt() ?? 0,
     );
   }
-
-
-
 
   // Helper methods to get specific readings
   List<double> get heartRateReadings {
@@ -134,6 +132,7 @@ class PulseOxSession {
     return readings.map((r) => r['timestamp'] as int).toList();
   }
 }
+
 extension PulseOxSessionExtension on PulseOxSession {
   List<double> get heartRateReadings {
     return readings.map((r) {
@@ -169,6 +168,7 @@ extension PulseOxSessionExtension on PulseOxSession {
     }).toList();
   }
 }
+
 class ECGReading {
   final DateTime timestamp;
   final String filename;
@@ -246,7 +246,7 @@ class Patient {
     List<Recording> parseRecordings() {
       var recordingsData = data['recordings'];
       if (recordingsData == null) return [];
-      
+
       if (recordingsData is List) {
         return recordingsData
             .map((x) => Recording.fromMap(x as Map<dynamic, dynamic>))
@@ -262,7 +262,7 @@ class Patient {
     List<PulseOxSession> parsePulseOxSessions() {
       var sessionsData = data['pulseOxSessions'];
       if (sessionsData == null) return [];
-      
+
       if (sessionsData is List) {
         return sessionsData
             .map((x) => PulseOxSession.fromMap(x as Map<dynamic, dynamic>))
@@ -278,7 +278,7 @@ class Patient {
     List<ECGReading> parseECGReadings() {
       var readingsData = data['ecgReadings'];
       if (readingsData == null) return [];
-      
+
       if (readingsData is List) {
         return readingsData
             .map((x) => ECGReading.fromMap(x as Map<dynamic, dynamic>))
@@ -304,12 +304,12 @@ class Patient {
     );
   }
 
-
   void addRecording(Recording recording) {
     recordings.add(recording);
   }
 
-void addPulseOxSession(PulseOxSession session) {  // Updated method
+  void addPulseOxSession(PulseOxSession session) {
+    // Updated method
     pulseOxSessions.add(session);
   }
 
@@ -347,8 +347,9 @@ class Recording {
 
   factory Recording.fromMap(Map<dynamic, dynamic> data) {
     var amplitude = data['peakAmplitude'];
-    double peakAmplitude = (amplitude is int) ? amplitude.toDouble() : amplitude;
-    
+    double peakAmplitude =
+        (amplitude is int) ? amplitude.toDouble() : amplitude;
+
     return Recording(
       timestamp: DateTime.parse(data['timestamp']),
       filename: data['filename'],

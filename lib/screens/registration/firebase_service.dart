@@ -20,10 +20,7 @@ class FirebaseService {
 
   Future<void> saveUser(User user) async {
     try {
-      await _database
-          .child('users')
-          .child(user.uid)
-          .set(user.toMap());
+      await _database.child('users').child(user.uid).set(user.toMap());
       print('User saved successfully!');
     } catch (e) {
       print('Error saving user: $e');
@@ -33,11 +30,8 @@ class FirebaseService {
 
   Future<User?> getUser(String uid, String s) async {
     try {
-      DataSnapshot snapshot = await _database
-          .child('users')
-          .child(uid)
-          .get();
-      
+      DataSnapshot snapshot = await _database.child('users').child(uid).get();
+
       if (snapshot.exists && snapshot.value != null) {
         return User.fromMap(snapshot.value as Map<dynamic, dynamic>);
       } else {
@@ -52,7 +46,8 @@ class FirebaseService {
 
   Future<void> savePatient(String uid, Patient patient) async {
     try {
-      String sanitizedMedicalCard = patient.medicalCardNumber.replaceAll('/', '_');
+      String sanitizedMedicalCard =
+          patient.medicalCardNumber.replaceAll('/', '_');
       await _database
           .child('users')
           .child(uid)
@@ -75,7 +70,7 @@ class FirebaseService {
           .child('patients')
           .child(sanitizedMedicalCard)
           .get();
-      
+
       if (snapshot.exists && snapshot.value != null) {
         return Patient.fromMap(snapshot.value as Map<dynamic, dynamic>);
       } else {
@@ -90,17 +85,15 @@ class FirebaseService {
 
   Future<List<Patient>> getPatientsForUser(String uid) async {
     try {
-      DataSnapshot snapshot = await _database
-          .child('users')
-          .child(uid)
-          .child('patients')
-          .get();
-      
+      DataSnapshot snapshot =
+          await _database.child('users').child(uid).child('patients').get();
+
       if (!snapshot.exists || snapshot.value == null) {
         return [];
       }
 
-      Map<dynamic, dynamic> patientsMap = snapshot.value as Map<dynamic, dynamic>;
+      Map<dynamic, dynamic> patientsMap =
+          snapshot.value as Map<dynamic, dynamic>;
       List<Patient> patients = patientsMap.entries.map((entry) {
         return Patient.fromMap(entry.value as Map<dynamic, dynamic>);
       }).toList();
@@ -116,7 +109,7 @@ class FirebaseService {
   void debugAudioData(List<int> audioData, int sampleRate, int duration) {
     int expectedSamples = sampleRate * duration;
     int expectedBytes = expectedSamples * 2;
-    
+
     print("Audio Debug Info:");
     print("Sample Rate: $sampleRate Hz");
     print("Duration: $duration seconds");
@@ -124,7 +117,8 @@ class FirebaseService {
     print("Expected bytes: $expectedBytes");
     print("Actual bytes received: ${audioData.length}");
     print("Actual samples (bytes/2): ${audioData.length ~/ 2}");
-    print("Calculated duration: ${audioData.length / (2 * sampleRate)} seconds");
+    print(
+        "Calculated duration: ${audioData.length / (2 * sampleRate)} seconds");
   }
 
   Future<void> saveRecording(
@@ -136,18 +130,18 @@ class FirebaseService {
   ) async {
     try {
       String sanitizedMedicalCard = medicalCardNumber.replaceAll('/', '_');
-      
+
       // Validate and adjust audio data if necessary
-      int expectedBytes = (metadata['sampleRate'] ?? 4000) * 
-                         (metadata['duration'] ?? 0) * 
-                         2;  // 2 bytes per sample
-      
+      int expectedBytes = (metadata['sampleRate'] ?? 4000) *
+          (metadata['duration'] ?? 0) *
+          2; // 2 bytes per sample
+
       List<int> processedAudioData = audioData;
       if (audioData.length != expectedBytes) {
         print("Warning: Audio data length mismatch");
         print("Expected: $expectedBytes bytes");
         print("Actual: ${audioData.length} bytes");
-        
+
         if (audioData.length > expectedBytes) {
           processedAudioData = audioData.sublist(0, expectedBytes);
           print("Trimmed audio data to expected length");
@@ -155,11 +149,8 @@ class FirebaseService {
       }
 
       // Debug processed data
-      debugAudioData(
-        processedAudioData,
-        metadata['sampleRate'] ?? 4000,
-        metadata['duration']
-      );
+      debugAudioData(processedAudioData, metadata['sampleRate'] ?? 4000,
+          metadata['duration']);
 
       // Create WAV file
       final wavData = createWavFile(
@@ -170,21 +161,22 @@ class FirebaseService {
       );
 
       // Generate filename
-      String filename = 'users/$uid/patients/$sanitizedMedicalCard/recordings/${timestamp.millisecondsSinceEpoch}.wav';
+      String filename =
+          'users/$uid/patients/$sanitizedMedicalCard/recordings/${timestamp.millisecondsSinceEpoch}.wav';
 
       // Upload to Firebase Storage
       await _storage.ref(filename).putData(
-        Uint8List.fromList(wavData),
-        SettableMetadata(
-          contentType: 'audio/wav',
-          customMetadata: {
-            'sampleRate': (metadata['sampleRate'] ?? 4000).toString(),
-            'duration': metadata['duration'].toString(),
-            'bitsPerSample': (metadata['bitsPerSample'] ?? 16).toString(),
-            'channels': (metadata['channels'] ?? 1).toString(),
-          },
-        ),
-      );
+            Uint8List.fromList(wavData),
+            SettableMetadata(
+              contentType: 'audio/wav',
+              customMetadata: {
+                'sampleRate': (metadata['sampleRate'] ?? 4000).toString(),
+                'duration': metadata['duration'].toString(),
+                'bitsPerSample': (metadata['bitsPerSample'] ?? 16).toString(),
+                'channels': (metadata['channels'] ?? 1).toString(),
+              },
+            ),
+          );
 
       // Save metadata to Realtime Database
       await _database
@@ -195,14 +187,14 @@ class FirebaseService {
           .child('recordings')
           .push()
           .set({
-            'timestamp': timestamp.toIso8601String(),
-            'filename': filename,
-            'duration': metadata['duration'],
-            'sampleRate': metadata['sampleRate'] ?? 4000,
-            'bitsPerSample': metadata['bitsPerSample'] ?? 16,
-            'channels': metadata['channels'] ?? 1,
-            'peakAmplitude': metadata['peakAmplitude'],
-          });
+        'timestamp': timestamp.toIso8601String(),
+        'filename': filename,
+        'duration': metadata['duration'],
+        'sampleRate': metadata['sampleRate'] ?? 4000,
+        'bitsPerSample': metadata['bitsPerSample'] ?? 16,
+        'channels': metadata['channels'] ?? 1,
+        'peakAmplitude': metadata['peakAmplitude'],
+      });
 
       print("Recording saved successfully with correct duration");
     } catch (e) {
@@ -219,35 +211,36 @@ class FirebaseService {
   }) {
     final int byteRate = sampleRate * channels * (bitsPerSample ~/ 8);
     final int blockAlign = channels * (bitsPerSample ~/ 8);
-    
+
     ByteData header = ByteData(44);
-    
+
     // RIFF header
-    header.setUint32(0, 0x52494646, Endian.big);  // "RIFF"
-    header.setUint32(4, 36 + audioData.length, Endian.little);  // File size
-    header.setUint32(8, 0x57415645, Endian.big);  // "WAVE"
-    
+    header.setUint32(0, 0x52494646, Endian.big); // "RIFF"
+    header.setUint32(4, 36 + audioData.length, Endian.little); // File size
+    header.setUint32(8, 0x57415645, Endian.big); // "WAVE"
+
     // Format chunk
-    header.setUint32(12, 0x666D7420, Endian.big);  // "fmt "
-    header.setUint32(16, 16, Endian.little);  // Format chunk size
-    header.setUint16(20, 1, Endian.little);  // PCM format
-    header.setUint16(22, channels, Endian.little);  // Channels
-    header.setUint32(24, sampleRate, Endian.little);  // Sample rate
-    header.setUint32(28, byteRate, Endian.little);  // Byte rate
-    header.setUint16(32, blockAlign, Endian.little);  // Block align
-    header.setUint16(34, bitsPerSample, Endian.little);  // Bits per sample
-    
+    header.setUint32(12, 0x666D7420, Endian.big); // "fmt "
+    header.setUint32(16, 16, Endian.little); // Format chunk size
+    header.setUint16(20, 1, Endian.little); // PCM format
+    header.setUint16(22, channels, Endian.little); // Channels
+    header.setUint32(24, sampleRate, Endian.little); // Sample rate
+    header.setUint32(28, byteRate, Endian.little); // Byte rate
+    header.setUint16(32, blockAlign, Endian.little); // Block align
+    header.setUint16(34, bitsPerSample, Endian.little); // Bits per sample
+
     // Data chunk
-    header.setUint32(36, 0x64617461, Endian.big);  // "data"
-    header.setUint32(40, audioData.length, Endian.little);  // Data size
-    
+    header.setUint32(36, 0x64617461, Endian.big); // "data"
+    header.setUint32(40, audioData.length, Endian.little); // Data size
+
     return [...header.buffer.asUint8List(), ...audioData];
   }
 
-  Future<List<Recording>> getRecordingsForPatient(String uid, String medicalCardNumber) async {
+  Future<List<Recording>> getRecordingsForPatient(
+      String uid, String medicalCardNumber) async {
     try {
       String sanitizedMedicalCard = medicalCardNumber.replaceAll('/', '_');
-      
+
       DataSnapshot snapshot = await _database
           .child('users')
           .child(uid)
@@ -260,19 +253,23 @@ class FirebaseService {
         return [];
       }
 
-      Map<dynamic, dynamic> recordingsMap = snapshot.value as Map<dynamic, dynamic>;
+      Map<dynamic, dynamic> recordingsMap =
+          snapshot.value as Map<dynamic, dynamic>;
       List<Recording> recordings = [];
 
       for (var entry in recordingsMap.entries) {
-        Map<dynamic, dynamic> recordingData = entry.value as Map<dynamic, dynamic>;
+        Map<dynamic, dynamic> recordingData =
+            entry.value as Map<dynamic, dynamic>;
         Recording recording = Recording.fromMap(recordingData);
-        
+
         try {
-          String downloadUrl = await _storage.ref(recording.filename).getDownloadURL();
+          String downloadUrl =
+              await _storage.ref(recording.filename).getDownloadURL();
           recording.downloadUrl = downloadUrl;
           recordings.add(recording);
         } catch (e) {
-          print('Error getting download URL for recording ${recording.filename}: $e');
+          print(
+              'Error getting download URL for recording ${recording.filename}: $e');
           continue;
         }
       }
@@ -284,92 +281,95 @@ class FirebaseService {
       rethrow;
     }
   }
-   Future<void> savePulseOxSession(
-  String uid,
-  String medicalCardNumber,
-  List<Map<String, dynamic>> sessionReadings,
-  Map<String, double> averages,
-) async {
-  try {
-    String sanitizedMedicalCard = medicalCardNumber.replaceAll('/', '_');
-    
-    // Ensure readings are in the correct format
-    List<Map<String, dynamic>> formattedReadings = sessionReadings.map((reading) {
-      return {
-        'heartRate': reading['heartRate'],
-        'spO2': reading['spO2'],
-        'temperature': reading['temperature'],
-        'timestamp': reading['timestamp'],
-      };
-    }).toList();
-    
-    // Save session data
-    await _database
-        .child('users')
-        .child(uid)
-        .child('patients')
-        .child(sanitizedMedicalCard)
-        .child('pulseOxSessions')
-        .push()
-        .set({
-          'timestamp': DateTime.now().toIso8601String(),
-          'averages': {
-            'heartRate': averages['heartRate'] ?? 0.0,
-            'spO2': averages['spO2'] ?? 0.0,
-            'temperature': averages['temperature'] ?? 0.0,
-          },
-          'readings': formattedReadings,
-          'readingCount': formattedReadings.length,
-        });
 
-    print('PulseOx session saved successfully');
-  } catch (e) {
-    print('Error saving PulseOx session: $e');
-    rethrow;
-  }
-}
+  Future<void> savePulseOxSession(
+    String uid,
+    String medicalCardNumber,
+    List<Map<String, dynamic>> sessionReadings,
+    Map<String, double> averages,
+  ) async {
+    try {
+      String sanitizedMedicalCard = medicalCardNumber.replaceAll('/', '_');
 
-Future<List<PulseOxSession>> getPulseOxSessions(
-  String uid,
-  String medicalCardNumber,
-) async {
-  try {
-    String sanitizedMedicalCard = medicalCardNumber.replaceAll('/', '_');
-    
-    DataSnapshot snapshot = await _database
-        .child('users')
-        .child(uid)
-        .child('patients')
-        .child(sanitizedMedicalCard)
-        .child('pulseOxSessions')
-        .get();
+      // Ensure readings are in the correct format
+      List<Map<String, dynamic>> formattedReadings =
+          sessionReadings.map((reading) {
+        return {
+          'heartRate': reading['heartRate'],
+          'spO2': reading['spO2'],
+          'temperature': reading['temperature'],
+          'timestamp': reading['timestamp'],
+        };
+      }).toList();
 
-    if (!snapshot.exists || snapshot.value == null) {
-      return [];
+      // Save session data
+      await _database
+          .child('users')
+          .child(uid)
+          .child('patients')
+          .child(sanitizedMedicalCard)
+          .child('pulseOxSessions')
+          .push()
+          .set({
+        'timestamp': DateTime.now().toIso8601String(),
+        'averages': {
+          'heartRate': averages['heartRate'] ?? 0.0,
+          'spO2': averages['spO2'] ?? 0.0,
+          'temperature': averages['temperature'] ?? 0.0,
+        },
+        'readings': formattedReadings,
+        'readingCount': formattedReadings.length,
+      });
+
+      print('PulseOx session saved successfully');
+    } catch (e) {
+      print('Error saving PulseOx session: $e');
+      rethrow;
     }
-
-    Map<dynamic, dynamic> sessionsMap = snapshot.value as Map<dynamic, dynamic>;
-    List<PulseOxSession> sessions = [];
-
-    sessionsMap.forEach((key, value) {
-      if (value is Map) {
-        // Ensure readings is treated as a List
-        if (value['readings'] is Map) {
-          value['readings'] = (value['readings'] as Map).values.toList();
-        }
-        sessions.add(PulseOxSession.fromMap(value as Map<dynamic, dynamic>));
-      }
-    });
-
-    // Sort by timestamp, newest first
-    sessions.sort((a, b) => b.timestamp.compareTo(a.timestamp));
-
-    return sessions;
-  } catch (e) {
-    print('Error fetching PulseOx sessions: $e');
-    rethrow;
   }
-}
+
+  Future<List<PulseOxSession>> getPulseOxSessions(
+    String uid,
+    String medicalCardNumber,
+  ) async {
+    try {
+      String sanitizedMedicalCard = medicalCardNumber.replaceAll('/', '_');
+
+      DataSnapshot snapshot = await _database
+          .child('users')
+          .child(uid)
+          .child('patients')
+          .child(sanitizedMedicalCard)
+          .child('pulseOxSessions')
+          .get();
+
+      if (!snapshot.exists || snapshot.value == null) {
+        return [];
+      }
+
+      Map<dynamic, dynamic> sessionsMap =
+          snapshot.value as Map<dynamic, dynamic>;
+      List<PulseOxSession> sessions = [];
+
+      sessionsMap.forEach((key, value) {
+        if (value is Map) {
+          // Ensure readings is treated as a List
+          if (value['readings'] is Map) {
+            value['readings'] = (value['readings'] as Map).values.toList();
+          }
+          sessions.add(PulseOxSession.fromMap(value as Map<dynamic, dynamic>));
+        }
+      });
+
+      // Sort by timestamp, newest first
+      sessions.sort((a, b) => b.timestamp.compareTo(a.timestamp));
+
+      return sessions;
+    } catch (e) {
+      print('Error fetching PulseOx sessions: $e');
+      rethrow;
+    }
+  }
 
   Future<void> saveECGReading(
     String uid,
@@ -379,7 +379,7 @@ Future<List<PulseOxSession>> getPulseOxSessions(
   ) async {
     try {
       String sanitizedMedicalCard = medicalCardNumber.replaceAll('/', '_');
-      
+
       // Create binary file from ECG data
       final processedData = ByteData(ecgData.length);
       for (var i = 0; i < ecgData.length; i++) {
@@ -388,20 +388,21 @@ Future<List<PulseOxSession>> getPulseOxSessions(
 
       // Generate filename and timestamp
       DateTime timestamp = DateTime.now();
-      String filename = 'users/$uid/patients/$sanitizedMedicalCard/ecg/${timestamp.millisecondsSinceEpoch}.ecg';
+      String filename =
+          'users/$uid/patients/$sanitizedMedicalCard/ecg/${timestamp.millisecondsSinceEpoch}.ecg';
 
       // Upload to Firebase Storage
       await _storage.ref(filename).putData(
-        Uint8List.fromList(ecgData),
-        SettableMetadata(
-          contentType: 'application/octet-stream',
-          customMetadata: {
-            'sampleRate': (metadata['sampleRate'] ?? 4000).toString(),
-            'duration': metadata['duration'].toString(),
-            'timestamp': timestamp.toIso8601String(),
-          },
-        ),
-      );
+            Uint8List.fromList(ecgData),
+            SettableMetadata(
+              contentType: 'application/octet-stream',
+              customMetadata: {
+                'sampleRate': (metadata['sampleRate'] ?? 4000).toString(),
+                'duration': metadata['duration'].toString(),
+                'timestamp': timestamp.toIso8601String(),
+              },
+            ),
+          );
 
       // Get download URL
       String downloadUrl = await _storage.ref(filename).getDownloadURL();
@@ -415,12 +416,12 @@ Future<List<PulseOxSession>> getPulseOxSessions(
           .child('ecgData')
           .push()
           .set({
-            'timestamp': timestamp.toIso8601String(),
-            'filename': filename,
-            'downloadUrl': downloadUrl,
-            'duration': metadata['duration'],
-            'sampleRate': metadata['sampleRate'] ?? 4000,
-          });
+        'timestamp': timestamp.toIso8601String(),
+        'filename': filename,
+        'downloadUrl': downloadUrl,
+        'duration': metadata['duration'],
+        'sampleRate': metadata['sampleRate'] ?? 4000,
+      });
 
       print('ECG reading saved successfully');
     } catch (e) {
@@ -428,13 +429,14 @@ Future<List<PulseOxSession>> getPulseOxSessions(
       rethrow;
     }
   }
+
   Future<List<Map<String, dynamic>>> getPulseOxReadings(
     String uid,
     String medicalCardNumber,
   ) async {
     try {
       String sanitizedMedicalCard = medicalCardNumber.replaceAll('/', '_');
-      
+
       DataSnapshot snapshot = await _database
           .child('users')
           .child(uid)
@@ -447,16 +449,16 @@ Future<List<PulseOxSession>> getPulseOxSessions(
         return [];
       }
 
-      Map<dynamic, dynamic> readingsMap = snapshot.value as Map<dynamic, dynamic>;
+      Map<dynamic, dynamic> readingsMap =
+          snapshot.value as Map<dynamic, dynamic>;
       List<Map<String, dynamic>> readings = [];
 
       readingsMap.forEach((key, value) {
         readings.add(Map<String, dynamic>.from(value as Map));
       });
 
-      readings.sort((a, b) => 
-        DateTime.parse(b['timestamp']).compareTo(DateTime.parse(a['timestamp']))
-      );
+      readings.sort((a, b) => DateTime.parse(b['timestamp'])
+          .compareTo(DateTime.parse(a['timestamp'])));
 
       return readings;
     } catch (e) {
@@ -471,7 +473,7 @@ Future<List<PulseOxSession>> getPulseOxSessions(
   ) async {
     try {
       String sanitizedMedicalCard = medicalCardNumber.replaceAll('/', '_');
-      
+
       DataSnapshot snapshot = await _database
           .child('users')
           .child(uid)
@@ -484,34 +486,54 @@ Future<List<PulseOxSession>> getPulseOxSessions(
         return [];
       }
 
-      Map<dynamic, dynamic> readingsMap = snapshot.value as Map<dynamic, dynamic>;
+      Map<dynamic, dynamic> readingsMap =
+          snapshot.value as Map<dynamic, dynamic>;
       List<Map<String, dynamic>> readings = [];
 
       for (var entry in readingsMap.entries) {
-        Map<dynamic, dynamic> readingData = entry.value as Map<dynamic, dynamic>;
+        Map<dynamic, dynamic> readingData =
+            entry.value as Map<dynamic, dynamic>;
         Map<String, dynamic> reading = Map<String, dynamic>.from(readingData);
-        
+
         try {
           // Ensure the download URL is still valid
-          if (!reading.containsKey('downloadUrl') || reading['downloadUrl'] == null) {
-            String downloadUrl = await _storage.ref(reading['filename']).getDownloadURL();
+          if (!reading.containsKey('downloadUrl') ||
+              reading['downloadUrl'] == null) {
+            String downloadUrl =
+                await _storage.ref(reading['filename']).getDownloadURL();
             reading['downloadUrl'] = downloadUrl;
           }
           readings.add(reading);
         } catch (e) {
-          print('Error getting download URL for ECG ${reading['filename']}: $e');
+          print(
+              'Error getting download URL for ECG ${reading['filename']}: $e');
           continue;
         }
       }
 
-      readings.sort((a, b) => 
-        DateTime.parse(b['timestamp']).compareTo(DateTime.parse(a['timestamp']))
-      );
+      readings.sort((a, b) => DateTime.parse(b['timestamp'])
+          .compareTo(DateTime.parse(a['timestamp'])));
 
       return readings;
     } catch (e) {
       print('Error fetching ECG readings: $e');
       rethrow;
     }
+  }
+
+  // Add this method to get a stream of patients
+  Stream<List<Patient>> getPatientsStream(String uid) {
+    return _database
+        .child('users')
+        .child(uid)
+        .child('patients')
+        .onValue
+        .map((event) {
+      final patientsMap = event.snapshot.value as Map<dynamic, dynamic>;
+      final patients = patientsMap.entries.map((entry) {
+        return Patient.fromMap(Map<String, dynamic>.from(entry.value));
+      }).toList();
+      return patients;
+    });
   }
 }
