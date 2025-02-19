@@ -101,26 +101,37 @@ class _BLEScreenState extends State<BLEScreen> with SingleTickerProviderStateMix
   }
 
   void _startScan() {
-    setState(() {
-      _isScanning = true;
-    });
-    final bleManager = Provider.of<BLEManager>(context, listen: false);
-    bleManager.scanDevices(timeout: Duration(seconds: 10)).listen(
-      (results) {
-        setState(() {
-          scanResults = results;
-          _isScanning = false;
-        });
-      },
-      onError: (error) {
-        print("BLE scan error: $error");
-        setState(() {
-          _isScanning = false;
-        });
-        _showErrorSnackBar("Scanning failed. Please try again.");
-      },
-    );
-  }
+  setState(() {
+    _isScanning = true;
+  });
+  final bleManager = Provider.of<BLEManager>(context, listen: false);
+  bleManager.scanDevices(timeout: Duration(seconds: 10)).listen(
+    (results) {
+      setState(() {
+        final targetService = "19B10000-E8F2-537E-4F6C-D104768A1214";
+        final targetName = "ESP32_Combined";
+        scanResults = results.where((result) {
+          // Check if any advertised service UUID matches the target (ignoring case)
+          final hasTargetUuid = result.advertisementData.serviceUuids.any(
+            (uuid) => uuid.toUpperCase() == targetService.toUpperCase(),
+          );
+          // Also check if the device name matches the target name (ignoring case)
+          final isTargetName = result.device.name.toUpperCase() == targetName.toUpperCase();
+          return hasTargetUuid || isTargetName;
+        }).toList();
+        _isScanning = false;
+      });
+    },
+    onError: (error) {
+      print("BLE scan error: $error");
+      setState(() {
+        _isScanning = false;
+      });
+      _showErrorSnackBar("Scanning failed. Please try again.");
+    },
+  );
+}
+
 
   void _connectToDevice(BluetoothDevice device) async {
   setState(() {
@@ -371,4 +382,8 @@ class _BLEScreenState extends State<BLEScreen> with SingleTickerProviderStateMix
     if (rssi >= -80) return Colors.orange;
     return Colors.red;
   }
+}
+
+extension on Guid {
+  toUpperCase() {}
 }
