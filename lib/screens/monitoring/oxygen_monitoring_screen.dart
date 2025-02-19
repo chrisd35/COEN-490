@@ -19,11 +19,12 @@ class _OxygenMonitoringState extends State<OxygenMonitoring> {
   Patient? selectedPatient;
   double? firstTimestamp;
   int lastReadingIndex = 0;
-  bool isActive = false; // Add state to track if monitoring is active
+  bool isActive = true; // Add state to track if monitoring is active
 
   @override
   void initState() {
     super.initState();
+      isActive = true;
     _startPeriodicUpdate();
   }
 

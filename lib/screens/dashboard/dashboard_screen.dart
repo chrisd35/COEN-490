@@ -15,6 +15,8 @@ import '..//registration/firebase_service.dart';
 import '../registration/auth_page.dart';
 import '../monitoring/ecg_monitoring_screen.dart';
 import '../monitoring/oxygen_monitoring_screen.dart';
+import '../../utils/models.dart';
+import '../../utils/ble_manager.dart';
 
 class DashboardScreen extends StatefulWidget {
   @override
@@ -221,7 +223,11 @@ class _DashboardScreenState extends State<DashboardScreen> {
       color: Colors.green,
       onTap: () => Navigator.push(
         context,
-        MaterialPageRoute(builder: (context) => ECGMonitoring()),
+  MaterialPageRoute(
+    builder: (context) => ECGMonitoring(
+      bleManager: BLEManager(), // Pass your BLE manager instance
+    ),
+  ),
       ),
     ),
     _FeatureCard(
@@ -310,7 +316,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
       color: Colors.green,
       onTap: () => Navigator.push(
         context,
-        MaterialPageRoute(builder: (context) => ECGMonitoring()),
+        MaterialPageRoute(builder: (context) => ECGMonitoring(bleManager: BLEManager(), )),
       ),
     ),
     _FeatureCard(
