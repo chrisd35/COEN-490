@@ -168,59 +168,59 @@ void _login() async {
     );
 
     if (userCredential?.user != null) {
-      // Get the route arguments
+      // Get any route arguments
       final args = ModalRoute.of(context)?.settings.arguments as Map<String, dynamic>?;
-      
+
       if (args != null) {
         if (args['returnRoute'] == 'murmur_record' && args['pendingAction'] == 'save_recording') {
-          // Return to previous screen if coming from murmur record save
           Navigator.pop(context, true);
+          return; // exit _login
         } else if (args['returnRoute'] == 'recording_playback' && args['pendingAction'] == 'view_recordings') {
-  // Navigate to dashboard after login from playback prompt
-  Navigator.pushAndRemoveUntil(
-    context,
-    MaterialPageRoute(builder: (context) => DashboardScreen()),
-    (Route<dynamic> route) => false,
-  );
-
+          Navigator.pushReplacement(
+            context,
+            MaterialPageRoute(builder: (context) => DashboardScreen()),
+          );
+          return; // exit _login
         }
       } else {
-        // Normal login flow - Refresh the dashboard
-        Navigator.pushAndRemoveUntil(
+        // Normal login flow: Replace login with dashboard.
+        Navigator.pushReplacement(
           context,
           MaterialPageRoute(builder: (context) => DashboardScreen()),
-          (Route<dynamic> route) => false,
         );
+        return; // exit _login
       }
     }
-    } on FirebaseAuthException catch (e) {
-      String errorMessage;
-      switch (e.code) {
-        case 'invalid-credential':
-          errorMessage = 'Wrong email or password.';
-          break;
-        case 'invalid-email':
-          errorMessage = 'The email address is badly formatted.';
-          break;
-        case 'user-disabled':
-          errorMessage = 'This user account has been disabled.';
-          break;
-        case 'too-many-requests':
-          errorMessage = 'Too many attempts. Please try again later.';
-          break;
-        case 'network-request-failed':
-          errorMessage = 'A network error occurred. Please check your connection.';
-          break;
-        default:
-          errorMessage = 'An error occurred. Please try again.';
-      }
-      _showErrorSnackBar(errorMessage);
-    } catch (e) {
-      _showErrorSnackBar('An unexpected error occurred. Please try again.');
+  } on FirebaseAuthException catch (e) {
+    String errorMessage;
+    switch (e.code) {
+      case 'invalid-credential':
+        errorMessage = 'Wrong email or password.';
+        break;
+      case 'invalid-email':
+        errorMessage = 'The email address is badly formatted.';
+        break;
+      case 'user-disabled':
+        errorMessage = 'This user account has been disabled.';
+        break;
+      case 'too-many-requests':
+        errorMessage = 'Too many attempts. Please try again later.';
+        break;
+      case 'network-request-failed':
+        errorMessage = 'A network error occurred. Please check your connection.';
+        break;
+      default:
+        errorMessage = 'An error occurred. Please try again.';
     }
-    
-    setState(() => _isLoading = false);
+    _showErrorSnackBar(errorMessage);
+  } catch (e) {
+    _showErrorSnackBar('An unexpected error occurred. Please try again.');
   }
+
+  // If no navigation occurred, stop loading.
+  setState(() => _isLoading = false);
+}
+
 
   void _showErrorSnackBar(String message) {
     ScaffoldMessenger.of(context).showSnackBar(
