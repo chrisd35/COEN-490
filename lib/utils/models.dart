@@ -85,26 +85,44 @@ class PulseOxSession {
 
     // Convert readings list
     List<Map<String, dynamic>> parseReadings() {
-      var readingsData = data['readings'];
-      if (readingsData == null) return [];
-      
-      if (readingsData is List) {
-        return readingsData.map((reading) {
-          if (reading is Map) {
-            return Map<String, dynamic>.from(reading);
-          }
-          return <String, dynamic>{};
-        }).toList();
-      } else if (readingsData is Map) {
-        return readingsData.values.map((reading) {
-          if (reading is Map) {
-            return Map<String, dynamic>.from(reading);
-          }
-          return <String, dynamic>{};
-        }).toList();
-      }
-      return [];
+  var readingsData = data['readings'];
+  if (readingsData == null) return [];
+  
+  List<Map<String, dynamic>> readingsList = [];
+  
+  void convertReading(Map<String, dynamic> readingMap) {
+    if (readingMap.containsKey('heartRate')) {
+      readingMap['heartRate'] = (readingMap['heartRate'] as num).toDouble();
     }
+    if (readingMap.containsKey('spO2')) {
+      readingMap['spO2'] = (readingMap['spO2'] as num).toDouble();
+    }
+    if (readingMap.containsKey('temperature')) {
+      readingMap['temperature'] = (readingMap['temperature'] as num).toDouble();
+    }
+  }
+  
+  if (readingsData is List) {
+    for (var reading in readingsData) {
+      if (reading is Map) {
+        var readingMap = Map<String, dynamic>.from(reading);
+        convertReading(readingMap);
+        readingsList.add(readingMap);
+      }
+    }
+  } else if (readingsData is Map) {
+    for (var reading in readingsData.values) {
+      if (reading is Map) {
+        var readingMap = Map<String, dynamic>.from(reading);
+        convertReading(readingMap);
+        readingsList.add(readingMap);
+      }
+    }
+  }
+  
+  return readingsList;
+}
+
 
     return PulseOxSession(
       timestamp: DateTime.parse(data['timestamp'] ?? DateTime.now().toIso8601String()),

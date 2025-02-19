@@ -152,7 +152,7 @@ class _BLEScreenState extends State<BLEScreen> with SingleTickerProviderStateMix
 
     _showSuccessSnackBar("Connected to ${device.name.isEmpty ? "Unknown Device" : device.name}");
     
-    Future.delayed(Duration(seconds: 2), () {
+    Future.delayed(Duration(seconds: 1), () {
       Navigator.pop(context);
     });
   } catch (e) {
