@@ -371,63 +371,98 @@ Future<List<PulseOxSession>> getPulseOxSessions(
   }
 }
 
-  Future<void> saveECGReading(
-    String uid,
-    String medicalCardNumber,
-    List<int> ecgData,
-    Map<String, dynamic> metadata,
-  ) async {
-    try {
-      String sanitizedMedicalCard = medicalCardNumber.replaceAll('/', '_');
-      
-      // Create binary file from ECG data
-      final processedData = ByteData(ecgData.length);
-      for (var i = 0; i < ecgData.length; i++) {
-        processedData.setInt8(i, ecgData[i]);
-      }
+ Future<void> saveECGReading(
+  String uid,
+  String medicalCardNumber,
+  List<int> ecgData,
+  Map<String, dynamic> metadata,
+) async {
+  try {
+    String sanitizedMedicalCard = medicalCardNumber.replaceAll('/', '_');
+    
+    // Ensure ECG data is in the correct range (e.g., 0–4095)
+    List<int> processedECGData = ecgData.map((value) {
+      return value.clamp(0, 4095);
+    }).toList();
 
-      // Generate filename and timestamp
-      DateTime timestamp = DateTime.now();
-      String filename = 'users/$uid/patients/$sanitizedMedicalCard/ecg/${timestamp.millisecondsSinceEpoch}.ecg';
-
-      // Upload to Firebase Storage
-      await _storage.ref(filename).putData(
-        Uint8List.fromList(ecgData),
-        SettableMetadata(
-          contentType: 'application/octet-stream',
-          customMetadata: {
-            'sampleRate': (metadata['sampleRate'] ?? 4000).toString(),
-            'duration': metadata['duration'].toString(),
-            'timestamp': timestamp.toIso8601String(),
-          },
-        ),
-      );
-
-      // Get download URL
-      String downloadUrl = await _storage.ref(filename).getDownloadURL();
-
-      // Save metadata to Realtime Database
-      await _database
-          .child('users')
-          .child(uid)
-          .child('patients')
-          .child(sanitizedMedicalCard)
-          .child('ecgData')
-          .push()
-          .set({
-            'timestamp': timestamp.toIso8601String(),
-            'filename': filename,
-            'downloadUrl': downloadUrl,
-            'duration': metadata['duration'],
-            'sampleRate': metadata['sampleRate'] ?? 4000,
-          });
-
-      print('ECG reading saved successfully');
-    } catch (e) {
-      print('Error saving ECG reading: $e');
-      rethrow;
+    // Convert the processed ECG data to 16-bit little-endian bytes
+    ByteData byteData = ByteData(processedECGData.length * 2);
+    for (int i = 0; i < processedECGData.length; i++) {
+      byteData.setInt16(i * 2, processedECGData[i], Endian.little);
     }
+    Uint8List ecgBytes = byteData.buffer.asUint8List();
+
+    // Generate filename and timestamp
+    DateTime timestamp = DateTime.now();
+    String filename = 'users/$uid/patients/$sanitizedMedicalCard/ecg/${timestamp.millisecondsSinceEpoch}.ecg';
+
+    // Upload to Firebase Storage
+    await _storage.ref(filename).putData(
+      ecgBytes,
+      SettableMetadata(
+        contentType: 'application/octet-stream',
+        customMetadata: {
+          'sampleRate': (metadata['sampleRate'] ?? 4000).toString(),
+          'duration': metadata['duration'].toString(),
+          'timestamp': timestamp.toIso8601String(),
+        },
+      ),
+    );
+
+    // Get download URL
+    String downloadUrl = await _storage.ref(filename).getDownloadURL();
+
+    // Save metadata to Realtime Database
+    await _database
+        .child('users')
+        .child(uid)
+        .child('patients')
+        .child(sanitizedMedicalCard)
+        .child('ecgData')
+        .push()
+        .set({
+          'timestamp': timestamp.toIso8601String(),
+          'filename': filename,
+          'downloadUrl': downloadUrl,
+          'duration': metadata['duration'],
+          'sampleRate': metadata['sampleRate'] ?? 4000,
+        });
+
+    print('ECG reading saved successfully');
+  } catch (e) {
+    print('Error saving ECG reading: $e');
+    rethrow;
   }
+}
+
+
+ Future<List<int>> downloadECGData(String downloadUrl) async {
+  try {
+    final response = await FirebaseStorage.instance
+        .refFromURL(downloadUrl)
+        .getData();
+    
+    if (response != null) {
+      // Convert bytes to ECG values
+      ByteData byteData = ByteData.sublistView(Uint8List.fromList(response));
+      List<int> ecgData = [];
+      
+      for (int i = 0; i < response.length; i += 2) {
+        // Read 16-bit integer (little-endian)
+        int value = byteData.getInt16(i, Endian.little);
+        // Ensure value is within the expected range (e.g., 0–4095)
+        ecgData.add(value.clamp(0, 4095));
+      }
+      
+      return ecgData;
+    }
+    return [];
+  } catch (e) {
+    print('Error downloading ECG data: $e');
+    rethrow;
+  }
+}
+
   Future<List<Map<String, dynamic>>> getPulseOxReadings(
     String uid,
     String medicalCardNumber,
