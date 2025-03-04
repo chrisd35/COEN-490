@@ -1,3 +1,4 @@
+import 'package:firebase_auth/firebase_auth.dart' as firebase_auth;
 import 'package:firebase_core/firebase_core.dart';
 import 'package:firebase_database/firebase_database.dart';
 import 'package:firebase_storage/firebase_storage.dart';
@@ -50,21 +51,63 @@ class FirebaseService {
     }
   }
 
-  Future<void> savePatient(String uid, Patient patient) async {
+Future<void> savePatient(String uid, Patient patient) async {
+  try {
+    // Validate required fields
+    if (patient.fullName.isEmpty) {
+      throw Exception('Patient name cannot be empty');
+    }
+    
+    if (patient.medicalCardNumber.isEmpty) {
+      throw Exception('Medical card number cannot be empty');
+    }
+    
+    if (patient.dateOfBirth.isEmpty) {
+      throw Exception('Date of birth cannot be empty');
+    }
+    
+    if (patient.gender.isEmpty) {
+      throw Exception('Gender cannot be empty');
+    }
+    
+    // Check for duplicate Medicare number
+    String sanitizedMedicalCard = patient.medicalCardNumber.replaceAll('/', '_');
+    
+    // First, check if a patient with this Medicare number already exists
     try {
-      String sanitizedMedicalCard = patient.medicalCardNumber.replaceAll('/', '_');
-      await _database
+      DataSnapshot snapshot = await _database
           .child('users')
           .child(uid)
           .child('patients')
           .child(sanitizedMedicalCard)
-          .set(patient.toMap());
-      print('Patient saved successfully!');
+          .get();
+      
+      if (snapshot.exists && snapshot.value != null) {
+        throw Exception('A patient with this medical card number already exists');
+      }
     } catch (e) {
-      print('Error saving patient: $e');
-      rethrow;
+      // If the error is not our custom exception for duplication, rethrow it
+      if (e is! Exception || e.toString() != 'Exception: A patient with this medical card number already exists') {
+        print('Error checking for duplicate: $e');
+      } else {
+        rethrow; // Rethrow our duplication error
+      }
     }
+    
+    // If we get here, we can save the patient
+    await _database
+        .child('users')
+        .child(uid)
+        .child('patients')
+        .child(sanitizedMedicalCard)
+        .set(patient.toMap());
+    
+    print('Patient saved successfully!');
+  } catch (e) {
+    print('Error saving patient: $e');
+    rethrow;
   }
+}
 
   Future<Patient?> getPatient(String uid, String medicalCardNumber) async {
     try {
@@ -88,30 +131,182 @@ class FirebaseService {
     }
   }
 
-  Future<List<Patient>> getPatientsForUser(String uid) async {
+  Future<bool> isEmailInUse(String email) async {
+  try {
+    // First check with Firebase Auth directly
+    // This will throw an error if the email exists
     try {
-      DataSnapshot snapshot = await _database
-          .child('users')
-          .child(uid)
-          .child('patients')
-          .get();
-      
-      if (!snapshot.exists || snapshot.value == null) {
-        return [];
-      }
-
-      Map<dynamic, dynamic> patientsMap = snapshot.value as Map<dynamic, dynamic>;
-      List<Patient> patients = patientsMap.entries.map((entry) {
-        return Patient.fromMap(entry.value as Map<dynamic, dynamic>);
-      }).toList();
-
-      patients.sort((a, b) => a.fullName.compareTo(b.fullName));
-      return patients;
+      final methods = await firebase_auth.FirebaseAuth.instance.fetchSignInMethodsForEmail(email);
+      return methods.isNotEmpty;
     } catch (e) {
-      print('Error fetching patients: $e');
-      rethrow;
+      // Ignore specific errors and continue checking database
+      print('Error checking with Firebase Auth: $e');
     }
+    
+    // Additional check in your database for extra safety
+    // This is helpful if you store user data in your own database
+    final snapshot = await _database.child('users').get();
+    
+    if (snapshot.exists && snapshot.value != null) {
+      final users = snapshot.value as Map<dynamic, dynamic>;
+      
+      // Search through all users to find matching email
+      for (var userData in users.values) {
+        if (userData is Map && 
+            userData.containsKey('email') && 
+            userData['email'] == email) {
+          return true;
+        }
+      }
+    }
+    
+    return false;
+  } catch (e) {
+    print('Error checking if email is in use: $e');
+    return false; // Return false on error to avoid blocking legitimate registrations
   }
+}
+
+  Future<void> updatePatient(String uid, Patient patient) async {
+  try {
+    // Validate required fields
+    if (patient.fullName.isEmpty) {
+      throw Exception('Patient name cannot be empty');
+    }
+    
+    if (patient.medicalCardNumber.isEmpty) {
+      throw Exception('Medical card number cannot be empty');
+    }
+    
+    if (patient.dateOfBirth.isEmpty) {
+      throw Exception('Date of birth cannot be empty');
+    }
+    
+    if (patient.gender.isEmpty) {
+      throw Exception('Gender cannot be empty');
+    }
+    
+    String sanitizedMedicalCard = patient.medicalCardNumber.replaceAll('/', '_');
+    
+    // Check if patient exists before updating
+    DataSnapshot snapshot = await _database
+        .child('users')
+        .child(uid)
+        .child('patients')
+        .child(sanitizedMedicalCard)
+        .get();
+    
+    if (!snapshot.exists || snapshot.value == null) {
+      throw Exception('Patient record not found');
+    }
+    
+    // Update the patient record
+    await _database
+        .child('users')
+        .child(uid)
+        .child('patients')
+        .child(sanitizedMedicalCard)
+        .update(patient.toMap());
+    
+    print('Patient updated successfully!');
+  } catch (e) {
+    print('Error updating patient: $e');
+    rethrow;
+  }
+}
+
+ Future<List<Patient>> getPatientsForUser(String uid) async {
+  try {
+    DataSnapshot snapshot = await _database
+        .child('users')
+        .child(uid)
+        .child('patients')
+        .get();
+    
+    if (!snapshot.exists || snapshot.value == null) {
+      return [];
+    }
+
+    Map<dynamic, dynamic> patientsMap = snapshot.value as Map<dynamic, dynamic>;
+    List<Patient> patients = [];
+    
+    try {
+      patientsMap.entries.forEach((entry) {
+        try {
+          Patient patient = Patient.fromMap(entry.value as Map<dynamic, dynamic>);
+          patients.add(patient);
+        } catch (e) {
+          // Log error for this entry but continue processing other entries
+          print('Error parsing patient data: $e');
+        }
+      });
+    } catch (e) {
+      print('Error iterating through patients: $e');
+    }
+
+    // Sort by full name (case insensitive)
+    patients.sort((a, b) => a.fullName.toLowerCase().compareTo(b.fullName.toLowerCase()));
+    return patients;
+  } catch (e) {
+    print('Error fetching patients: $e');
+    rethrow;
+  }
+}
+
+Future<bool> isMedicareNumberRegistered(String uid, String medicareNumber) async {
+  try {
+    String sanitizedMedicalCard = medicareNumber.replaceAll('/', '_');
+    
+    DataSnapshot snapshot = await _database
+        .child('users')
+        .child(uid)
+        .child('patients')
+        .child(sanitizedMedicalCard)
+        .get();
+    
+    return snapshot.exists && snapshot.value != null;
+  } catch (e) {
+    print('Error checking Medicare number: $e');
+    return false; // Assume not registered on error
+  }
+}
+
+// Method to delete a patient record with confirmation requirement
+Future<void> deletePatient(String uid, String medicareNumber, String confirmationText) async {
+  try {
+    // Require exact confirmation text for deletion
+    if (confirmationText != "DELETE") {
+      throw Exception('Confirmation text does not match. Patient not deleted.');
+    }
+    
+    String sanitizedMedicalCard = medicareNumber.replaceAll('/', '_');
+    
+    // First check if patient exists
+    DataSnapshot snapshot = await _database
+        .child('users')
+        .child(uid)
+        .child('patients')
+        .child(sanitizedMedicalCard)
+        .get();
+    
+    if (!snapshot.exists || snapshot.value == null) {
+      throw Exception('Patient record not found');
+    }
+    
+    // Delete the patient record
+    await _database
+        .child('users')
+        .child(uid)
+        .child('patients')
+        .child(sanitizedMedicalCard)
+        .remove();
+    
+    print('Patient deleted successfully!');
+  } catch (e) {
+    print('Error deleting patient: $e');
+    rethrow;
+  }
+}
 
   void debugAudioData(List<int> audioData, int sampleRate, int duration) {
     int expectedSamples = sampleRate * duration;

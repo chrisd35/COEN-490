@@ -1,8 +1,12 @@
+import 'dart:async';
+import 'package:firebase_auth/firebase_auth.dart' as firebase_auth;
 import 'package:flutter/material.dart';
 import '../dashboard/dashboard_screen.dart';
 import 'firebase_service.dart';
 import '../../utils/models.dart';
 import 'auth_service.dart';
+import '/utils/validation_utils.dart';
+import 'email_verification_screen.dart';
 
 class AccountProfilePage extends StatefulWidget {
   final String? selectedRole;
@@ -37,11 +41,120 @@ class _AccountProfilePageState extends State<AccountProfilePage> {
   String? _selectedGender;
   String? _selectedRole;
 
+  // For additional validation feedback
+  String? _passwordStrengthFeedback;
+  bool _showPasswordStrength = false;
+  Color _passwordStrengthColor = Colors.grey;
+  
+  // For email validation
+  bool _isCheckingEmail = false;
+  bool _isEmailValid = false;
+  String? _emailError;
+  Timer? _emailDebounce;
+
   @override
   void initState() {
     super.initState();
     _selectedRole = widget.selectedRole;
+     _isRolePreselected = widget.selectedRole != null;
+     
   }
+  bool _isRolePreselected = false;
+
+  @override
+  void dispose() {
+    _emailDebounce?.cancel();
+    _fullNameController.dispose();
+    _emailController.dispose();
+    _passwordController.dispose();
+    _confirmPasswordController.dispose();
+    _dateOfBirthController.dispose();
+    _phoneNumberController.dispose();
+    super.dispose();
+  }
+
+  // Password strength indicator
+  void _updatePasswordStrength(String password) {
+    setState(() {
+      _showPasswordStrength = password.isNotEmpty;
+      
+      if (password.isEmpty) {
+        _passwordStrengthFeedback = null;
+        _passwordStrengthColor = Colors.grey;
+        return;
+      }
+      
+      if (password.length < 8) {
+        _passwordStrengthFeedback = 'Weak';
+        _passwordStrengthColor = Colors.red;
+        return;
+      }
+      
+      bool hasUppercase = password.contains(RegExp(r'[A-Z]'));
+      bool hasDigits = password.contains(RegExp(r'[0-9]'));
+      bool hasSpecialChars = password.contains(RegExp(r'[!@#$%^&*(),.?":{}|<>]'));
+      bool hasMinLength = password.length >= 8;
+      
+      if (hasUppercase && hasDigits && hasSpecialChars && hasMinLength) {
+        _passwordStrengthFeedback = 'Strong';
+        _passwordStrengthColor = Colors.green;
+      } else if ((hasUppercase || hasSpecialChars) && hasDigits && hasMinLength) {
+        _passwordStrengthFeedback = 'Moderate';
+        _passwordStrengthColor = Colors.orange;
+      } else {
+        _passwordStrengthFeedback = 'Weak';
+        _passwordStrengthColor = Colors.red;
+      }
+    });
+  }
+  
+  // Email availability checker
+ Future<void> _checkEmailAvailability() async {
+  final email = _emailController.text.trim();
+  
+  if (email.isEmpty) {
+    setState(() {
+      _isEmailValid = false;
+      _emailError = null;
+    });
+    return;
+  }
+  
+  // Use the comprehensive format validation
+  bool isFormatValid = ValidationUtils.isEmailFormatValid(email);
+  if (!isFormatValid) {
+    setState(() {
+      _isEmailValid = false;
+      _emailError = null; // Don't show error yet, validator will show it on submission
+    });
+    return;
+  }
+  
+  setState(() => _isCheckingEmail = true);
+  
+  try {
+    // Check if email is already registered
+    bool isRegistered = await _authService.isEmailRegistered(email);
+    
+    if (mounted) {
+      setState(() {
+        _emailError = isRegistered ? 
+            'This email is already registered. Please try logging in or use a different email.' : 
+            null;
+        _isEmailValid = !isRegistered && isFormatValid;  // Only valid if properly formatted AND not registered
+        _isCheckingEmail = false;
+      });
+    }
+  } catch (e) {
+    if (mounted) {
+      setState(() {
+        _isEmailValid = false;
+        _isCheckingEmail = false;
+      });
+    }
+  }
+}
+
 
   @override
   Widget build(BuildContext context) {
@@ -118,22 +231,54 @@ class _AccountProfilePageState extends State<AccountProfilePage> {
                         ),
                         SizedBox(height: 32),
 
-                        // Form Fields
+                        // Form Fields with improved validation
                         _buildTextField(
                           controller: _fullNameController,
                           label: 'Full Name',
                           prefixIcon: Icons.person_outline_rounded,
-                          validator: (value) => value!.isEmpty ? 'Required' : null,
+                          validator: ValidationUtils.validateName,
                         ),
                         SizedBox(height: 16),
 
-                        _buildTextField(
-                          controller: _emailController,
-                          label: 'Email',
-                          prefixIcon: Icons.email_outlined,
-                          keyboardType: TextInputType.emailAddress,
-                          validator: (value) => value!.isEmpty ? 'Required' : null,
-                        ),
+                        // Email field with real-time availability check
+                      _buildTextField(
+  controller: _emailController,
+  label: 'Email',
+  prefixIcon: Icons.email_outlined,
+  keyboardType: TextInputType.emailAddress,
+  validator: ValidationUtils.validateEmail,
+  errorText: _emailError,
+  suffix: _isCheckingEmail 
+  ? SizedBox(
+      height: 16, 
+      width: 16, 
+      child: CircularProgressIndicator(strokeWidth: 2),
+    ) 
+  : _emailController.text.isNotEmpty && 
+    _isEmailValid && 
+    _emailError == null && 
+    ValidationUtils.isEmailFormatValid(_emailController.text.trim())
+    ? Icon(Icons.check_circle, color: Colors.green, size: 20)
+    : _emailController.text.isNotEmpty && 
+      (!_isEmailValid || _emailError != null || !ValidationUtils.isEmailFormatValid(_emailController.text.trim()))
+      ? Icon(Icons.error, color: Colors.red, size: 20)
+      : null,
+  onChanged: (value) {
+    // Clear previous validations
+    if (_emailError != null || _isEmailValid) {
+      setState(() {
+        _emailError = null;
+        _isEmailValid = false;  // Reset validation state when email changes
+      });
+    }
+    
+    // Debounce the check to avoid too many requests
+    if (_emailDebounce?.isActive ?? false) _emailDebounce!.cancel();
+    _emailDebounce = Timer(Duration(milliseconds: 800), () {
+      _checkEmailAvailability();
+    });
+  },
+),
                         SizedBox(height: 16),
 
                         _buildTextField(
@@ -152,8 +297,34 @@ class _AccountProfilePageState extends State<AccountProfilePage> {
                               });
                             },
                           ),
-                          validator: (value) => value!.isEmpty ? 'Required' : null,
+                          validator: ValidationUtils.validatePassword,
+                          onChanged: _updatePasswordStrength,
                         ),
+                        
+                        // Password strength indicator
+                        if (_showPasswordStrength)
+                          Padding(
+                            padding: const EdgeInsets.only(left: 12.0, top: 4.0),
+                            child: Row(
+                              children: [
+                                Text(
+                                  'Password Strength: ',
+                                  style: TextStyle(
+                                    fontSize: 12,
+                                    color: Colors.grey[700],
+                                  ),
+                                ),
+                                Text(
+                                  _passwordStrengthFeedback ?? '',
+                                  style: TextStyle(
+                                    fontSize: 12,
+                                    color: _passwordStrengthColor,
+                                    fontWeight: FontWeight.bold,
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ),
                         SizedBox(height: 16),
 
                         _buildTextField(
@@ -182,12 +353,12 @@ class _AccountProfilePageState extends State<AccountProfilePage> {
                         ),
                         SizedBox(height: 16),
 
-                        // Date of Birth
+                        // Date of Birth with improved validation
                         GestureDetector(
                           onTap: () async {
                             DateTime? pickedDate = await showDatePicker(
                               context: context,
-                              initialDate: DateTime.now(),
+                              initialDate: DateTime.now().subtract(Duration(days: 365 * 18)), // Default to 18 years ago
                               firstDate: DateTime(1900),
                               lastDate: DateTime.now(),
                             );
@@ -203,7 +374,7 @@ class _AccountProfilePageState extends State<AccountProfilePage> {
                               controller: _dateOfBirthController,
                               label: 'Date of Birth',
                               prefixIcon: Icons.calendar_today_rounded,
-                              validator: (value) => value!.isEmpty ? 'Required' : null,
+                              validator: ValidationUtils.validateDateOfBirth,
                             ),
                           ),
                         ),
@@ -226,17 +397,18 @@ class _AccountProfilePageState extends State<AccountProfilePage> {
 
                         // Role Dropdown
                         _buildDropdownField(
-                          value: _selectedRole,
-                          label: 'Role',
-                          prefixIcon: Icons.work_outline_rounded,
-                          items: ['Medical Professional', 'Student'],
-                          onChanged: (value) {
-                            setState(() {
-                              _selectedRole = value;
-                            });
-                          },
-                          validator: (value) => value == null ? 'Required' : null,
-                        ),
+  value: _selectedRole,
+  label: 'Role',
+  prefixIcon: Icons.work_outline_rounded,
+  items: ['Medical Professional', 'Student'],
+  onChanged: _isRolePreselected ? null : (value) {
+    setState(() {
+      _selectedRole = value;
+    });
+  },
+  validator: (value) => value == null ? 'Required' : null,
+  isPreselected: _isRolePreselected,
+),
                         SizedBox(height: 16),
 
                         _buildTextField(
@@ -244,7 +416,7 @@ class _AccountProfilePageState extends State<AccountProfilePage> {
                           label: 'Phone Number',
                           prefixIcon: Icons.phone_outlined,
                           keyboardType: TextInputType.phone,
-                          validator: (value) => value!.isEmpty ? 'Required' : null,
+                          validator: ValidationUtils.validatePhoneNumber,
                         ),
                         SizedBox(height: 32),
 
@@ -300,16 +472,22 @@ class _AccountProfilePageState extends State<AccountProfilePage> {
     TextInputType? keyboardType,
     bool obscureText = false,
     Widget? suffixIcon,
+    Widget? suffix,
+    String? errorText,
     String? Function(String?)? validator,
+    void Function(String)? onChanged,
   }) {
     return TextFormField(
       controller: controller,
       obscureText: obscureText,
       keyboardType: keyboardType,
+      autovalidateMode: AutovalidateMode.onUserInteraction,
+      onChanged: onChanged,
       decoration: InputDecoration(
         labelText: label,
         prefixIcon: Icon(prefixIcon, color: Colors.grey[600], size: 22),
         suffixIcon: suffixIcon,
+        suffix: suffix,
         border: OutlineInputBorder(
           borderRadius: BorderRadius.circular(12),
           borderSide: BorderSide(color: Colors.grey[300]!),
@@ -322,8 +500,13 @@ class _AccountProfilePageState extends State<AccountProfilePage> {
           borderRadius: BorderRadius.circular(12),
           borderSide: BorderSide(color: Theme.of(context).primaryColor),
         ),
+        errorBorder: OutlineInputBorder(
+          borderRadius: BorderRadius.circular(12),
+          borderSide: BorderSide(color: Colors.red),
+        ),
         filled: true,
         fillColor: Colors.white,
+        errorText: errorText,
       ),
       validator: validator,
     );
@@ -331,100 +514,160 @@ class _AccountProfilePageState extends State<AccountProfilePage> {
 
   // Helper method to build consistent dropdown fields
   Widget _buildDropdownField({
-    required String? value,
-    required String label,
-    required IconData prefixIcon,
-    required List<String> items,
-    required void Function(String?) onChanged,
-    required String? Function(String?)? validator,
-  }) {
-    return DropdownButtonFormField<String>(
-      value: value,
-      decoration: InputDecoration(
-        labelText: label,
-        prefixIcon: Icon(prefixIcon, color: Colors.grey[600], size: 22),
-        border: OutlineInputBorder(
-          borderRadius: BorderRadius.circular(12),
-          borderSide: BorderSide(color: Colors.grey[300]!),
-        ),
-        enabledBorder: OutlineInputBorder(
-          borderRadius: BorderRadius.circular(12),
-          borderSide: BorderSide(color: Colors.grey[300]!),
-        ),
-        focusedBorder: OutlineInputBorder(
-          borderRadius: BorderRadius.circular(12),
-          borderSide: BorderSide(color: Theme.of(context).primaryColor),
-        ),
-        filled: true,
-        fillColor: Colors.white,
+  required String? value,
+  required String label,
+  required IconData prefixIcon,
+  required List<String> items,
+  required void Function(String?)? onChanged,
+  required String? Function(String?)? validator,
+  bool isPreselected = false,  // New parameter to indicate if this field was pre-selected
+}) {
+  return DropdownButtonFormField<String>(
+    value: value,
+    autovalidateMode: AutovalidateMode.onUserInteraction,
+    decoration: InputDecoration(
+      labelText: label,
+      prefixIcon: Icon(prefixIcon, color: Colors.grey[600], size: 22),
+      border: OutlineInputBorder(
+        borderRadius: BorderRadius.circular(12),
+        borderSide: BorderSide(color: Colors.grey[300]!),
       ),
-      items: items.map((String item) {
-        return DropdownMenuItem(
-          value: item,
-          child: Text(item),
-        );
-      }).toList(),
-      onChanged: onChanged,
-      validator: validator,
-    );
-  }
+      enabledBorder: OutlineInputBorder(
+        borderRadius: BorderRadius.circular(12),
+        borderSide: BorderSide(color: isPreselected ? Theme.of(context).primaryColor : Colors.grey[300]!),
+      ),
+      focusedBorder: OutlineInputBorder(
+        borderRadius: BorderRadius.circular(12),
+        borderSide: BorderSide(color: Theme.of(context).primaryColor),
+      ),
+      errorBorder: OutlineInputBorder(
+        borderRadius: BorderRadius.circular(12),
+        borderSide: BorderSide(color: Colors.red),
+      ),
+      filled: true,
+      fillColor: isPreselected ? Colors.grey[50] : Colors.white,
+      // Add a suffix icon to indicate it's preselected
+      suffixIcon: isPreselected 
+          ? Tooltip(
+              message: 'Role pre-selected',
+              child: Icon(Icons.check_circle, color: Colors.green, size: 20),
+            ) 
+          : null,
+    ),
+    items: items.map((String item) {
+      return DropdownMenuItem(
+        value: item,
+        child: Text(item),
+      );
+    }).toList(),
+    onChanged: isPreselected ? null : onChanged,  // Disable dropdown if preselected
+    validator: validator,
+  );
+}
 
-  // Submit form logic
-void _submitForm() async {
-  if (_formKey.currentState!.validate()) {
+  // Submit form logic with improved error handling
+  void _submitForm() async {
+    if (!_formKey.currentState!.validate()) {
+      // Form validation failed - show a message to fix errors
+      _showErrorMessage('Please correct the errors in the form.');
+      return;
+    }
+    
+    // Check for email error
+    if (_emailError != null) {
+      _showErrorMessage(_emailError!);
+      return;
+    }
+    
     setState(() => _isLoading = true);
     
     try {
       final email = _emailController.text.trim();
       final password = _passwordController.text.trim();
 
-      final user = await _authService.register(email, password);
-
-      if (user != null) {
-        User newUser = User(
-          fullName: _fullNameController.text,
-          email: email,
-          password: password,
-          dateOfBirth: _dateOfBirthController.text,
-          gender: _selectedGender!,
-          role: _selectedRole!,
-          phoneNumber: _phoneNumberController.text,
-          uid: user.uid,
-        );
-
-        await _firebaseService.saveUser(newUser);
-
-        _formKey.currentState!.reset();
-        _showSuccessMessage('Account created successfully!');
-
-        // Important: Check mounted before accessing context
-        if (!mounted) return;
-
-        // Check if we need to return to murmur record
-        final returnToMurmurRecord = widget.returnRoute == 'murmur_record';
+      // Double check if email is already registered
+      try {
+        bool isRegistered = await _authService.isEmailRegistered(email);
         
-        if (returnToMurmurRecord) {
-          // Pop back through the navigation stack with success result
-          Navigator.of(context).pop(true);  // Pop AccountProfilePage
-        } else {
-          // Normal registration flow
-          Navigator.pushAndRemoveUntil(
-            context,
-            MaterialPageRoute(builder: (context) => DashboardScreen()),
-            (Route<dynamic> route) => false,
-          );
+        if (isRegistered) {
+          _showErrorMessage('This email is already registered. Please try logging in or use a different email.');
+          setState(() => _isLoading = false);
+          return;
         }
+        
+        // Proceed with registration
+        final user = await _authService.register(email, password);
+
+        if (user != null) {
+          // Format phone number
+          String formattedPhone = ValidationUtils.formatPhoneNumber(_phoneNumberController.text);
+          
+          User newUser = User(
+            fullName: _fullNameController.text.trim(),
+            email: email,
+            password: password, // Consider not storing the password in the database
+            dateOfBirth: _dateOfBirthController.text,
+            gender: _selectedGender!,
+            role: _selectedRole!,
+            phoneNumber: formattedPhone,
+            uid: user.uid,
+          );
+
+          await _firebaseService.saveUser(newUser);
+
+          _formKey.currentState!.reset();
+          _showSuccessMessage('Account created successfully! Please verify your email.');
+
+          // Important: Check mounted before accessing context
+          if (!mounted) return;
+
+          // Check if we need to return to murmur record
+          final returnToMurmurRecord = widget.returnRoute == 'murmur_record';
+          
+          if (returnToMurmurRecord) {
+            // Pop back through the navigation stack with success result
+            Navigator.of(context).pop(true);  // Pop AccountProfilePage
+          } else {
+            // Navigate to email verification screen
+            Navigator.pushReplacement(
+              context,
+              MaterialPageRoute(
+                builder: (context) => EmailVerificationScreen(email: email),
+              ),
+            );
+          }
+        }
+      } on firebase_auth.FirebaseAuthException catch (e) {
+        String errorMessage;
+        
+        switch (e.code) {
+          case 'email-already-in-use':
+            errorMessage = 'This email is already registered. Please try logging in or use a different email.';
+            break;
+          case 'invalid-email':
+            errorMessage = 'Please provide a valid email address.';
+            break;
+          case 'weak-password':
+            errorMessage = 'The password you provided is too weak. Please choose a stronger password.';
+            break;
+          case 'operation-not-allowed':
+            errorMessage = 'Account creation is currently disabled. Please try again later.';
+            break;
+          default:
+            errorMessage = 'Registration failed: ${e.message}';
+        }
+        
+        _showErrorMessage(errorMessage);
       }
     } catch (e) {
       if (!mounted) return;
-      _showErrorMessage('Registration failed. Please try again.');
+      _showErrorMessage('Registration failed. Please check your information and try again.');
     } finally {
       if (mounted) {
         setState(() => _isLoading = false);
       }
     }
   }
-}
 
   void _showSuccessMessage(String message) {
     ScaffoldMessenger.of(context).showSnackBar(
