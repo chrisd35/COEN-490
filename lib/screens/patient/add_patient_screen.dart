@@ -2,10 +2,11 @@ import 'package:flutter/material.dart';
 import '../dashboard/components/patient_card.dart';
 import '../registration/firebase_service.dart';
 import '/utils/models.dart';
-import 'package:firebase_auth/firebase_auth.dart';
+import 'package:firebase_auth/firebase_auth.dart' as firebase_auth;
+import '/utils/validation_utils.dart'; // Import validation utilities
 
 class AddPatientScreen extends StatefulWidget {
-   final bool fromMurmurRecord;
+  final bool fromMurmurRecord;
 
   AddPatientScreen({
     Key? key,
@@ -25,6 +26,9 @@ class _AddPatientScreenState extends State<AddPatientScreen> {
   final _dateOfBirthController = TextEditingController();
   final _phoneNumberController = TextEditingController();
   String? _selectedGender;
+  bool _isLoading = false;
+  bool _isCheckingMedicareNumber = false;
+  String? _medicareNumberError;
 
   @override
   void dispose() {
@@ -36,7 +40,7 @@ class _AddPatientScreenState extends State<AddPatientScreen> {
     super.dispose();
   }
 
-  InputDecoration _buildInputDecoration(String label, IconData? icon) {
+  InputDecoration _buildInputDecoration(String label, IconData? icon, {String? errorText}) {
     return InputDecoration(
       labelText: label,
       labelStyle: TextStyle(
@@ -56,10 +60,59 @@ class _AddPatientScreenState extends State<AddPatientScreen> {
         borderRadius: BorderRadius.circular(12),
         borderSide: BorderSide(color: Colors.blue[700]!, width: 2),
       ),
+      errorBorder: OutlineInputBorder(
+        borderRadius: BorderRadius.circular(12),
+        borderSide: BorderSide(color: Colors.red),
+      ),
       filled: true,
       fillColor: Colors.grey[50],
       contentPadding: EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+      errorText: errorText,
     );
+  }
+
+  // Method to check if Medicare number is already in use
+  Future<bool> _isMedicareNumberUnique(String medicareNumber) async {
+    setState(() => _isCheckingMedicareNumber = true);
+    
+    try {
+      final uid = firebase_auth.FirebaseAuth.instance.currentUser?.uid;
+      if (uid == null) return true; // Can't check without a user ID
+      
+      final patients = await _firebaseService.getPatientsForUser(uid);
+      
+      // Check if any existing patient has this medical card number
+      bool isUnique = !patients.any((patient) => 
+        patient.medicalCardNumber.replaceAll('/', '_') == 
+        medicareNumber.replaceAll('/', '_')
+      );
+      
+      return isUnique;
+    } catch (e) {
+      print('Error checking Medicare number uniqueness: $e');
+      return true; // Assume unique on error to allow submission
+    } finally {
+      if (mounted) {
+        setState(() => _isCheckingMedicareNumber = false);
+      }
+    }
+  }
+
+  // Validate Medicare number with uniqueness check
+  Future<String?> _validateMedicareNumber(String? value) async {
+    // First check basic validation
+    String? basicValidation = ValidationUtils.validateMedicareNumber(value);
+    if (basicValidation != null) {
+      return basicValidation;
+    }
+    
+    // Then check uniqueness
+    bool isUnique = await _isMedicareNumberUnique(value!);
+    if (!isUnique) {
+      return 'This medical card number is already registered';
+    }
+    
+    return null;
   }
 
   @override
@@ -100,7 +153,8 @@ class _AddPatientScreenState extends State<AddPatientScreen> {
                     TextFormField(
                       controller: _fullNameController,
                       decoration: _buildInputDecoration('Full Name', Icons.person),
-                      validator: (value) => value!.isEmpty ? 'Required' : null,
+                      autovalidateMode: AutovalidateMode.onUserInteraction,
+                      validator: ValidationUtils.validateName,
                     ),
                     SizedBox(height: 16),
 
@@ -109,19 +163,26 @@ class _AddPatientScreenState extends State<AddPatientScreen> {
                       controller: _emailController,
                       decoration: _buildInputDecoration('Email', Icons.email),
                       keyboardType: TextInputType.emailAddress,
-                      validator: (value) {
-                        if (value!.isEmpty) return 'Required';
-                        if (!value.contains('@')) return 'Invalid email';
-                        return null;
-                      },
+                      autovalidateMode: AutovalidateMode.onUserInteraction,
+                      validator: ValidationUtils.validateEmail,
                     ),
                     SizedBox(height: 16),
 
-                    // Medical Card
+                    // Medical Card with uniqueness check
                     TextFormField(
                       controller: _medicalCardController,
-                      decoration: _buildInputDecoration('Medical Card #', Icons.health_and_safety),
-                      validator: (value) => value!.isEmpty ? 'Required' : null,
+                      decoration: _buildInputDecoration(
+                        'Medical Card #', 
+                        Icons.health_and_safety,
+                        errorText: _medicareNumberError,
+                      ),
+                      autovalidateMode: AutovalidateMode.onUserInteraction,
+                      onChanged: (value) {
+                        // Clear error when user types
+                        if (_medicareNumberError != null) {
+                          setState(() => _medicareNumberError = null);
+                        }
+                      },
                     ),
                     SizedBox(height: 16),
 
@@ -130,7 +191,7 @@ class _AddPatientScreenState extends State<AddPatientScreen> {
                       onTap: () async {
                         DateTime? pickedDate = await showDatePicker(
                           context: context,
-                          initialDate: DateTime.now(),
+                          initialDate: DateTime.now().subtract(Duration(days: 365 * 30)), // Default to 30 years ago
                           firstDate: DateTime(1900),
                           lastDate: DateTime.now(),
                           builder: (context, child) {
@@ -158,7 +219,8 @@ class _AddPatientScreenState extends State<AddPatientScreen> {
                             'Date of Birth',
                             Icons.calendar_today,
                           ),
-                          validator: (value) => value!.isEmpty ? 'Required' : null,
+                          autovalidateMode: AutovalidateMode.onUserInteraction,
+                          validator: ValidationUtils.validateDateOfBirth,
                         ),
                       ),
                     ),
@@ -168,6 +230,7 @@ class _AddPatientScreenState extends State<AddPatientScreen> {
                     DropdownButtonFormField<String>(
                       decoration: _buildInputDecoration('Gender', Icons.people),
                       value: _selectedGender,
+                      autovalidateMode: AutovalidateMode.onUserInteraction,
                       items: ['Male', 'Female', 'Other'].map((String gender) {
                         return DropdownMenuItem(
                           value: gender,
@@ -179,7 +242,7 @@ class _AddPatientScreenState extends State<AddPatientScreen> {
                           _selectedGender = value;
                         });
                       },
-                      validator: (value) => value == null ? 'Required' : null,
+                      validator: (value) => value == null ? 'Gender is required' : null,
                     ),
                     SizedBox(height: 16),
 
@@ -188,13 +251,14 @@ class _AddPatientScreenState extends State<AddPatientScreen> {
                       controller: _phoneNumberController,
                       decoration: _buildInputDecoration('Phone Number', Icons.phone),
                       keyboardType: TextInputType.phone,
-                      validator: (value) => value!.isEmpty ? 'Required' : null,
+                      autovalidateMode: AutovalidateMode.onUserInteraction,
+                      validator: ValidationUtils.validatePhoneNumber,
                     ),
                     SizedBox(height: 32),
 
                     // Save Button
                     ElevatedButton(
-                      onPressed: _submitForm,
+                      onPressed: _isLoading ? null : _submitForm,
                       style: ElevatedButton.styleFrom(
                         backgroundColor: Colors.blue[700],
                         padding: EdgeInsets.symmetric(vertical: 16),
@@ -203,14 +267,23 @@ class _AddPatientScreenState extends State<AddPatientScreen> {
                         ),
                         elevation: 0,
                       ),
-                      child: Text(
-                        'Save Patient Information',
-                        style: TextStyle(
-                          fontSize: 16,
-                          fontWeight: FontWeight.w600,
-                           color: Colors.white,
-                        ),
-                      ),
+                      child: _isLoading
+                          ? SizedBox(
+                              width: 24,
+                              height: 24,
+                              child: CircularProgressIndicator(
+                                strokeWidth: 2,
+                                valueColor: AlwaysStoppedAnimation<Color>(Colors.white),
+                              ),
+                            )
+                          : Text(
+                              'Save Patient Information',
+                              style: TextStyle(
+                                fontSize: 16,
+                                fontWeight: FontWeight.w600,
+                                color: Colors.white,
+                              ),
+                            ),
                     ),
                   ],
                 ),
@@ -222,49 +295,90 @@ class _AddPatientScreenState extends State<AddPatientScreen> {
     );
   }
 
-void _submitForm() async {
-  if (_formKey.currentState!.validate()) {
-    final user = FirebaseAuth.instance.currentUser;
-    if (user == null) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text('Error: User not logged in!'),
-          backgroundColor: Colors.red[400],
-        ),
-      );
+  void _submitForm() async {
+    // Check for Medicare number uniqueness first
+    String medicareNumber = _medicalCardController.text.trim();
+    String? medicareError = await _validateMedicareNumber(medicareNumber);
+    
+    if (medicareError != null) {
+      setState(() => _medicareNumberError = medicareError);
+      _showErrorSnackBar(medicareError);
       return;
     }
+    
+    if (_formKey.currentState!.validate()) {
+      setState(() => _isLoading = true);
+      
+      try {
+        final user = firebase_auth.FirebaseAuth.instance.currentUser;
+        if (user == null) {
+          _showErrorSnackBar('Error: User not logged in!');
+          setState(() => _isLoading = false);
+          return;
+        }
 
-    Patient newPatient = Patient(
-      fullName: _fullNameController.text,
-      email: _emailController.text,
-      medicalCardNumber: _medicalCardController.text,
-      dateOfBirth: _dateOfBirthController.text,
-      gender: _selectedGender!,
-      phoneNumber: _phoneNumberController.text,
-    );
+        // Format the phone number
+        String formattedPhone = ValidationUtils.formatPhoneNumber(_phoneNumberController.text);
 
-    await _firebaseService.savePatient(user.uid, newPatient);
+        Patient newPatient = Patient(
+          fullName: _fullNameController.text.trim(),
+          email: _emailController.text.trim(),
+          medicalCardNumber: _medicalCardController.text.trim(),
+          dateOfBirth: _dateOfBirthController.text,
+          gender: _selectedGender!,
+          phoneNumber: formattedPhone,
+        );
 
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(
-        content: Text('Patient saved successfully!'),
-        backgroundColor: Colors.green[400],
-      ),
-    );
+        await _firebaseService.savePatient(user.uid, newPatient);
 
-    if (widget.fromMurmurRecord) {
-      // If we came from MurmurRecord, pop and return the new patient
-      Navigator.pop(context, newPatient);
+        _showSuccessSnackBar('Patient saved successfully!');
+
+        if (widget.fromMurmurRecord) {
+          // If we came from MurmurRecord, pop and return the new patient
+          Navigator.pop(context, newPatient);
+        } else {
+          // Original navigation to patient list
+          Navigator.push(
+            context,
+            MaterialPageRoute(
+              builder: (context) => PatientCard(),
+            ),
+          );
+        }
+      } catch (e) {
+        _showErrorSnackBar('Error saving patient: ${e.toString()}');
+      } finally {
+        if (mounted) {
+          setState(() => _isLoading = false);
+        }
+      }
     } else {
-      // Original navigation to patient list
-      Navigator.push(
-        context,
-        MaterialPageRoute(
-          builder: (context) => PatientCard(),
-        ),
-      );
+      // Form validation failed
+      _showErrorSnackBar('Please correct the errors in the form.');
     }
   }
-}
+
+  void _showErrorSnackBar(String message) {
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Text(message),
+        backgroundColor: Colors.red[400],
+        behavior: SnackBarBehavior.floating,
+        margin: EdgeInsets.all(16),
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+      ),
+    );
+  }
+
+  void _showSuccessSnackBar(String message) {
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Text(message),
+        backgroundColor: Colors.green[400],
+        behavior: SnackBarBehavior.floating,
+        margin: EdgeInsets.all(16),
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+      ),
+    );
+  }
 }
