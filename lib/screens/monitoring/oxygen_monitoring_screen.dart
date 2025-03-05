@@ -10,6 +10,10 @@ import '../../utils/navigation_service.dart';
 import '../../widgets/back_button.dart';
 
 class OxygenMonitoring extends StatefulWidget {
+  final String? preselectedPatientId;
+
+  const OxygenMonitoring({Key? key, this.preselectedPatientId}) : super(key: key);
+
   @override
   _OxygenMonitoringState createState() => _OxygenMonitoringState();
 }
@@ -22,12 +26,36 @@ class _OxygenMonitoringState extends State<OxygenMonitoring> {
   double? firstTimestamp;
   int lastReadingIndex = 0;
   bool isActive = true; // Add state to track if monitoring is active
+  final FirebaseService _firebaseService = FirebaseService();
 
   @override
   void initState() {
     super.initState();
     isActive = true;
+    if (widget.preselectedPatientId != null) {
+      _loadPatientDetails(widget.preselectedPatientId!);
+    }
     _startPeriodicUpdate();
+  }
+
+  Future<void> _loadPatientDetails(String medicalCardNumber) async {
+    try {
+      final currentUser = FirebaseAuth.instance.currentUser;
+      if (currentUser == null) return;
+      
+      final patient = await _firebaseService.getPatient(
+        currentUser.uid,
+        medicalCardNumber,
+      );
+      
+      if (patient != null) {
+        setState(() {
+          selectedPatient = patient;
+        });
+      }
+    } catch (e) {
+      print('Error loading patient details: $e');
+    }
   }
 
   void _startPeriodicUpdate() {
@@ -102,11 +130,15 @@ class _OxygenMonitoringState extends State<OxygenMonitoring> {
 
   @override
   Widget build(BuildContext context) {
+    String title = selectedPatient != null 
+        ? 'Oxygen Monitoring - ${selectedPatient!.fullName}'
+        : 'Oxygen Monitoring';
+
     return BackButtonHandler(
       strategy: BackButtonHandlingStrategy.normal,
       child: Scaffold(
         appBar: AppBar(
-          title: Text('Oxygen Monitoring'),
+          title: Text(title),
           leading: IconButton(
             icon: Icon(Icons.arrow_back),
             onPressed: () => NavigationService.goBack(),
@@ -114,33 +146,7 @@ class _OxygenMonitoringState extends State<OxygenMonitoring> {
           actions: [
             IconButton(
               icon: Icon(Icons.history),
-              onPressed: () async {
-                final currentUser = FirebaseAuth.instance.currentUser;
-                final firebaseService = FirebaseService();
-
-                if (currentUser == null) {
-                  ScaffoldMessenger.of(context).showSnackBar(
-                    SnackBar(content: Text('User not logged in')),
-                  );
-                  return;
-                }
-
-                // Show patient selection dialog first
-                final selectedPatient = await showDialog<Patient>(
-                  context: context,
-                  builder: (context) => PatientSelectionDialog(),
-                );
-
-                if (selectedPatient != null) {
-                  // Navigate to history screen with selected patient using NavigationService
-                  NavigationService.navigateTo(
-                    AppRoutes.pulseOxHistory,
-                    arguments: {
-                      'preselectedPatientId': selectedPatient.medicalCardNumber,
-                    },
-                  );
-                }
-              },
+              onPressed: () => _showHistory(),
             ),
             IconButton(
               icon: Icon(Icons.refresh),
@@ -431,10 +437,7 @@ class _OxygenMonitoringState extends State<OxygenMonitoring> {
     );
   }
 
-
-  Future<void> _showSaveDialog(BuildContext context) async {
-    final bleManager = Provider.of<BLEManager>(context, listen: false);
-    final firebaseService = FirebaseService();
+  Future<void> _showHistory() async {
     final currentUser = FirebaseAuth.instance.currentUser;
 
     if (currentUser == null) {
@@ -444,31 +447,83 @@ class _OxygenMonitoringState extends State<OxygenMonitoring> {
       return;
     }
 
-    selectedPatient = await showDialog<Patient>(
+    // If we have a preselected patient, go directly to history
+    if (selectedPatient != null) {
+      NavigationService.navigateTo(
+        AppRoutes.pulseOxHistory,
+        arguments: {
+          'preselectedPatientId': selectedPatient!.medicalCardNumber,
+        },
+      );
+      return;
+    }
+
+    // Otherwise show dialog to select patient
+    final patient = await showDialog<Patient>(
       context: context,
       builder: (context) => PatientSelectionDialog(),
     );
 
-    if (selectedPatient != null && bleManager.currentSessionReadings.isNotEmpty) {
-      try {
-        await firebaseService.savePulseOxSession(
-          currentUser.uid,
-          selectedPatient!.medicalCardNumber,
-          List<Map<String, dynamic>>.from(bleManager.currentSessionReadings),
-          bleManager.sessionAverages,
-        );
-        
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Data saved successfully!')),
-        );
-      } catch (e) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Error saving data: $e')),
-        );
-      }
-    } else if (bleManager.currentSessionReadings.isEmpty) {
+    if (patient != null) {
+      NavigationService.navigateTo(
+        AppRoutes.pulseOxHistory,
+        arguments: {
+          'preselectedPatientId': patient.medicalCardNumber,
+        },
+      );
+    }
+  }
+
+  Future<void> _showSaveDialog(BuildContext context) async {
+    final bleManager = Provider.of<BLEManager>(context, listen: false);
+    final currentUser = FirebaseAuth.instance.currentUser;
+
+    if (currentUser == null) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('User not logged in')),
+      );
+      return;
+    }
+
+    // If we have a preselected patient, use it directly
+    if (selectedPatient != null) {
+      _savePulseOxData(currentUser.uid, selectedPatient!, bleManager);
+      return;
+    }
+
+    // Otherwise show dialog to select patient
+    final patient = await showDialog<Patient>(
+      context: context,
+      builder: (context) => PatientSelectionDialog(),
+    );
+
+    if (patient != null) {
+      _savePulseOxData(currentUser.uid, patient, bleManager);
+    }
+  }
+
+  void _savePulseOxData(String uid, Patient patient, BLEManager bleManager) async {
+    if (bleManager.currentSessionReadings.isEmpty) {
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(content: Text('No data to save')),
+      );
+      return;
+    }
+
+    try {
+      await _firebaseService.savePulseOxSession(
+        uid,
+        patient.medicalCardNumber,
+        List<Map<String, dynamic>>.from(bleManager.currentSessionReadings),
+        bleManager.sessionAverages,
+      );
+      
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Data saved successfully!')),
+      );
+    } catch (e) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Error saving data: $e')),
       );
     }
   }

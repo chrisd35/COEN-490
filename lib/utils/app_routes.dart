@@ -46,13 +46,9 @@ class AppRoutes {
     login: (context) => LoginPage(),
     register: (context) => RegisterPage(),
     dashboard: (context) => DashboardScreen(),
-    murmurRecord: (context) => MurmurRecord(),
-    recordingPlayback: (context) => RecordingPlaybackScreen(),
     patientCard: (context) => PatientCard(),
     murmurChart: (context) => MurmurChart(),
     bleScreen: (context) => BLEScreen(),
-    ecgMonitoring: (context) => ECGMonitoring(bleManager: BLEManager()),
-    oxygenMonitoring: (context) => OxygenMonitoring(),
     addPatient: (context) => AddPatientScreen(),
   };
   
@@ -75,6 +71,14 @@ class AppRoutes {
           ),
         );
         
+      case recordingPlayback:
+        final args = settings.arguments as Map<String, dynamic>?;
+        return MaterialPageRoute(
+          builder: (context) => RecordingPlaybackScreen(
+            preselectedPatientId: args?['preselectedPatientId'],
+          ),
+        );
+        
       case addPatient:
         final args = settings.arguments as Map<String, dynamic>?;
         return MaterialPageRoute(
@@ -89,6 +93,23 @@ class AppRoutes {
         return MaterialPageRoute(
           builder: (context) => PatientDetails(
             patient: args!['patient'],
+          ),
+        );
+        
+      case ecgMonitoring:
+        final args = settings.arguments as Map<String, dynamic>?;
+        return MaterialPageRoute(
+          builder: (context) => ECGMonitoring(
+            bleManager: BLEManager(),
+            preselectedPatientId: args?['preselectedPatientId'],
+          ),
+        );
+        
+      case oxygenMonitoring:
+        final args = settings.arguments as Map<String, dynamic>?;
+        return MaterialPageRoute(
+          builder: (context) => OxygenMonitoring(
+            preselectedPatientId: args?['preselectedPatientId'],
           ),
         );
         

@@ -25,11 +25,13 @@ class MurmurRecord extends StatefulWidget {
 }
 
 class _MurmurRecordState extends State<MurmurRecord> {
+
   final AudioPlayer _audioPlayer = AudioPlayer();
   final FirebaseService _firebaseService = FirebaseService();
   bool _isRecording = false;
   bool _hasRecordingCompleted = false;
   bool _isPlaying = false;
+  bool _cameFromPatientDetails = false;
   List<int>? _recordedAudioData;
   double _bufferSize = 0;
   Duration _recordingDuration = Duration.zero;
@@ -38,6 +40,7 @@ class _MurmurRecordState extends State<MurmurRecord> {
   @override
   void initState() {
     super.initState();
+    _cameFromPatientDetails = widget.preselectedPatientId != null;
     _setupAudioPlayer();
   }
 
@@ -456,11 +459,15 @@ class _MurmurRecordState extends State<MurmurRecord> {
   }
 
   @override
-  void dispose() {
-    _audioPlayer.dispose();
-    _recordingTimer?.cancel();
-    super.dispose();
+void dispose() {
+  // Stop audio playback when navigating away
+  if (_isPlaying) {
+    _audioPlayer.stop();
   }
+  _audioPlayer.dispose();
+  _recordingTimer?.cancel();
+  super.dispose();
+}
 
   Widget _buildWaveform(BuildContext context, BLEManager bleManager) {
     return Container(
@@ -523,10 +530,9 @@ class _MurmurRecordState extends State<MurmurRecord> {
 
   @override
   Widget build(BuildContext context) {
-    return BackButtonHandler(
+   return BackButtonHandler(
       strategy: BackButtonHandlingStrategy.normal,
       child: Scaffold(
-        backgroundColor: Colors.grey[50],
         appBar: AppBar(
           title: Text(
             widget.preselectedPatientId != null 
@@ -543,7 +549,20 @@ class _MurmurRecordState extends State<MurmurRecord> {
           leading: IconButton(
             icon: Icon(Icons.arrow_back_ios, size: 20),
             onPressed: () async {
-              // Check if user is logged in before navigating back
+
+              if (_isPlaying) {
+      await _audioPlayer.stop();
+      setState(() {
+        _isPlaying = false;
+      });
+    }
+              // If we came from patient details, just go back
+              if (_cameFromPatientDetails) {
+                NavigationService.goBack();
+                return;
+              }
+              
+              // Otherwise, use the original login logic for guests
               final authService = Provider.of<AuthService>(context, listen: false);
               final isGuest = await authService.isGuest();
               
@@ -745,15 +764,22 @@ class _MurmurRecordState extends State<MurmurRecord> {
         mainAxisSize: MainAxisSize.min,
         children: [
           FloatingActionButton.extended(
-            onPressed: () => setState(() {
-              _hasRecordingCompleted = false;
-              _recordedAudioData = null;
-            }),
-            backgroundColor: Colors.red,
-            label: Text("Discard"),
-            icon: Icon(Icons.delete),
-            heroTag: null,
-          ),
+  onPressed: () {
+    // Stop audio if playing
+    if (_isPlaying) {
+      _audioPlayer.stop();
+    }
+    setState(() {
+      _hasRecordingCompleted = false;
+      _recordedAudioData = null;
+      _isPlaying = false;
+    });
+  },
+  backgroundColor: Colors.red,
+  label: Text("Discard"),
+  icon: Icon(Icons.delete),
+  heroTag: null,
+),
           SizedBox(width: 16),
           FloatingActionButton.extended(
             onPressed: _showSaveRecordingDialog,
