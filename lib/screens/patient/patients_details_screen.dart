@@ -30,156 +30,123 @@ class PatientDetails extends StatelessWidget {
             onPressed: () => NavigationService.goBack(),
           ),
         ),
-        body: Container(
-          color: Colors.grey[50],
-          child: SingleChildScrollView(
+        backgroundColor: Colors.grey[100],
+        body: SingleChildScrollView(
+          child: Padding(
+            padding: const EdgeInsets.all(16.0),
             child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                // Patient Summary Header
-                Container(
-                  width: double.infinity,
-                  padding: EdgeInsets.all(24),
-                  decoration: BoxDecoration(
-                    color: Colors.white,
-                    borderRadius: BorderRadius.only(
-                      bottomLeft: Radius.circular(24),
-                      bottomRight: Radius.circular(24),
+                // Patient Overview Card
+                _buildPatientCard(context),
+                
+                SizedBox(height: 16),
+                
+                // Categories grid
+                GridView.count(
+                  crossAxisCount: 2,
+                  shrinkWrap: true,
+                  physics: NeverScrollableScrollPhysics(),
+                  mainAxisSpacing: 16,
+                  crossAxisSpacing: 16,
+                  childAspectRatio: 1.1,
+                  children: [
+                    _buildCategoryCard(
+                      context: context,
+                      icon: Icons.monitor_heart,
+                      title: 'ECG',
+                      color: Colors.red[400]!,
+                      onTap: () => NavigationService.navigateTo(
+                        AppRoutes.ecgMonitoring,
+                        arguments: {
+                          'preselectedPatientId': patient.medicalCardNumber,
+                        },
+                      ),
                     ),
-                    boxShadow: [
-                      BoxShadow(
-                        color: Colors.black.withOpacity(0.05),
-                        blurRadius: 10,
-                        offset: Offset(0, 5),
+                    _buildCategoryCard(
+                      context: context,
+                      icon: Icons.air,
+                      title: 'Oxygen',
+                      color: Colors.blue[400]!,
+                      onTap: () => NavigationService.navigateTo(
+                        AppRoutes.oxygenMonitoring,
+                        arguments: {
+                          'preselectedPatientId': patient.medicalCardNumber,
+                        },
                       ),
-                    ],
-                  ),
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Row(
-                        children: [
-                          CircleAvatar(
-                            radius: 30,
-                            backgroundColor: Colors.blue[700],
-                            child: Text(
-                              patient.fullName.substring(0, 1).toUpperCase(),
-                              style: TextStyle(
-                                fontSize: 24,
-                                fontWeight: FontWeight.bold,
-                                color: Colors.white,
-                              ),
-                            ),
-                          ),
-                          SizedBox(width: 16),
-                          Expanded(
-                            child: Column(
-                              crossAxisAlignment: CrossAxisAlignment.start,
-                              children: [
-                                Text(
-                                  patient.fullName,
-                                  style: TextStyle(
-                                    fontSize: 24,
-                                    fontWeight: FontWeight.bold,
-                                    color: Colors.black87,
-                                  ),
-                                ),
-                                Text(
-                                  'Medical Card: ${patient.medicalCardNumber}',
-                                  style: TextStyle(
-                                    fontSize: 16,
-                                    color: Colors.grey[600],
-                                  ),
-                                ),
-                              ],
-                            ),
-                          ),
-                        ],
+                    ),
+                    _buildCategoryCard(
+                      context: context,
+                      icon: Icons.volume_up,
+                      title: 'Murmur',
+                      color: Colors.purple[400]!,
+                      onTap: () => NavigationService.navigateTo(
+                        AppRoutes.murmurRecord,
+                        arguments: {
+                          'preselectedPatientId': patient.medicalCardNumber,
+                        },
                       ),
-                    ],
+                    ),
+                    _buildCategoryCard(
+                      context: context,
+                      icon: Icons.history,
+                      title: 'History',
+                      color: Colors.green[400]!,
+                      onTap: () => _showHistoryOptions(context),
+                    ),
+                  ],
+                ),
+              ],
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildPatientCard(BuildContext context) {
+    return Card(
+      elevation: 2,
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.circular(16),
+      ),
+      child: Padding(
+        padding: const EdgeInsets.all(16.0),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(
+              children: [
+                CircleAvatar(
+                  radius: 32,
+                  backgroundColor: Colors.blue[700],
+                  child: Text(
+                    patient.fullName.substring(0, 1).toUpperCase(),
+                    style: TextStyle(
+                      fontSize: 26,
+                      fontWeight: FontWeight.bold,
+                      color: Colors.white,
+                    ),
                   ),
                 ),
-
-                // Patient Information Section
-                Padding(
-                  padding: const EdgeInsets.all(24.0),
+                SizedBox(width: 16),
+                Expanded(
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
                       Text(
-                        'Patient Information',
+                        patient.fullName,
                         style: TextStyle(
-                          fontSize: 20,
+                          fontSize: 22,
                           fontWeight: FontWeight.bold,
                           color: Colors.black87,
                         ),
                       ),
-                      SizedBox(height: 16),
-                      Container(
-                        decoration: BoxDecoration(
-                          color: Colors.white,
-                          borderRadius: BorderRadius.circular(16),
-                          boxShadow: [
-                            BoxShadow(
-                              color: Colors.black.withOpacity(0.05),
-                              blurRadius: 10,
-                              offset: Offset(0, 5),
-                            ),
-                          ],
-                        ),
-                        child: Column(
-                          children: [
-                            _buildInfoRow(Icons.calendar_today, 'Date of Birth', patient.dateOfBirth),
-                            Divider(height: 1),
-                            _buildInfoRow(Icons.people, 'Gender', patient.gender),
-                            Divider(height: 1),
-                            _buildInfoRow(Icons.phone, 'Phone', patient.phoneNumber),
-                            Divider(height: 1),
-                            _buildInfoRow(Icons.email, 'Email', patient.email),
-                          ],
-                        ),
-                      ),
-                      SizedBox(height: 32),
-
+                      SizedBox(height: 4),
                       Text(
-                        'Monitoring Options',
+                        'ID: ${patient.medicalCardNumber}',
                         style: TextStyle(
-                          fontSize: 20,
-                          fontWeight: FontWeight.bold,
-                          color: Colors.black87,
-                        ),
-                      ),
-                      SizedBox(height: 16),
-
-                      // Monitoring Buttons
-                      _buildMonitoringButton(
-                        context,
-                        'ECG Monitoring',
-                        Icons.monitor_heart,
-                        Colors.blue[700]!,
-                        () => NavigationService.navigateTo(AppRoutes.ecgMonitoring),
-                      ),
-                      SizedBox(height: 16),
-
-                      _buildMonitoringButton(
-                        context,
-                        'Oxygen Monitoring',
-                        Icons.air,
-                        Colors.blue[700]!,
-                        () => NavigationService.navigateTo(AppRoutes.oxygenMonitoring),
-                      ),
-                      SizedBox(height: 16),
-
-                      _buildMonitoringButton(
-                        context,
-                        'Murmur Analysis',
-                        Icons.volume_up,
-                        Colors.blue[700]!,
-                        () => NavigationService.navigateTo(
-                          AppRoutes.murmurRecord,
-                          arguments: {
-                            'preselectedPatientId': patient.medicalCardNumber,
-                          },
+                          fontSize: 16,
+                          color: Colors.grey[600],
                         ),
                       ),
                     ],
@@ -187,6 +154,55 @@ class PatientDetails extends StatelessWidget {
                 ),
               ],
             ),
+            Divider(height: 24),
+            _buildInfoRow(Icons.calendar_today, 'Date of Birth', patient.dateOfBirth),
+            SizedBox(height: 8),
+            _buildInfoRow(Icons.people, 'Gender', patient.gender),
+            SizedBox(height: 8),
+            _buildInfoRow(Icons.phone, 'Phone', patient.phoneNumber),
+            SizedBox(height: 8),
+            _buildInfoRow(Icons.email, 'Email', patient.email),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildCategoryCard({
+    required BuildContext context,
+    required IconData icon,
+    required String title,
+    required Color color,
+    required VoidCallback onTap,
+  }) {
+    return Card(
+      elevation: 2,
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.circular(16),
+      ),
+      child: InkWell(
+        onTap: onTap,
+        borderRadius: BorderRadius.circular(16),
+        child: Padding(
+          padding: const EdgeInsets.all(16.0),
+          child: Column(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              Icon(
+                icon,
+                size: 40,
+                color: color,
+              ),
+              SizedBox(height: 12),
+              Text(
+                title,
+                style: TextStyle(
+                  fontSize: 16,
+                  fontWeight: FontWeight.bold,
+                  color: Colors.black87,
+                ),
+              ),
+            ],
           ),
         ),
       ),
@@ -194,76 +210,107 @@ class PatientDetails extends StatelessWidget {
   }
 
   Widget _buildInfoRow(IconData icon, String label, String value) {
-    return Padding(
-      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-      child: Row(
-        children: [
-          Icon(icon, size: 24, color: Colors.blue[700]),
-          SizedBox(width: 12),
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  label,
-                  style: TextStyle(
-                    fontSize: 14,
-                    color: Colors.grey[600],
-                    fontWeight: FontWeight.w500,
-                  ),
-                ),
-                SizedBox(height: 4),
-                Text(
-                  value,
-                  style: TextStyle(
-                    fontSize: 16,
-                    color: Colors.black87,
-                    fontWeight: FontWeight.w500,
-                  ),
-                ),
-              ],
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-
-  Widget _buildMonitoringButton(
-    BuildContext context,
-    String title,
-    IconData icon,
-    Color color,
-    VoidCallback onPressed,
-  ) {
-    return Container(
-      width: double.infinity,
-      height: 64,
-      child: ElevatedButton(
-        onPressed: onPressed,
-        style: ElevatedButton.styleFrom(
-          backgroundColor: color,
-          shape: RoundedRectangleBorder(
-            borderRadius: BorderRadius.circular(12),
-          ),
-          elevation: 0,
-        ),
-        child: Row(
-          mainAxisAlignment: MainAxisAlignment.center,
+    return Row(
+      children: [
+        Icon(icon, size: 18, color: Colors.blue[700]),
+        SizedBox(width: 8),
+        Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Icon(icon, color: Colors.white),
-            SizedBox(width: 12),
             Text(
-              title,
+              label,
+              style: TextStyle(
+                fontSize: 12,
+                color: Colors.grey[600],
+              ),
+            ),
+            Text(
+              value,
               style: TextStyle(
                 fontSize: 16,
-                fontWeight: FontWeight.w600,
-                color: Colors.white,
+                color: Colors.black87,
               ),
             ),
           ],
         ),
+      ],
+    );
+  }
+
+  void _showHistoryOptions(BuildContext context) {
+    showModalBottomSheet(
+      context: context,
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(
+          top: Radius.circular(20),
+        ),
       ),
+      builder: (context) {
+        return Padding(
+          padding: const EdgeInsets.symmetric(vertical: 24.0),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Text(
+                'View History',
+                style: TextStyle(
+                  fontSize: 20,
+                  fontWeight: FontWeight.bold,
+                ),
+              ),
+              SizedBox(height: 20),
+              ListTile(
+                leading: CircleAvatar(
+                  backgroundColor: Colors.red[100],
+                  child: Icon(Icons.monitor_heart, color: Colors.red),
+                ),
+                title: Text('ECG History'),
+                onTap: () {
+                  Navigator.pop(context);
+                  NavigationService.navigateTo(
+                    AppRoutes.ecgHistory,
+                    arguments: {
+                      'preselectedPatientId': patient.medicalCardNumber,
+                    },
+                  );
+                },
+              ),
+              ListTile(
+                leading: CircleAvatar(
+                  backgroundColor: Colors.blue[100],
+                  child: Icon(Icons.air, color: Colors.blue),
+                ),
+                title: Text('Oxygen Monitoring History'),
+                onTap: () {
+                  Navigator.pop(context);
+                  NavigationService.navigateTo(
+                    AppRoutes.pulseOxHistory,
+                    arguments: {
+                      'preselectedPatientId': patient.medicalCardNumber,
+                    },
+                  );
+                },
+              ),
+              ListTile(
+                leading: CircleAvatar(
+                  backgroundColor: Colors.purple[100],
+                  child: Icon(Icons.volume_up, color: Colors.purple),
+                ),
+                title: Text('Audio Recordings'),
+                onTap: () {
+                  Navigator.pop(context);
+                  NavigationService.navigateTo(
+                    AppRoutes.recordingPlayback,
+                    arguments: {
+                      'preselectedPatientId': patient.medicalCardNumber,
+                    },
+                  );
+                },
+              ),
+            ],
+          ),
+        );
+      },
     );
   }
 }

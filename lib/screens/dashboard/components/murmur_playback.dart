@@ -9,7 +9,9 @@ import '../../../utils/app_routes.dart';
 import '../../../widgets/back_button.dart';
 
 class RecordingPlaybackScreen extends StatefulWidget {
-  const RecordingPlaybackScreen({Key? key}) : super(key: key);
+  final String? preselectedPatientId;
+
+  const RecordingPlaybackScreen({Key? key, this.preselectedPatientId}) : super(key: key);
 
   @override
   _RecordingPlaybackScreenState createState() => _RecordingPlaybackScreenState();
@@ -29,8 +31,41 @@ class _RecordingPlaybackScreenState extends State<RecordingPlaybackScreen> {
   @override
   void initState() {
     super.initState();
-    _checkAuthAndLoadPatients();
     _setupAudioPlayer();
+    
+    if (widget.preselectedPatientId != null) {
+      _loadSpecificPatient(widget.preselectedPatientId!);
+    } else {
+      _checkAuthAndLoadPatients();
+    }
+  }
+
+  Future<void> _loadSpecificPatient(String medicalCardNumber) async {
+    try {
+      final authService = Provider.of<AuthService>(context, listen: false);
+      final currentUser = authService.getCurrentUser();
+      
+      if (currentUser == null) {
+        _showLoginPrompt();
+        return;
+      }
+      
+      final patient = await _firebaseService.getPatient(
+        currentUser.uid,
+        medicalCardNumber,
+      );
+      
+      if (patient != null) {
+        setState(() {
+          _selectedPatient = patient;
+          _patients = [patient]; // Set patients list with just this patient
+        });
+        
+        await _loadRecordings(patient);
+      }
+    } catch (e) {
+      _showErrorSnackBar("Failed to load patient: $e");
+    }
   }
 
   void _setupAudioPlayer() {
@@ -180,12 +215,16 @@ class _RecordingPlaybackScreenState extends State<RecordingPlaybackScreen> {
 
   @override
   Widget build(BuildContext context) {
+    String title = _selectedPatient != null 
+        ? "Recordings - ${_selectedPatient!.fullName}"
+        : "Recording Playback";
+        
     return BackButtonHandler(
       strategy: BackButtonHandlingStrategy.normal,
       child: Scaffold(
         appBar: AppBar(
           title: Text(
-            "Recording Playback",
+            title,
             style: TextStyle(
               fontWeight: FontWeight.w600,
               color: Colors.black87,
@@ -202,7 +241,7 @@ class _RecordingPlaybackScreenState extends State<RecordingPlaybackScreen> {
         body: SafeArea(
           child: Column(
             children: [
-              _buildPatientSelector(),
+              if (widget.preselectedPatientId == null) _buildPatientSelector(),
               if (_selectedPatient != null) _buildRecordingsList(),
               if (_selectedRecording != null) _buildPlaybackControls(),
             ],

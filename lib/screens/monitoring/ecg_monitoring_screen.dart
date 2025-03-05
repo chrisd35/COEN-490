@@ -11,13 +11,13 @@ import '../../widgets/back_button.dart';
 
 class ECGMonitoring extends StatefulWidget {
   final String? uid;
-  final String? medicalCardNumber;
+  final String? preselectedPatientId;
   final BLEManager bleManager;
 
   const ECGMonitoring({
     Key? key,
     this.uid,
-    this.medicalCardNumber,
+    this.preselectedPatientId,
     required this.bleManager,
   }) : super(key: key);
 
@@ -30,6 +30,7 @@ class _ECGMonitoringState extends State<ECGMonitoring> {
   final double minY = 0;
   final double maxY = 4095;
   double zoomLevel = 1.0;
+  final FirebaseService _firebaseService = FirebaseService();
 
   double currentHeartRate = 0.0;
   double rrInterval = 0.0;
@@ -39,14 +40,38 @@ class _ECGMonitoringState extends State<ECGMonitoring> {
   List<int> lastRPeakTimes = []; // Store times of last R peaks
   DateTime? lastPeakTime;
   List<double> lastHeartRates = [];
+  Patient? selectedPatient;
 
   ScrollController scrollController = ScrollController();
 
   @override
   void initState() {
     super.initState();
+    if (widget.preselectedPatientId != null) {
+      _loadPatientDetails(widget.preselectedPatientId!);
+    }
     widget.bleManager.clearECGBuffer();
     widget.bleManager.addListener(_onBLEUpdate);
+  }
+
+  Future<void> _loadPatientDetails(String medicalCardNumber) async {
+    try {
+      final currentUser = FirebaseAuth.instance.currentUser;
+      if (currentUser == null) return;
+      
+      final patient = await _firebaseService.getPatient(
+        currentUser.uid,
+        medicalCardNumber,
+      );
+      
+      if (patient != null) {
+        setState(() {
+          selectedPatient = patient;
+        });
+      }
+    } catch (e) {
+      print('Error loading patient details: $e');
+    }
   }
 
   @override
@@ -176,7 +201,6 @@ class _ECGMonitoringState extends State<ECGMonitoring> {
 
   Future<void> _showSaveDialog() async {
     final currentUser = FirebaseAuth.instance.currentUser;
-    final firebaseService = FirebaseService();
 
     if (currentUser == null) {
       ScaffoldMessenger.of(context).showSnackBar(
@@ -185,35 +209,52 @@ class _ECGMonitoringState extends State<ECGMonitoring> {
       return;
     }
 
-    final selectedPatient = await showDialog<Patient>(
+    // If we have a preselected patient, use it directly
+    if (selectedPatient != null) {
+      _saveECGToPatient(currentUser.uid, selectedPatient!);
+      return;
+    }
+
+    // Otherwise show dialog to select patient
+    final patient = await showDialog<Patient>(
       context: context,
       builder: (context) => PatientSelectionDialog(),
     );
 
-    if (selectedPatient != null && _points.isNotEmpty) {
-      try {
-        // Convert points to ECG data format, regardless of metrics
-        List<int> ecgData = _points.map((point) => point.y.toInt()).toList();
-        
-        await firebaseService.saveECGReading(
-          currentUser.uid,
-          selectedPatient.medicalCardNumber,
-          ecgData,
-          {
-            'duration': (ecgData.length / 100).round(), // assuming 100Hz
-            'sampleRate': 100,
-            // Remove any dependencies on calculated metrics
-          },
-        );
+    if (patient != null) {
+      _saveECGToPatient(currentUser.uid, patient);
+    }
+  }
 
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('ECG Recording saved successfully')),
-        );
-      } catch (e) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Error saving ECG recording: $e')),
-        );
-      }
+  void _saveECGToPatient(String uid, Patient patient) async {
+    if (_points.isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('No ECG data to save')),
+      );
+      return;
+    }
+
+    try {
+      // Convert points to ECG data format
+      List<int> ecgData = _points.map((point) => point.y.toInt()).toList();
+      
+      await _firebaseService.saveECGReading(
+        uid,
+        patient.medicalCardNumber,
+        ecgData,
+        {
+          'duration': (ecgData.length / 100).round(),
+          'sampleRate': 100,
+        },
+      );
+
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('ECG Recording saved successfully')),
+      );
+    } catch (e) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Error saving ECG recording: $e')),
+      );
     }
   }
 
@@ -227,16 +268,28 @@ class _ECGMonitoringState extends State<ECGMonitoring> {
       return;
     }
 
-    final selectedPatient = await showDialog<Patient>(
+    // If we have a preselected patient, go directly to history
+    if (selectedPatient != null) {
+      NavigationService.navigateTo(
+        AppRoutes.ecgHistory,
+        arguments: {
+          'preselectedPatientId': selectedPatient!.medicalCardNumber,
+        },
+      );
+      return;
+    }
+
+    // Otherwise show dialog to select patient
+    final patient = await showDialog<Patient>(
       context: context,
       builder: (context) => PatientSelectionDialog(),
     );
 
-    if (selectedPatient != null) {
-      // Use NavigationService instead of direct Navigator push
-      NavigationService.navigateTo(AppRoutes.ecgHistory,
+    if (patient != null) {
+      NavigationService.navigateTo(
+        AppRoutes.ecgHistory,
         arguments: {
-          'preselectedPatientId': selectedPatient.medicalCardNumber,
+          'preselectedPatientId': patient.medicalCardNumber,
         },
       );
     }
@@ -335,12 +388,15 @@ class _ECGMonitoringState extends State<ECGMonitoring> {
   @override
   Widget build(BuildContext context) {
     final isConnected = widget.bleManager.connectedDevice != null;
+    String title = selectedPatient != null 
+        ? 'ECG Monitoring - ${selectedPatient!.fullName}'
+        : 'ECG Monitoring';
 
     return BackButtonHandler(
       strategy: BackButtonHandlingStrategy.normal,
       child: Scaffold(
         appBar: AppBar(
-          title: Text('ECG Monitoring'),
+          title: Text(title),
           actions: [
             IconButton(
               icon: Icon(Icons.history),
