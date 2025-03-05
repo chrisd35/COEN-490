@@ -1,7 +1,6 @@
 import 'dart:async';
 import 'package:firebase_auth/firebase_auth.dart' as firebase_auth;
 import 'package:flutter/material.dart';
-import '../dashboard/dashboard_screen.dart';
 import 'firebase_service.dart';
 import '../../utils/models.dart';
 import 'auth_service.dart';

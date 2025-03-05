@@ -1,14 +1,13 @@
 import 'package:flutter/material.dart';
 import 'dart:ui' as ui show TextDirection;
 import 'dart:math' show Point, max, min, pi, pow, sqrt;
+import '../../utils/app_routes.dart';
 import '../../utils/ble_manager.dart';
 import '../registration/firebase_service.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import '../../utils/models.dart';
-import 'package:intl/intl.dart';
-import '../monitoring/oxygen_monitoring_screen.dart'; 
-import '../monitoring/ecg_history.dart';
-
+import '../../utils/navigation_service.dart';
+import '../../widgets/back_button.dart';
 
 class ECGMonitoring extends StatefulWidget {
   final String? uid;
@@ -32,7 +31,7 @@ class _ECGMonitoringState extends State<ECGMonitoring> {
   final double maxY = 4095;
   double zoomLevel = 1.0;
 
-   double currentHeartRate = 0.0;
+  double currentHeartRate = 0.0;
   double rrInterval = 0.0;
   double signalQuality = 0.0;
   List<int> rPeakIndices = [];
@@ -72,7 +71,7 @@ class _ECGMonitoringState extends State<ECGMonitoring> {
           }
         }
       });
-         _calculateECGMetrics(); 
+      _calculateECGMetrics(); 
       widget.bleManager.clearECGBuffer();
 
       // Auto-scroll to the latest data
@@ -85,7 +84,8 @@ class _ECGMonitoringState extends State<ECGMonitoring> {
       }
     }
   }
-    Widget _buildMetricsPanel() {
+  
+  Widget _buildMetricsPanel() {
     return Container(
       padding: EdgeInsets.all(16),
       child: Row(
@@ -162,7 +162,7 @@ class _ECGMonitoringState extends State<ECGMonitoring> {
     });
   }
 
-    void _resetDisplay() {
+  void _resetDisplay() {
     setState(() {
       _points.clear();
       currentHeartRate = 0.0;
@@ -174,7 +174,7 @@ class _ECGMonitoringState extends State<ECGMonitoring> {
     });
   }
 
- Future<void> _showSaveDialog() async {
+  Future<void> _showSaveDialog() async {
     final currentUser = FirebaseAuth.instance.currentUser;
     final firebaseService = FirebaseService();
 
@@ -233,18 +233,16 @@ class _ECGMonitoringState extends State<ECGMonitoring> {
     );
 
     if (selectedPatient != null) {
-      Navigator.push(
-        context,
-        MaterialPageRoute(
-          builder: (context) => ECGHistory(
-            preselectedPatientId: selectedPatient.medicalCardNumber,
-          ),
-        ),
+      // Use NavigationService instead of direct Navigator push
+      NavigationService.navigateTo(AppRoutes.ecgHistory,
+        arguments: {
+          'preselectedPatientId': selectedPatient.medicalCardNumber,
+        },
       );
     }
   }
 
- void _calculateECGMetrics() {
+  void _calculateECGMetrics() {
     if (_points.length < 100) return;
 
     // Get last 100 samples (1 second at 100Hz)
@@ -334,86 +332,89 @@ class _ECGMonitoringState extends State<ECGMonitoring> {
     }
   }
 
+  @override
   Widget build(BuildContext context) {
     final isConnected = widget.bleManager.connectedDevice != null;
 
-    return Scaffold(
-      appBar: AppBar(
-        title: Text('ECG Monitoring'),
-        actions: [
-          IconButton(
-            icon: Icon(Icons.history),
-            onPressed: _showHistory,
-          ),
-          IconButton(
-            icon: Icon(Icons.save),
-            onPressed: _showSaveDialog,
-          ),
-          IconButton(
-            icon: Icon(Icons.zoom_in),
-            onPressed: () => _adjustZoom(0.1),
-          ),
-          IconButton(
-            icon: Icon(Icons.zoom_out),
-            onPressed: () => _adjustZoom(-0.1),
-          ),
-          // Added Reset Button to clear the screen/graph and metrics
-          IconButton(
-            icon: Icon(Icons.refresh),
-            onPressed: _resetDisplay,
-          ),
-        ],
-      ),
-      body: Column(
-        children: [
-          Padding(
-            padding: const EdgeInsets.all(16.0),
-            child: Row(
-              mainAxisAlignment: MainAxisAlignment.spaceBetween,
-              children: [
-                Text(
-                  'Live ECG Monitor',
-                  style: Theme.of(context).textTheme.titleLarge,
-                ),
-                Container(
-                  padding: EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-                  decoration: BoxDecoration(
-                    color: isConnected ? Colors.green : Colors.red,
-                    borderRadius: BorderRadius.circular(12),
-                  ),
-                  child: Text(
-                    isConnected ? 'Connected' : 'Disconnected',
-                    style: TextStyle(color: Colors.white),
-                  ),
-                ),
-              ],
+    return BackButtonHandler(
+      strategy: BackButtonHandlingStrategy.normal,
+      child: Scaffold(
+        appBar: AppBar(
+          title: Text('ECG Monitoring'),
+          actions: [
+            IconButton(
+              icon: Icon(Icons.history),
+              onPressed: _showHistory,
             ),
-          ),
-          _buildMetricsPanel(), 
-          Expanded(
-            child: SingleChildScrollView(
-              controller: scrollController,
-              scrollDirection: Axis.horizontal,
-              child: Container(
-                width: _points.length * 2.0 * zoomLevel, // Adjust width based on zoom
-                child: CustomPaint(
-                  painter: ECGPainter(
-                    points: _points,
-                    minY: minY,
-                    maxY: maxY,
-                    zoomLevel: zoomLevel,
+            IconButton(
+              icon: Icon(Icons.save),
+              onPressed: _showSaveDialog,
+            ),
+            IconButton(
+              icon: Icon(Icons.zoom_in),
+              onPressed: () => _adjustZoom(0.1),
+            ),
+            IconButton(
+              icon: Icon(Icons.zoom_out),
+              onPressed: () => _adjustZoom(-0.1),
+            ),
+            // Added Reset Button to clear the screen/graph and metrics
+            IconButton(
+              icon: Icon(Icons.refresh),
+              onPressed: _resetDisplay,
+            ),
+          ],
+        ),
+        body: Column(
+          children: [
+            Padding(
+              padding: const EdgeInsets.all(16.0),
+              child: Row(
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                children: [
+                  Text(
+                    'Live ECG Monitor',
+                    style: Theme.of(context).textTheme.titleLarge,
                   ),
-                  size: Size.infinite,
+                  Container(
+                    padding: EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                    decoration: BoxDecoration(
+                      color: isConnected ? Colors.green : Colors.red,
+                      borderRadius: BorderRadius.circular(12),
+                    ),
+                    child: Text(
+                      isConnected ? 'Connected' : 'Disconnected',
+                      style: TextStyle(color: Colors.white),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+            _buildMetricsPanel(), 
+            Expanded(
+              child: SingleChildScrollView(
+                controller: scrollController,
+                scrollDirection: Axis.horizontal,
+                child: Container(
+                  width: _points.length * 2.0 * zoomLevel, // Adjust width based on zoom
+                  child: CustomPaint(
+                    painter: ECGPainter(
+                      points: _points,
+                      minY: minY,
+                      maxY: maxY,
+                      zoomLevel: zoomLevel,
+                    ),
+                    size: Size.infinite,
+                  ),
                 ),
               ),
             ),
-          ),
-        ],
+          ],
+        ),
       ),
     );
   }
 }
-
 
 class ECGPainter extends CustomPainter {
   final List<Point<double>> points;
@@ -560,6 +561,10 @@ class ECGPainter extends CustomPainter {
   bool shouldRepaint(covariant CustomPainter oldDelegate) => true;
 }
 
+class PatientSelectionDialog extends StatefulWidget {
+  @override
+  _PatientSelectionDialogState createState() => _PatientSelectionDialogState();
+}
 
 class _PatientSelectionDialogState extends State<PatientSelectionDialog> {
   List<Patient> patients = [];

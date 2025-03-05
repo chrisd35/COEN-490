@@ -1,7 +1,9 @@
 import 'dart:async';
 import 'package:flutter/material.dart';
 import '../registration/auth_service.dart';
-import '../dashboard/dashboard_screen.dart';
+import '../../utils/navigation_service.dart';
+import '../../utils/app_routes.dart';
+import '../../widgets/back_button.dart';
 
 class EmailVerificationScreen extends StatefulWidget {
   final String email;
@@ -64,11 +66,7 @@ class _EmailVerificationScreenState extends State<EmailVerificationScreen> {
         _timer?.cancel();
         // Navigate to dashboard after verification
         Future.delayed(Duration(seconds: 2), () {
-          Navigator.pushAndRemoveUntil(
-            context,
-            MaterialPageRoute(builder: (context) => DashboardScreen()),
-            (route) => false,
-          );
+          NavigationService.navigateToAndRemoveUntil(AppRoutes.dashboard);
         });
       }
     } catch (e) {
@@ -127,80 +125,83 @@ class _EmailVerificationScreenState extends State<EmailVerificationScreen> {
 
   @override
   Widget build(BuildContext context) {
-    return Scaffold(
-      appBar: AppBar(
-        title: Text('Email Verification'),
-        automaticallyImplyLeading: false, // Disable back button
-      ),
-      body: Padding(
-        padding: const EdgeInsets.all(24.0),
-        child: Column(
-          mainAxisAlignment: MainAxisAlignment.center,
-          crossAxisAlignment: CrossAxisAlignment.center,
-          children: [
-            Icon(
-              _isVerified ? Icons.check_circle : Icons.mark_email_unread,
-              size: 80,
-              color: _isVerified ? Colors.green : Theme.of(context).primaryColor,
-            ),
-            SizedBox(height: 24),
-            Text(
-              _isVerified
-                  ? 'Email Verified!'
-                  : 'Verify Your Email',
-              style: TextStyle(
-                fontSize: 24,
-                fontWeight: FontWeight.bold,
+    return BackButtonHandler(
+      strategy: BackButtonHandlingStrategy.block,
+      child: Scaffold(
+        appBar: AppBar(
+          title: Text('Email Verification'),
+          automaticallyImplyLeading: false, // Disable back button
+        ),
+        body: Padding(
+          padding: const EdgeInsets.all(24.0),
+          child: Column(
+            mainAxisAlignment: MainAxisAlignment.center,
+            crossAxisAlignment: CrossAxisAlignment.center,
+            children: [
+              Icon(
+                _isVerified ? Icons.check_circle : Icons.mark_email_unread,
+                size: 80,
+                color: _isVerified ? Colors.green : Theme.of(context).primaryColor,
               ),
-              textAlign: TextAlign.center,
-            ),
-            SizedBox(height: 16),
-            Text(
-              _isVerified
-                  ? 'Your email has been successfully verified. Redirecting you to the dashboard...'
-                  : 'We\'ve sent a verification email to ${widget.email}. Please check your inbox and click the verification link.',
-              style: TextStyle(
-                fontSize: 16,
-                color: Colors.grey[700],
-              ),
-              textAlign: TextAlign.center,
-            ),
-            SizedBox(height: 32),
-            if (!_isVerified) ...[
+              SizedBox(height: 24),
               Text(
-                'Didn\'t receive the email? Check your spam folder or click below to resend.',
+                _isVerified
+                    ? 'Email Verified!'
+                    : 'Verify Your Email',
                 style: TextStyle(
-                  fontSize: 14,
-                  color: Colors.grey[600],
+                  fontSize: 24,
+                  fontWeight: FontWeight.bold,
                 ),
                 textAlign: TextAlign.center,
               ),
-              SizedBox(height: 24),
-              ElevatedButton(
-                onPressed: _canResendEmail ? _resendVerificationEmail : null,
-                style: ElevatedButton.styleFrom(
-                  padding: EdgeInsets.symmetric(horizontal: 32, vertical: 12),
-                  shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(8),
+              SizedBox(height: 16),
+              Text(
+                _isVerified
+                    ? 'Your email has been successfully verified. Redirecting you to the dashboard...'
+                    : 'We\'ve sent a verification email to ${widget.email}. Please check your inbox and click the verification link.',
+                style: TextStyle(
+                  fontSize: 16,
+                  color: Colors.grey[700],
+                ),
+                textAlign: TextAlign.center,
+              ),
+              SizedBox(height: 32),
+              if (!_isVerified) ...[
+                Text(
+                  'Didn\'t receive the email? Check your spam folder or click below to resend.',
+                  style: TextStyle(
+                    fontSize: 14,
+                    color: Colors.grey[600],
+                  ),
+                  textAlign: TextAlign.center,
+                ),
+                SizedBox(height: 24),
+                ElevatedButton(
+                  onPressed: _canResendEmail ? _resendVerificationEmail : null,
+                  style: ElevatedButton.styleFrom(
+                    padding: EdgeInsets.symmetric(horizontal: 32, vertical: 12),
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(8),
+                    ),
+                  ),
+                  child: Text(
+                    _canResendEmail
+                        ? 'Resend Verification Email'
+                        : 'Resend in $_resendCooldown seconds',
+                    style: TextStyle(fontSize: 16),
                   ),
                 ),
-                child: Text(
-                  _canResendEmail
-                      ? 'Resend Verification Email'
-                      : 'Resend in $_resendCooldown seconds',
-                  style: TextStyle(fontSize: 16),
+                SizedBox(height: 16),
+                TextButton(
+                  onPressed: () {
+                    _authService.logout();
+                    NavigationService.navigateToAndRemoveUntil(AppRoutes.auth);
+                  },
+                  child: Text('Cancel and Return to Login'),
                 ),
-              ),
-              SizedBox(height: 16),
-              TextButton(
-                onPressed: () {
-                  _authService.logout();
-                  Navigator.of(context).pop();
-                },
-                child: Text('Cancel and Return to Login'),
-              ),
+              ],
             ],
-          ],
+          ),
         ),
       ),
     );

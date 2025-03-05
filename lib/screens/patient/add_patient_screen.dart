@@ -1,9 +1,11 @@
 import 'package:flutter/material.dart';
-import '../dashboard/components/patient_card.dart';
 import '../registration/firebase_service.dart';
 import '/utils/models.dart';
 import 'package:firebase_auth/firebase_auth.dart' as firebase_auth;
-import '/utils/validation_utils.dart'; // Import validation utilities
+import '/utils/validation_utils.dart';
+import '../../utils/navigation_service.dart';
+import '../../utils/app_routes.dart';
+import '../../widgets/back_button.dart';
 
 class AddPatientScreen extends StatefulWidget {
   final bool fromMurmurRecord;
@@ -117,175 +119,178 @@ class _AddPatientScreenState extends State<AddPatientScreen> {
 
   @override
   Widget build(BuildContext context) {
-    return Scaffold(
-      appBar: AppBar(
-        title: Text(
-          'Create New Patient',
-          style: TextStyle(fontWeight: FontWeight.w600),
+    return BackButtonHandler(
+      strategy: BackButtonHandlingStrategy.normal,
+      child: Scaffold(
+        appBar: AppBar(
+          title: Text(
+            'Create New Patient',
+            style: TextStyle(fontWeight: FontWeight.w600),
+          ),
+          elevation: 0,
+          backgroundColor: Colors.white,
+          foregroundColor: Colors.black87,
         ),
-        elevation: 0,
-        backgroundColor: Colors.white,
-        foregroundColor: Colors.black87,
-      ),
-      body: Container(
-        color: Colors.white,
-        child: SafeArea(
-          child: SingleChildScrollView(
-            child: Padding(
-              padding: const EdgeInsets.all(24.0),
-              child: Form(
-                key: _formKey,
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.stretch,
-                  children: [
-                    // Header
-                    Text(
-                      'Patient Information',
-                      style: TextStyle(
-                        fontSize: 24,
-                        fontWeight: FontWeight.bold,
-                        color: Colors.black87,
+        body: Container(
+          color: Colors.white,
+          child: SafeArea(
+            child: SingleChildScrollView(
+              child: Padding(
+                padding: const EdgeInsets.all(24.0),
+                child: Form(
+                  key: _formKey,
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.stretch,
+                    children: [
+                      // Header
+                      Text(
+                        'Patient Information',
+                        style: TextStyle(
+                          fontSize: 24,
+                          fontWeight: FontWeight.bold,
+                          color: Colors.black87,
+                        ),
                       ),
-                    ),
-                    SizedBox(height: 24),
+                      SizedBox(height: 24),
 
-                    // Full Name
-                    TextFormField(
-                      controller: _fullNameController,
-                      decoration: _buildInputDecoration('Full Name', Icons.person),
-                      autovalidateMode: AutovalidateMode.onUserInteraction,
-                      validator: ValidationUtils.validateName,
-                    ),
-                    SizedBox(height: 16),
-
-                    // Email
-                    TextFormField(
-                      controller: _emailController,
-                      decoration: _buildInputDecoration('Email', Icons.email),
-                      keyboardType: TextInputType.emailAddress,
-                      autovalidateMode: AutovalidateMode.onUserInteraction,
-                      validator: ValidationUtils.validateEmail,
-                    ),
-                    SizedBox(height: 16),
-
-                    // Medical Card with uniqueness check
-                    TextFormField(
-                      controller: _medicalCardController,
-                      decoration: _buildInputDecoration(
-                        'Medical Card #', 
-                        Icons.health_and_safety,
-                        errorText: _medicareNumberError,
+                      // Full Name
+                      TextFormField(
+                        controller: _fullNameController,
+                        decoration: _buildInputDecoration('Full Name', Icons.person),
+                        autovalidateMode: AutovalidateMode.onUserInteraction,
+                        validator: ValidationUtils.validateName,
                       ),
-                      autovalidateMode: AutovalidateMode.onUserInteraction,
-                      onChanged: (value) {
-                        // Clear error when user types
-                        if (_medicareNumberError != null) {
-                          setState(() => _medicareNumberError = null);
-                        }
-                      },
-                    ),
-                    SizedBox(height: 16),
+                      SizedBox(height: 16),
 
-                    // Date of Birth
-                    GestureDetector(
-                      onTap: () async {
-                        DateTime? pickedDate = await showDatePicker(
-                          context: context,
-                          initialDate: DateTime.now().subtract(Duration(days: 365 * 30)), // Default to 30 years ago
-                          firstDate: DateTime(1900),
-                          lastDate: DateTime.now(),
-                          builder: (context, child) {
-                            return Theme(
-                              data: Theme.of(context).copyWith(
-                                colorScheme: ColorScheme.light(
-                                  primary: Colors.blue[700]!,
+                      // Email
+                      TextFormField(
+                        controller: _emailController,
+                        decoration: _buildInputDecoration('Email', Icons.email),
+                        keyboardType: TextInputType.emailAddress,
+                        autovalidateMode: AutovalidateMode.onUserInteraction,
+                        validator: ValidationUtils.validateEmail,
+                      ),
+                      SizedBox(height: 16),
+
+                      // Medical Card with uniqueness check
+                      TextFormField(
+                        controller: _medicalCardController,
+                        decoration: _buildInputDecoration(
+                          'Medical Card #', 
+                          Icons.health_and_safety,
+                          errorText: _medicareNumberError,
+                        ),
+                        autovalidateMode: AutovalidateMode.onUserInteraction,
+                        onChanged: (value) {
+                          // Clear error when user types
+                          if (_medicareNumberError != null) {
+                            setState(() => _medicareNumberError = null);
+                          }
+                        },
+                      ),
+                      SizedBox(height: 16),
+
+                      // Date of Birth
+                      GestureDetector(
+                        onTap: () async {
+                          DateTime? pickedDate = await showDatePicker(
+                            context: context,
+                            initialDate: DateTime.now().subtract(Duration(days: 365 * 30)), // Default to 30 years ago
+                            firstDate: DateTime(1900),
+                            lastDate: DateTime.now(),
+                            builder: (context, child) {
+                              return Theme(
+                                data: Theme.of(context).copyWith(
+                                  colorScheme: ColorScheme.light(
+                                    primary: Colors.blue[700]!,
+                                  ),
+                                ),
+                                child: child!,
+                              );
+                            },
+                          );
+                          if (pickedDate != null) {
+                            setState(() {
+                              _dateOfBirthController.text =
+                                  "${pickedDate.toLocal()}".split(' ')[0];
+                            });
+                          }
+                        },
+                        child: AbsorbPointer(
+                          child: TextFormField(
+                            controller: _dateOfBirthController,
+                            decoration: _buildInputDecoration(
+                              'Date of Birth',
+                              Icons.calendar_today,
+                            ),
+                            autovalidateMode: AutovalidateMode.onUserInteraction,
+                            validator: ValidationUtils.validateDateOfBirth,
+                          ),
+                        ),
+                      ),
+                      SizedBox(height: 16),
+
+                      // Gender Dropdown
+                      DropdownButtonFormField<String>(
+                        decoration: _buildInputDecoration('Gender', Icons.people),
+                        value: _selectedGender,
+                        autovalidateMode: AutovalidateMode.onUserInteraction,
+                        items: ['Male', 'Female', 'Other'].map((String gender) {
+                          return DropdownMenuItem(
+                            value: gender,
+                            child: Text(gender),
+                          );
+                        }).toList(),
+                        onChanged: (value) {
+                          setState(() {
+                            _selectedGender = value;
+                          });
+                        },
+                        validator: (value) => value == null ? 'Gender is required' : null,
+                      ),
+                      SizedBox(height: 16),
+
+                      // Phone Number
+                      TextFormField(
+                        controller: _phoneNumberController,
+                        decoration: _buildInputDecoration('Phone Number', Icons.phone),
+                        keyboardType: TextInputType.phone,
+                        autovalidateMode: AutovalidateMode.onUserInteraction,
+                        validator: ValidationUtils.validatePhoneNumber,
+                      ),
+                      SizedBox(height: 32),
+
+                      // Save Button
+                      ElevatedButton(
+                        onPressed: _isLoading ? null : _submitForm,
+                        style: ElevatedButton.styleFrom(
+                          backgroundColor: Colors.blue[700],
+                          padding: EdgeInsets.symmetric(vertical: 16),
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(12),
+                          ),
+                          elevation: 0,
+                        ),
+                        child: _isLoading
+                            ? SizedBox(
+                                width: 24,
+                                height: 24,
+                                child: CircularProgressIndicator(
+                                  strokeWidth: 2,
+                                  valueColor: AlwaysStoppedAnimation<Color>(Colors.white),
+                                ),
+                              )
+                            : Text(
+                                'Save Patient Information',
+                                style: TextStyle(
+                                  fontSize: 16,
+                                  fontWeight: FontWeight.w600,
+                                  color: Colors.white,
                                 ),
                               ),
-                              child: child!,
-                            );
-                          },
-                        );
-                        if (pickedDate != null) {
-                          setState(() {
-                            _dateOfBirthController.text =
-                                "${pickedDate.toLocal()}".split(' ')[0];
-                          });
-                        }
-                      },
-                      child: AbsorbPointer(
-                        child: TextFormField(
-                          controller: _dateOfBirthController,
-                          decoration: _buildInputDecoration(
-                            'Date of Birth',
-                            Icons.calendar_today,
-                          ),
-                          autovalidateMode: AutovalidateMode.onUserInteraction,
-                          validator: ValidationUtils.validateDateOfBirth,
-                        ),
                       ),
-                    ),
-                    SizedBox(height: 16),
-
-                    // Gender Dropdown
-                    DropdownButtonFormField<String>(
-                      decoration: _buildInputDecoration('Gender', Icons.people),
-                      value: _selectedGender,
-                      autovalidateMode: AutovalidateMode.onUserInteraction,
-                      items: ['Male', 'Female', 'Other'].map((String gender) {
-                        return DropdownMenuItem(
-                          value: gender,
-                          child: Text(gender),
-                        );
-                      }).toList(),
-                      onChanged: (value) {
-                        setState(() {
-                          _selectedGender = value;
-                        });
-                      },
-                      validator: (value) => value == null ? 'Gender is required' : null,
-                    ),
-                    SizedBox(height: 16),
-
-                    // Phone Number
-                    TextFormField(
-                      controller: _phoneNumberController,
-                      decoration: _buildInputDecoration('Phone Number', Icons.phone),
-                      keyboardType: TextInputType.phone,
-                      autovalidateMode: AutovalidateMode.onUserInteraction,
-                      validator: ValidationUtils.validatePhoneNumber,
-                    ),
-                    SizedBox(height: 32),
-
-                    // Save Button
-                    ElevatedButton(
-                      onPressed: _isLoading ? null : _submitForm,
-                      style: ElevatedButton.styleFrom(
-                        backgroundColor: Colors.blue[700],
-                        padding: EdgeInsets.symmetric(vertical: 16),
-                        shape: RoundedRectangleBorder(
-                          borderRadius: BorderRadius.circular(12),
-                        ),
-                        elevation: 0,
-                      ),
-                      child: _isLoading
-                          ? SizedBox(
-                              width: 24,
-                              height: 24,
-                              child: CircularProgressIndicator(
-                                strokeWidth: 2,
-                                valueColor: AlwaysStoppedAnimation<Color>(Colors.white),
-                              ),
-                            )
-                          : Text(
-                              'Save Patient Information',
-                              style: TextStyle(
-                                fontSize: 16,
-                                fontWeight: FontWeight.w600,
-                                color: Colors.white,
-                              ),
-                            ),
-                    ),
-                  ],
+                    ],
+                  ),
                 ),
               ),
             ),
@@ -335,15 +340,12 @@ class _AddPatientScreenState extends State<AddPatientScreen> {
 
         if (widget.fromMurmurRecord) {
           // If we came from MurmurRecord, pop and return the new patient
-          Navigator.pop(context, newPatient);
+          NavigationService.goBackWithResult(newPatient);
         } else {
-          // Original navigation to patient list
-          Navigator.push(
-            context,
-            MaterialPageRoute(
-              builder: (context) => PatientCard(),
-            ),
-          );
+          // Use replaceTo instead of push to prevent going back to the form
+           NavigationService.replaceTo(
+    AppRoutes.patientDetails,
+    arguments: {'patient': newPatient}, );
         }
       } catch (e) {
         _showErrorSnackBar('Error saving patient: ${e.toString()}');

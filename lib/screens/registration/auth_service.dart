@@ -1,7 +1,8 @@
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:shared_preferences/shared_preferences.dart';
+import 'package:flutter/foundation.dart';
 
-class AuthService {
+class AuthService extends ChangeNotifier {
   final FirebaseAuth _auth = FirebaseAuth.instance;
   static const String GUEST_KEY = 'is_guest_mode';
   static const String LAST_LOGIN_KEY = 'last_login_time';
@@ -64,6 +65,9 @@ class AuthService {
       
       // Store login time
       await _updateLastLoginTime();
+      
+      // Notify listeners about the auth state change
+      notifyListeners();
       
       return userCredential.user;
     } on FirebaseAuthException catch (e) {
@@ -128,6 +132,9 @@ class AuthService {
       // Store login time
       await _updateLastLoginTime();
       
+      // Notify listeners about the auth state change
+      notifyListeners();
+      
       return credential;
     } on FirebaseAuthException catch (e) {
       // Increment failed attempts for authentication failures
@@ -151,6 +158,9 @@ class AuthService {
       
       // Simply set guest mode without anonymous authentication
       await _setGuestMode(true);
+      
+      // Notify listeners about the auth state change
+      notifyListeners();
     } catch (e) {
       print('Error entering guest mode: $e');
       rethrow;
@@ -164,6 +174,9 @@ class AuthService {
         await _auth.signOut();
       }
       await _setGuestMode(false);
+      
+      // Notify listeners about the auth state change
+      notifyListeners();
     } catch (e) {
       print('Error during logout: $e');
       rethrow;
@@ -309,6 +322,9 @@ class AuthService {
       
       // Change password
       await user.updatePassword(newPassword);
+      
+      // Notify listeners about potential auth state change
+      notifyListeners();
     } on FirebaseAuthException catch (e) {
       print('Error changing password: ${e.code} - ${e.message}');
       rethrow;
