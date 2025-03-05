@@ -1,11 +1,13 @@
 import 'package:flutter/material.dart';
 import 'package:fl_chart/fl_chart.dart';
 import 'package:provider/provider.dart';
+import '../../utils/app_routes.dart';
 import '../../utils/ble_manager.dart';
 import '../registration/firebase_service.dart';
 import '../../utils/models.dart';
 import 'package:firebase_auth/firebase_auth.dart';
-import '../monitoring/pusleox_history.dart';
+import '../../utils/navigation_service.dart';
+import '../../widgets/back_button.dart';
 
 class OxygenMonitoring extends StatefulWidget {
   @override
@@ -24,7 +26,7 @@ class _OxygenMonitoringState extends State<OxygenMonitoring> {
   @override
   void initState() {
     super.initState();
-      isActive = true;
+    isActive = true;
     _startPeriodicUpdate();
   }
 
@@ -100,84 +102,89 @@ class _OxygenMonitoringState extends State<OxygenMonitoring> {
 
   @override
   Widget build(BuildContext context) {
-    return Scaffold(
-      appBar: AppBar(
-  title: Text('Oxygen Monitoring'),
-  actions: [
-   IconButton(
-  icon: Icon(Icons.history),
-  onPressed: () async {
-    final currentUser = FirebaseAuth.instance.currentUser;
-    final firebaseService = FirebaseService();
-
-    if (currentUser == null) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('User not logged in')),
-      );
-      return;
-    }
-
-    // Show patient selection dialog first
-    final selectedPatient = await showDialog<Patient>(
-      context: context,
-      builder: (context) => PatientSelectionDialog(),
-    );
-
-    if (selectedPatient != null) {
-      // Navigate to history screen with selected patient
-      Navigator.push(
-        context,
-        MaterialPageRoute(
-          builder: (context) => PulseOxHistory(
-            preselectedPatientId: selectedPatient.medicalCardNumber,
+    return BackButtonHandler(
+      strategy: BackButtonHandlingStrategy.normal,
+      child: Scaffold(
+        appBar: AppBar(
+          title: Text('Oxygen Monitoring'),
+          leading: IconButton(
+            icon: Icon(Icons.arrow_back),
+            onPressed: () => NavigationService.goBack(),
           ),
-        ),
-      );
-    }
-  },
-),
-    IconButton(
-      icon: Icon(Icons.refresh),
-      onPressed: _resetGraph,
-    ),
-    IconButton(
-      icon: Icon(Icons.save),
-      onPressed: () => _showSaveDialog(context),
-    ),
-  ],
-),
-      body: Consumer<BLEManager>(
-        builder: (context, bleManager, child) {
-          return Padding(
-            padding: const EdgeInsets.all(16.0),
-            child: SingleChildScrollView(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  _buildValueCards(bleManager),
-                  SizedBox(height: 20),
-                  _buildGraphCard(
-                    'Heart Rate',
-                    heartRateSpots,
-                    Colors.red,
-                    40,
-                    120,
-                    'BPM',
-                  ),
-                  SizedBox(height: 20),
-                  _buildGraphCard(
-                    'SpO2',
-                    spO2Spots,
-                    Colors.blue,
-                    85,
-                    100,
-                    '%',
-                  ),
-                ],
-              ),
+          actions: [
+            IconButton(
+              icon: Icon(Icons.history),
+              onPressed: () async {
+                final currentUser = FirebaseAuth.instance.currentUser;
+                final firebaseService = FirebaseService();
+
+                if (currentUser == null) {
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    SnackBar(content: Text('User not logged in')),
+                  );
+                  return;
+                }
+
+                // Show patient selection dialog first
+                final selectedPatient = await showDialog<Patient>(
+                  context: context,
+                  builder: (context) => PatientSelectionDialog(),
+                );
+
+                if (selectedPatient != null) {
+                  // Navigate to history screen with selected patient using NavigationService
+                  NavigationService.navigateTo(
+                    AppRoutes.pulseOxHistory,
+                    arguments: {
+                      'preselectedPatientId': selectedPatient.medicalCardNumber,
+                    },
+                  );
+                }
+              },
             ),
-          );
-        },
+            IconButton(
+              icon: Icon(Icons.refresh),
+              onPressed: _resetGraph,
+            ),
+            IconButton(
+              icon: Icon(Icons.save),
+              onPressed: () => _showSaveDialog(context),
+            ),
+          ],
+        ),
+        body: Consumer<BLEManager>(
+          builder: (context, bleManager, child) {
+            return Padding(
+              padding: const EdgeInsets.all(16.0),
+              child: SingleChildScrollView(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    _buildValueCards(bleManager),
+                    SizedBox(height: 20),
+                    _buildGraphCard(
+                      'Heart Rate',
+                      heartRateSpots,
+                      Colors.red,
+                      40,
+                      120,
+                      'BPM',
+                    ),
+                    SizedBox(height: 20),
+                    _buildGraphCard(
+                      'SpO2',
+                      spO2Spots,
+                      Colors.blue,
+                      85,
+                      100,
+                      '%',
+                    ),
+                  ],
+                ),
+              ),
+            );
+          },
+        ),
       ),
     );
   }

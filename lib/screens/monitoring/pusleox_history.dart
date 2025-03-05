@@ -4,6 +4,8 @@ import '../../utils/models.dart';
 import '../registration/firebase_service.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:intl/intl.dart';
+import '../../utils/navigation_service.dart';
+import '../../widgets/back_button.dart';
 
 class PulseOxHistory extends StatefulWidget {
   final String? preselectedPatientId;
@@ -67,97 +69,104 @@ class _PulseOxHistoryState extends State<PulseOxHistory> {
 
   @override
   Widget build(BuildContext context) {
-    return Scaffold(
-      appBar: AppBar(
-        title: Text(patientName ?? 'Pulse Ox History'),
-      ),
-      body: isLoading 
-          ? Center(child: CircularProgressIndicator())
-          : sessions.isEmpty
-              ? Center(
-                  child: Column(
-                    mainAxisAlignment: MainAxisAlignment.center,
+    return BackButtonHandler(
+      strategy: BackButtonHandlingStrategy.normal,
+      child: Scaffold(
+        appBar: AppBar(
+          title: Text(patientName ?? 'Pulse Ox History'),
+          leading: IconButton(
+            icon: Icon(Icons.arrow_back),
+            onPressed: () => NavigationService.goBack(),
+          ),
+        ),
+        body: isLoading 
+            ? Center(child: CircularProgressIndicator())
+            : sessions.isEmpty
+                ? Center(
+                    child: Column(
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      children: [
+                        Icon(
+                          Icons.history,
+                          size: 64,
+                          color: Colors.grey[400],
+                        ),
+                        SizedBox(height: 16),
+                        Text(
+                          'No recorded sessions found',
+                          style: TextStyle(
+                            fontSize: 18,
+                            color: Colors.grey[600],
+                          ),
+                        ),
+                      ],
+                    ),
+                  )
+                : Column(
                     children: [
-                      Icon(
-                        Icons.history,
-                        size: 64,
-                        color: Colors.grey[400],
-                      ),
-                      SizedBox(height: 16),
-                      Text(
-                        'No recorded sessions found',
-                        style: TextStyle(
-                          fontSize: 18,
-                          color: Colors.grey[600],
+                      // Session selection with date/time
+                      Padding(
+                        padding: const EdgeInsets.all(16.0),
+                        child: Card(
+                          child: Padding(
+                            padding: const EdgeInsets.symmetric(horizontal: 16.0),
+                            child: DropdownButton<PulseOxSession>(
+                              isExpanded: true,
+                              value: selectedSession,
+                              items: sessions.map((session) {
+                                return DropdownMenuItem(
+                                  value: session,
+                                  child: Text(
+                                    DateFormat('MMM dd, yyyy - HH:mm:ss')
+                                        .format(session.timestamp),
+                                    style: TextStyle(
+                                      fontSize: 16,
+                                    ),
+                                  ),
+                                );
+                              }).toList(),
+                              onChanged: (session) {
+                                setState(() {
+                                  selectedSession = session;
+                                });
+                              },
+                            ),
+                          ),
                         ),
                       ),
+                      if (selectedSession != null) ...[
+                        _buildAveragesCard(selectedSession!),
+                        Expanded(
+                          child: SingleChildScrollView(
+                            padding: EdgeInsets.all(16),
+                            child: Column(
+                              children: [
+                               _buildGraphCard(
+                                  'Heart Rate',
+                                  selectedSession!.heartRateReadings,  // Ensure this is List<num>
+                                  selectedSession!.timestamps,
+                                  Colors.red,
+                                  40,
+                                  120,
+                                  'BPM',
+                                ),
+                                _buildGraphCard(
+                                  'SpO2',
+                                  selectedSession!.spO2Readings,  // Ensure this is List<num>
+                                  selectedSession!.timestamps,
+                                  Colors.blue,
+                                  85,
+                                  100,
+                                  '%',
+                                ),
+                              ],
+                            ),
+                          ),
+                        ),
+                      ],
                     ],
                   ),
-                )
-              : Column(
-                  children: [
-                    // Session selection with date/time
-                    Padding(
-                      padding: const EdgeInsets.all(16.0),
-                      child: Card(
-                        child: Padding(
-                          padding: const EdgeInsets.symmetric(horizontal: 16.0),
-                          child: DropdownButton<PulseOxSession>(
-                            isExpanded: true,
-                            value: selectedSession,
-                            items: sessions.map((session) {
-                              return DropdownMenuItem(
-                                value: session,
-                                child: Text(
-                                  DateFormat('MMM dd, yyyy - HH:mm:ss')
-                                      .format(session.timestamp),
-                                  style: TextStyle(
-                                    fontSize: 16,
-                                  ),
-                                ),
-                              );
-                            }).toList(),
-                            onChanged: (session) {
-                              setState(() {
-                                selectedSession = session;
-                              });
-                            },
-                          ),
-                        ),
-                      ),
-                    ),
-                    if (selectedSession != null) ...[
-                      _buildAveragesCard(selectedSession!),
-                      Expanded(
-                        child: SingleChildScrollView(
-                          padding: EdgeInsets.all(16),
-                          child: Column(
-                            children: [
-                             _buildGraphCard(
-  'Heart Rate',
-  selectedSession!.heartRateReadings,  // Ensure this is List<num>
-  selectedSession!.timestamps,
-  Colors.red,
-  40,
-  120,
-  'BPM',
-),
-_buildGraphCard(
-  'SpO2',
-  selectedSession!.spO2Readings,  // Ensure this is List<num>
-  selectedSession!.timestamps,
-  Colors.blue,
-  85,
-  100,
-  '%',
-),
-                            ],
-                          ),
-                        ),
-                      ),
-                    ],
-                  ],
-                ),
+      ),
     );
   }
 
@@ -237,114 +246,113 @@ _buildGraphCard(
     );
   }
 
-Widget _buildGraphCard(
-  String title,
-  List<num> values,  // Changed from List<double> to List<num>
-  List<int> timestamps,
-  Color color,
-  double minY,
-  double maxY,
-  String unit,
-) {
-  // Convert timestamps to relative seconds from start
-  final startTime = timestamps.first;
-  final spots = List.generate(values.length, (i) {
-    final relativeTime = (timestamps[i] - startTime) / 1000.0;
-    return FlSpot(relativeTime, values[i].toDouble());  // Convert to double explicitly
-  });
+  Widget _buildGraphCard(
+    String title,
+    List<num> values,  // Changed from List<double> to List<num>
+    List<int> timestamps,
+    Color color,
+    double minY,
+    double maxY,
+    String unit,
+  ) {
+    // Convert timestamps to relative seconds from start
+    final startTime = timestamps.first;
+    final spots = List.generate(values.length, (i) {
+      final relativeTime = (timestamps[i] - startTime) / 1000.0;
+      return FlSpot(relativeTime, values[i].toDouble());  // Convert to double explicitly
+    });
 
-  return Card(
-    elevation: 4,
-    child: Padding(
-      padding: const EdgeInsets.all(16.0),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Text(
-            title,
-            style: TextStyle(
-              fontSize: 18,
-              fontWeight: FontWeight.bold,
-            ),
-          ),
-          SizedBox(height: 16),
-          Container(
-            height: 200,
-            child: LineChart(
-              LineChartData(
-                minY: minY,
-                maxY: maxY,
-                gridData: FlGridData(
-                  show: true,
-                  drawVerticalLine: true,
-                  horizontalInterval: title == 'Heart Rate' ? 20 : 5,
-                  getDrawingHorizontalLine: (value) {
-                    return FlLine(
-                      color: Colors.grey[300]!,
-                      strokeWidth: 1,
-                    );
-                  },
-                ),
-                titlesData: FlTitlesData(
-                  leftTitles: AxisTitles(
-                    sideTitles: SideTitles(
-                      showTitles: true,
-                      reservedSize: 40,
-                      interval: title == 'Heart Rate' ? 20 : 5,
-                      getTitlesWidget: (value, meta) {
-                        return Text(
-                          value.toInt().toString(),
-                          style: TextStyle(
-                            color: Colors.grey[600],
-                            fontSize: 12,
-                          ),
-                        );
-                      },
-                    ),
-                  ),
-                  bottomTitles: AxisTitles(
-                    sideTitles: SideTitles(
-                      showTitles: true,
-                      reservedSize: 30,
-                      interval: 0.5,
-                      getTitlesWidget: (value, meta) {
-                        return Text(
-                          value.toStringAsFixed(1),
-                          style: TextStyle(
-                            color: Colors.grey[600],
-                            fontSize: 12,
-                          ),
-                        );
-                      },
-                    ),
-                  ),
-                  rightTitles: AxisTitles(
-                    sideTitles: SideTitles(showTitles: false),
-                  ),
-                  topTitles: AxisTitles(
-                    sideTitles: SideTitles(showTitles: false),
-                  ),
-                ),
-                lineBarsData: [
-                  LineChartBarData(
-                    spots: spots,
-                    isCurved: true,
-                    color: color,
-                    barWidth: 2,
-                    dotData: FlDotData(show: false),
-                    belowBarData: BarAreaData(
-                      show: true,
-                      color: color.withOpacity(0.1),
-                    ),
-                  ),
-                ],
+    return Card(
+      elevation: 4,
+      child: Padding(
+        padding: const EdgeInsets.all(16.0),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(
+              title,
+              style: TextStyle(
+                fontSize: 18,
+                fontWeight: FontWeight.bold,
               ),
             ),
-          ),
-        ],
+            SizedBox(height: 16),
+            Container(
+              height: 200,
+              child: LineChart(
+                LineChartData(
+                  minY: minY,
+                  maxY: maxY,
+                  gridData: FlGridData(
+                    show: true,
+                    drawVerticalLine: true,
+                    horizontalInterval: title == 'Heart Rate' ? 20 : 5,
+                    getDrawingHorizontalLine: (value) {
+                      return FlLine(
+                        color: Colors.grey[300]!,
+                        strokeWidth: 1,
+                      );
+                    },
+                  ),
+                  titlesData: FlTitlesData(
+                    leftTitles: AxisTitles(
+                      sideTitles: SideTitles(
+                        showTitles: true,
+                        reservedSize: 40,
+                        interval: title == 'Heart Rate' ? 20 : 5,
+                        getTitlesWidget: (value, meta) {
+                          return Text(
+                            value.toInt().toString(),
+                            style: TextStyle(
+                              color: Colors.grey[600],
+                              fontSize: 12,
+                            ),
+                          );
+                        },
+                      ),
+                    ),
+                    bottomTitles: AxisTitles(
+                      sideTitles: SideTitles(
+                        showTitles: true,
+                        reservedSize: 30,
+                        interval: 0.5,
+                        getTitlesWidget: (value, meta) {
+                          return Text(
+                            value.toStringAsFixed(1),
+                            style: TextStyle(
+                              color: Colors.grey[600],
+                              fontSize: 12,
+                            ),
+                          );
+                        },
+                      ),
+                    ),
+                    rightTitles: AxisTitles(
+                      sideTitles: SideTitles(showTitles: false),
+                    ),
+                    topTitles: AxisTitles(
+                      sideTitles: SideTitles(showTitles: false),
+                    ),
+                  ),
+                  lineBarsData: [
+                    LineChartBarData(
+                      spots: spots,
+                      isCurved: true,
+                      color: color,
+                      barWidth: 2,
+                      dotData: FlDotData(show: false),
+                      belowBarData: BarAreaData(
+                        show: true,
+                        color: color.withOpacity(0.1),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ),
+          ],
+        ),
       ),
-    ),
-  );
-}
-
+    );
+  }
 }

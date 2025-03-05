@@ -1,9 +1,11 @@
-import 'package:coen_490/screens/monitoring/ecg_monitoring_screen.dart';
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
 import 'dart:math';
 import '../../utils/models.dart';
 import '../registration/firebase_service.dart';
+import '../monitoring/ecg_monitoring_screen.dart';
+import '../../utils/navigation_service.dart';
+import '../../widgets/back_button.dart';
 
 class ECGViewer extends StatefulWidget {
   final ECGReading reading;
@@ -60,83 +62,90 @@ class _ECGViewerState extends State<ECGViewer> {
     });
   }
 
-@override
-Widget build(BuildContext context) {
-  return Scaffold(
-    appBar: AppBar(
-      title: Text('ECG Data - ${widget.patientName}'),
-      actions: [
-        IconButton(
-          icon: Icon(Icons.zoom_in),
-          onPressed: () => _adjustZoom(0.1),
+  @override
+  Widget build(BuildContext context) {
+    return BackButtonHandler(
+      strategy: BackButtonHandlingStrategy.normal,
+      child: Scaffold(
+        appBar: AppBar(
+          title: Text('ECG Data - ${widget.patientName}'),
+          leading: IconButton(
+            icon: Icon(Icons.arrow_back),
+            onPressed: () => NavigationService.goBack(),
+          ),
+          actions: [
+            IconButton(
+              icon: Icon(Icons.zoom_in),
+              onPressed: () => _adjustZoom(0.1),
+            ),
+            IconButton(
+              icon: Icon(Icons.zoom_out),
+              onPressed: () => _adjustZoom(-0.1),
+            ),
+          ],
         ),
-        IconButton(
-          icon: Icon(Icons.zoom_out),
-          onPressed: () => _adjustZoom(-0.1),
-        ),
-      ],
-    ),
-    body: isLoading
-        ? Center(child: CircularProgressIndicator())
-        : Column(
-            children: [
-              Padding(
-                padding: const EdgeInsets.all(16.0),
-                child: Card(
-                  child: Padding(
+        body: isLoading
+            ? Center(child: CircularProgressIndicator())
+            : Column(
+                children: [
+                  Padding(
                     padding: const EdgeInsets.all(16.0),
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Text(
-                          'Recording Information',
-                          style: TextStyle(
-                            fontSize: 18,
-                            fontWeight: FontWeight.bold,
-                          ),
+                    child: Card(
+                      child: Padding(
+                        padding: const EdgeInsets.all(16.0),
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text(
+                              'Recording Information',
+                              style: TextStyle(
+                                fontSize: 18,
+                                fontWeight: FontWeight.bold,
+                              ),
+                            ),
+                            SizedBox(height: 8),
+                            Text('Duration: ${widget.reading.duration} seconds'),
+                            Text('Sample Rate: ${widget.reading.sampleRate} Hz'),
+                            Text('Date: ${DateFormat('MMM dd, yyyy - HH:mm:ss').format(widget.reading.timestamp)}'),
+                          ],
                         ),
-                        SizedBox(height: 8),
-                        Text('Duration: ${widget.reading.duration} seconds'),
-                        Text('Sample Rate: ${widget.reading.sampleRate} Hz'),
-                        Text('Date: ${DateFormat('MMM dd, yyyy - HH:mm:ss').format(widget.reading.timestamp)}'),
-                      ],
+                      ),
                     ),
                   ),
-                ),
-              ),
-              Expanded(
-                child: Padding(
-                  padding: const EdgeInsets.all(16.0),
-                  child: Container(
-                    decoration: BoxDecoration(
-                      border: Border.all(color: Colors.grey[300]!),
-                      borderRadius: BorderRadius.circular(8),
-                    ),
-                    // Constrain the height of the ECG graph
-                    height: 300, // Set a fixed height for the graph
-                    child: SingleChildScrollView(
-                      controller: scrollController,
-                      scrollDirection: Axis.horizontal,
+                  Expanded(
+                    child: Padding(
+                      padding: const EdgeInsets.all(16.0),
                       child: Container(
-                        width: _points.length * 2.0 * zoomLevel,
-                        height: 300, // Match the height of the parent container
-                        child: CustomPaint(
-                          painter: ECGPainter(
-                            points: _points,
-                            minY: 0,
-                            maxY: 4095,
-                            zoomLevel: zoomLevel,
+                        decoration: BoxDecoration(
+                          border: Border.all(color: Colors.grey[300]!),
+                          borderRadius: BorderRadius.circular(8),
+                        ),
+                        // Constrain the height of the ECG graph
+                        height: 300, // Set a fixed height for the graph
+                        child: SingleChildScrollView(
+                          controller: scrollController,
+                          scrollDirection: Axis.horizontal,
+                          child: Container(
+                            width: _points.length * 2.0 * zoomLevel,
+                            height: 300, // Match the height of the parent container
+                            child: CustomPaint(
+                              painter: ECGPainter(
+                                points: _points,
+                                minY: 0,
+                                maxY: 4095,
+                                zoomLevel: zoomLevel,
+                              ),
+                            ),
                           ),
                         ),
                       ),
                     ),
                   ),
-                ),
+                ],
               ),
-            ],
-          ),
-  );
-}
+      ),
+    );
+  }
 
   @override
   void dispose() {

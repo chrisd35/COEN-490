@@ -5,14 +5,12 @@ import 'package:flutter/material.dart';
 import 'package:audioplayers/audioplayers.dart';
 import 'package:provider/provider.dart';
 import 'package:fl_chart/fl_chart.dart';
-import '../../patient/add_patient_screen.dart';
-import '../../registration/login_page.dart';
-import '../../registration/register_page.dart';
-import '../dashboard_screen.dart';
 import '/utils/ble_manager.dart';
 import '../../registration/firebase_service.dart';
 import '/utils/models.dart';
-
+import '../../../utils/navigation_service.dart';
+import '../../../utils/app_routes.dart';
+import '../../../widgets/back_button.dart';
 
 class MurmurRecord extends StatefulWidget {
   final String? preselectedPatientId;
@@ -57,7 +55,7 @@ class _MurmurRecordState extends State<MurmurRecord> {
     });
   }
 
- void _startRecording() async {
+  void _startRecording() async {
     final bleManager = Provider.of<BLEManager>(context, listen: false);
     if (bleManager.connectedDevice != null) {
       try {
@@ -98,7 +96,7 @@ class _MurmurRecordState extends State<MurmurRecord> {
     });
   }
 
-    void _stopRecording() async {
+  void _stopRecording() async {
     final bleManager = Provider.of<BLEManager>(context, listen: false);
     try {
       _recordingTimer?.cancel();
@@ -126,35 +124,35 @@ class _MurmurRecordState extends State<MurmurRecord> {
   }
   
   Future<void> _playPreviewRecording() async {
-  if (_recordedAudioData == null) return;
+    if (_recordedAudioData == null) return;
 
-  try {
-    if (_isPlaying) {
-      await _audioPlayer.pause();
-      setState(() {
-        _isPlaying = false;
-      });
-    } else {
-      // Convert the raw audio data to WAV format
-      final wavData = _firebaseService.createWavFile(
-        _recordedAudioData!,
-        sampleRate: BLEManager.SAMPLE_RATE,
-        bitsPerSample: 16,
-        channels: 1,
-      );
+    try {
+      if (_isPlaying) {
+        await _audioPlayer.pause();
+        setState(() {
+          _isPlaying = false;
+        });
+      } else {
+        // Convert the raw audio data to WAV format
+        final wavData = _firebaseService.createWavFile(
+          _recordedAudioData!,
+          sampleRate: BLEManager.SAMPLE_RATE,
+          bitsPerSample: 16,
+          channels: 1,
+        );
 
-      // Create a temporary file or use in-memory playback
-      await _audioPlayer.play(
-        BytesSource(Uint8List.fromList(wavData)),
-      );
-      setState(() {
-        _isPlaying = true;
-      });
+        // Create a temporary file or use in-memory playback
+        await _audioPlayer.play(
+          BytesSource(Uint8List.fromList(wavData)),
+        );
+        setState(() {
+          _isPlaying = true;
+        });
+      }
+    } catch (e) {
+      _showErrorSnackBar("Failed to play recording: $e");
     }
-  } catch (e) {
-    _showErrorSnackBar("Failed to play recording: $e");
   }
-}
 
   void _showSaveRecordingDialog() async {
     final authService = Provider.of<AuthService>(context, listen: false);
@@ -229,23 +227,22 @@ class _MurmurRecordState extends State<MurmurRecord> {
     }
   }
 
-void _navigateToCreatePatient() {
-  if (!mounted) return;
-  
-  Navigator.push<Patient>(
-    context,
-    MaterialPageRoute(
-      builder: (context) => AddPatientScreen(fromMurmurRecord: true),
-    ),
-  ).then((newPatient) {
+  void _navigateToCreatePatient() {
     if (!mounted) return;
-    if (newPatient != null) {
-      final authService = Provider.of<AuthService>(context, listen: false);
-      final uid = authService.getCurrentUser()!.uid;
-      _saveRecordingToPatient(uid, newPatient.medicalCardNumber);
-    }
-  });
-}
+    
+    NavigationService.navigateTo(
+      AppRoutes.addPatient,
+      arguments: {'fromMurmurRecord': true},
+    ).then((newPatient) {
+      if (!mounted) return;
+      if (newPatient != null) {
+        final authService = Provider.of<AuthService>(context, listen: false);
+        final uid = authService.getCurrentUser()!.uid;
+        _saveRecordingToPatient(uid, newPatient.medicalCardNumber);
+      }
+    });
+  }
+
   void _showPatientSelectionDialog(String uid, List<Patient> patients) {
     showDialog(
       context: context,
@@ -282,32 +279,32 @@ void _navigateToCreatePatient() {
     );
   }
 
- void _showNoPatientDialog() {
-  showDialog(
-    context: context,
-    builder: (BuildContext dialogContext) { // Use dialogContext instead of context
-      return AlertDialog(
-        title: Text('No Patients Found'),
-        content: Text('Would you like to create a new patient?'),
-        actions: [
-          TextButton(
-            child: Text('Cancel'),
-            onPressed: () => Navigator.pop(dialogContext),
-          ),
-          TextButton(
-            child: Text('Create Patient'),
-            onPressed: () {
-              Navigator.pop(dialogContext);
-              if (mounted) { // Check if still mounted
-                _navigateToCreatePatient();
-              }
-            },
-          ),
-        ],
-      );
-    },
-  );
-}
+  void _showNoPatientDialog() {
+    showDialog(
+      context: context,
+      builder: (BuildContext dialogContext) { // Use dialogContext instead of context
+        return AlertDialog(
+          title: Text('No Patients Found'),
+          content: Text('Would you like to create a new patient?'),
+          actions: [
+            TextButton(
+              child: Text('Cancel'),
+              onPressed: () => Navigator.pop(dialogContext),
+            ),
+            TextButton(
+              child: Text('Create Patient'),
+              onPressed: () {
+                Navigator.pop(dialogContext);
+                if (mounted) { // Check if still mounted
+                  _navigateToCreatePatient();
+                }
+              },
+            ),
+          ],
+        );
+      },
+    );
+  }
 
   Future<void> _saveRecordingToPatient(String uid, String patientId) async {
     if (_recordedAudioData == null) return;
@@ -345,89 +342,78 @@ void _navigateToCreatePatient() {
       Navigator.pop(context);
       _showErrorSnackBar("Failed to save recording: $e");
     }
-}
+  }
 
- void _showLoginPrompt() {
-  showDialog(
-    context: context,
-    builder: (BuildContext context) {
-      return AlertDialog(
-        shape: RoundedRectangleBorder(
-          borderRadius: BorderRadius.circular(16),
-        ),
-        title: Text('Login Required'),
-        content: Text('You need to be logged in to save recordings. Do you have an account?'),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(context),
-            child: Text(
-              'Cancel',
-              style: TextStyle(color: Colors.grey[700]),
-            ),
+  void _showLoginPrompt() {
+    showDialog(
+      context: context,
+      builder: (BuildContext context) {
+        return AlertDialog(
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(16),
           ),
-          TextButton(
-            onPressed: () {
-              Navigator.pop(context);
-              Navigator.push(
-                context,
-                MaterialPageRoute(
-                  builder: (context) => LoginPage(),
-                  settings: RouteSettings(
-                    arguments: {
-                      'returnRoute': 'murmur_record',
-                      'pendingAction': 'save_recording',
-                    },
-                  ),
-                ),
-              ).then((value) {
-                if (value == true) {
-                  // User has successfully logged in, show save dialog again
-                  _showSaveRecordingDialog();
-                }
-              });
-            },
-            child: Text(
-              'Yes, I have an account',
-              style: TextStyle(color: Theme.of(context).primaryColor),
-            ),
-          ),
-          ElevatedButton(
-            onPressed: () {
-              Navigator.pop(context);
-              Navigator.push(
-                context,
-                MaterialPageRoute(
-                  builder: (context) => RegisterPage(),
-                  settings: RouteSettings(
-                    arguments: {
-                      'returnRoute': 'murmur_record',
-                      'pendingAction': 'save_recording',
-                    },
-                  ),
-                ),
-              ).then((value) {
-                if (value == true) {
-                  // User has successfully registered, show save dialog again
-                  _showSaveRecordingDialog();
-                }
-              });
-            },
-            style: ElevatedButton.styleFrom(
-              backgroundColor: Theme.of(context).primaryColor,
-              foregroundColor: Colors.white,
-              elevation: 0,
-              shape: RoundedRectangleBorder(
-                borderRadius: BorderRadius.circular(12),
+          title: Text('Login Required'),
+          content: Text('You need to be logged in to save recordings. Do you have an account?'),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(context),
+              child: Text(
+                'Cancel',
+                style: TextStyle(color: Colors.grey[700]),
               ),
             ),
-            child: Text('Create New Account'),
-          ),
-        ],
-      );
-    },
-  );
-}
-
+            TextButton(
+              onPressed: () {
+                Navigator.pop(context);
+                NavigationService.navigateTo(
+                  AppRoutes.login,
+                  arguments: {
+                    'returnRoute': 'murmur_record',
+                    'pendingAction': 'save_recording',
+                  },
+                ).then((value) {
+                  if (value == true) {
+                    // User has successfully logged in, show save dialog again
+                    _showSaveRecordingDialog();
+                  }
+                });
+              },
+              child: Text(
+                'Yes, I have an account',
+                style: TextStyle(color: Theme.of(context).primaryColor),
+              ),
+            ),
+            ElevatedButton(
+              onPressed: () {
+                Navigator.pop(context);
+                NavigationService.navigateTo(
+                  AppRoutes.register,
+                  arguments: {
+                    'returnRoute': 'murmur_record',
+                    'pendingAction': 'save_recording',
+                  },
+                ).then((value) {
+                  if (value == true) {
+                    // User has successfully registered, show save dialog again
+                    _showSaveRecordingDialog();
+                  }
+                });
+              },
+              style: ElevatedButton.styleFrom(
+                backgroundColor: Theme.of(context).primaryColor,
+                foregroundColor: Colors.white,
+                elevation: 0,
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(12),
+                ),
+              ),
+              child: Text('Create New Account'),
+            ),
+          ],
+        );
+      },
+    );
+  }
 
   void _showLoadingDialog(String message) {
     showDialog(
@@ -533,94 +519,94 @@ void _navigateToCreatePatient() {
         ),
       ],
     );
-}
+  }
 
   @override
   Widget build(BuildContext context) {
-    return Scaffold(
-      backgroundColor: Colors.grey[50],
-      appBar: AppBar(
-  title: Text(
-    widget.preselectedPatientId != null 
-        ? "Record Patient Murmur"
-        : "Murmur Analysis",
-    style: TextStyle(
-      fontWeight: FontWeight.w600,
-      color: Colors.black87,
-    ),
-  ),
-  elevation: 0,
-  backgroundColor: Colors.white,
-  foregroundColor: Colors.black87,
-  leading: IconButton(
-    icon: Icon(Icons.arrow_back_ios, size: 20),
-    onPressed: () async {
-      // Check if user is logged in before navigating back
-      final authService = Provider.of<AuthService>(context, listen: false);
-      final isGuest = await authService.isGuest();
-      
-      if (!isGuest) {
-        // If logged in, refresh dashboard
-        Navigator.pushAndRemoveUntil(
-          context,
-          MaterialPageRoute(builder: (context) => DashboardScreen()),
-          (Route<dynamic> route) => false,
-        );
-      } else {
-        // If guest, just pop back
-        Navigator.pop(context);
-      }
-    },
-  ),
-),
-      body: SafeArea(
-        child: Column(
-          children: [
-            Container(
-              width: double.infinity,
-              padding: EdgeInsets.all(24),
-              decoration: BoxDecoration(
-                color: Colors.white,
-                borderRadius: BorderRadius.only(
-                  bottomLeft: Radius.circular(24),
-                  bottomRight: Radius.circular(24),
-                ),
-                boxShadow: [
-                  BoxShadow(
-                    color: Colors.black.withOpacity(0.05),
-                    blurRadius: 10,
-                    offset: Offset(0, 5),
-                  ),
-                ],
-              ),
-              child: Consumer<BLEManager>(
-                builder: (context, bleManager, child) {
-                  return Column(
-                    children: [
-                      _buildWaveform(context, bleManager),
-                      SizedBox(height: 16),
-                      _buildRecordingStatus(),
-                    ],
-                  );
-                },
-              ),
+    return BackButtonHandler(
+      strategy: BackButtonHandlingStrategy.normal,
+      child: Scaffold(
+        backgroundColor: Colors.grey[50],
+        appBar: AppBar(
+          title: Text(
+            widget.preselectedPatientId != null 
+                ? "Record Patient Murmur"
+                : "Murmur Analysis",
+            style: TextStyle(
+              fontWeight: FontWeight.w600,
+              color: Colors.black87,
             ),
-            Expanded(
-              child: Center(
-                child: AnimatedSwitcher(
-                  duration: Duration(milliseconds: 300),
-                  child: _buildMainContent(),
-                ),
-              ),
-            ),
-          ],
+          ),
+          elevation: 0,
+          backgroundColor: Colors.white,
+          foregroundColor: Colors.black87,
+          leading: IconButton(
+            icon: Icon(Icons.arrow_back_ios, size: 20),
+            onPressed: () async {
+              // Check if user is logged in before navigating back
+              final authService = Provider.of<AuthService>(context, listen: false);
+              final isGuest = await authService.isGuest();
+              
+              if (!isGuest) {
+                // If logged in, go to dashboard
+                NavigationService.navigateToAndRemoveUntil(AppRoutes.dashboard);
+              } else {
+                // If guest, just go back
+                NavigationService.goBack();
+              }
+            },
+          ),
         ),
+        body: SafeArea(
+          child: Column(
+            children: [
+              Container(
+                width: double.infinity,
+                padding: EdgeInsets.all(24),
+                decoration: BoxDecoration(
+                  color: Colors.white,
+                  borderRadius: BorderRadius.only(
+                    bottomLeft: Radius.circular(24),
+                    bottomRight: Radius.circular(24),
+                  ),
+                  boxShadow: [
+                    BoxShadow(
+                      color: Colors.black.withOpacity(0.05),
+                      blurRadius: 10,
+                      offset: Offset(0, 5),
+                    ),
+                  ],
+                ),
+                child: Consumer<BLEManager>(
+                  builder: (context, bleManager, child) {
+                    return Column(
+                      children: [
+                        _buildWaveform(context, bleManager),
+                        SizedBox(height: 16),
+                        _buildRecordingStatus(),
+                      ],
+                    );
+                  },
+                ),
+              ),
+              Expanded(
+                child: Center(
+                  child: AnimatedSwitcher(
+                    duration: Duration(milliseconds: 300),
+                    child: _buildMainContent(),
+                  ),
+                ),
+              ),
+            ],
+          ),
+        ),
+        floatingActionButton: _buildFloatingActionButton(),
+        floatingActionButtonLocation: FloatingActionButtonLocation.centerFloat,
       ),
-      floatingActionButton: _buildFloatingActionButton(),
-      floatingActionButtonLocation: FloatingActionButtonLocation.centerFloat,
     );
   }
-   Widget _buildMainContent() {
+
+  Widget _buildMainContent() {
     if (_isRecording) {
       return _buildRecordingContent();
     } else if (_hasRecordingCompleted) {
@@ -629,6 +615,7 @@ void _navigateToCreatePatient() {
       return _buildInitialContent();
     }
   }
+
   Widget _buildRecordingContent() {
     return Column(
       mainAxisSize: MainAxisSize.min,
@@ -669,7 +656,7 @@ void _navigateToCreatePatient() {
     );
   }
 
- Widget _buildRecordingCompleteContent() {
+  Widget _buildRecordingCompleteContent() {
     return Column(
       mainAxisSize: MainAxisSize.min,
       children: [
@@ -715,7 +702,8 @@ void _navigateToCreatePatient() {
       ],
     );
   }
-Widget _buildInitialContent() {
+
+  Widget _buildInitialContent() {
     return Column(
       mainAxisSize: MainAxisSize.min,
       children: [
@@ -743,7 +731,6 @@ Widget _buildInitialContent() {
       ],
     );
   }
-
 
   Widget _buildFloatingActionButton() {
     if (_isRecording) {

@@ -1,9 +1,10 @@
 import 'package:flutter/material.dart';
 import 'package:firebase_database/firebase_database.dart';
 import 'package:firebase_auth/firebase_auth.dart';
-import '../../patient/add_patient_screen.dart';
-import '../../patient/patients_details_screen.dart';
 import '/utils/models.dart';
+import '../../../utils/navigation_service.dart';
+import '../../../utils/app_routes.dart';
+import '../../../widgets/back_button.dart';
 
 class PatientCard extends StatelessWidget {
   final DatabaseReference _database = FirebaseDatabase.instance.ref();
@@ -12,86 +13,86 @@ class PatientCard extends StatelessWidget {
   Widget build(BuildContext context) {
     final user = FirebaseAuth.instance.currentUser;
 
-    return Scaffold(
-      backgroundColor: Colors.grey[50],
-      body: SafeArea(
-        child: Column(
-          children: [
-            // Custom App Bar
-            Container(
-              padding: EdgeInsets.symmetric(horizontal: 8.0, vertical: 8.0),
-              decoration: BoxDecoration(
-                color: Colors.white,
-                boxShadow: [
-                  BoxShadow(
-                    color: Colors.black.withOpacity(0.05),
-                    blurRadius: 10,
-                    offset: Offset(0, 2),
-                  ),
-                ],
-              ),
-              child: Row(
-                children: [
-                  IconButton(
-                    icon: Icon(Icons.arrow_back_ios_new, size: 20),
-                    onPressed: () => Navigator.pop(context),
-                  ),
-                  Expanded(
-                    child: Text(
-                      'Patient Records',
-                      style: TextStyle(
-                        fontSize: 18,
-                        fontWeight: FontWeight.w600,
+    return BackButtonHandler(
+      strategy: BackButtonHandlingStrategy.normal,
+      child: Scaffold(
+        backgroundColor: Colors.grey[50],
+        body: SafeArea(
+          child: Column(
+            children: [
+              // Custom App Bar
+              Container(
+                padding: EdgeInsets.symmetric(horizontal: 8.0, vertical: 8.0),
+                decoration: BoxDecoration(
+                  color: Colors.white,
+                  boxShadow: [
+                    BoxShadow(
+                      color: Colors.black.withOpacity(0.05),
+                      blurRadius: 10,
+                      offset: Offset(0, 2),
+                    ),
+                  ],
+                ),
+                child: Row(
+                  children: [
+                    IconButton(
+                      icon: Icon(Icons.arrow_back_ios_new, size: 20),
+                      onPressed: () => NavigationService.goBack(),
+                    ),
+                    Expanded(
+                      child: Text(
+                        'Patient Records',
+                        style: TextStyle(
+                          fontSize: 18,
+                          fontWeight: FontWeight.w600,
+                        ),
+                        textAlign: TextAlign.center,
                       ),
-                      textAlign: TextAlign.center,
                     ),
-                  ),
-                  IconButton(
-                    icon: Icon(
-                      Icons.person_add_rounded,
-                      color: Theme.of(context).primaryColor,
+                    IconButton(
+                      icon: Icon(
+                        Icons.person_add_rounded,
+                        color: Theme.of(context).primaryColor,
+                      ),
+                      onPressed: () => NavigationService.navigateTo(AppRoutes.addPatient),
                     ),
-                    onPressed: () => Navigator.push(
-                      context,
-                      MaterialPageRoute(builder: (context) => AddPatientScreen()),
-                    ),
-                  ),
-                ],
+                  ],
+                ),
               ),
-            ),
 
-            // Main Content
-            Expanded(
-              child: StreamBuilder(
-                stream: _database
-                    .child('users')
-                    .child(user?.uid ?? '')
-                    .child('patients')
-                    .onValue,
-                builder: (context, AsyncSnapshot<DatabaseEvent> snapshot) {
-                  if (snapshot.hasError) {
-                    return _buildErrorState(snapshot.error.toString());
-                  }
+              // Main Content
+              Expanded(
+                child: StreamBuilder(
+                  stream: _database
+                      .child('users')
+                      .child(user?.uid ?? '')
+                      .child('patients')
+                      .onValue,
+                  builder: (context, AsyncSnapshot<DatabaseEvent> snapshot) {
+                    if (snapshot.hasError) {
+                      return _buildErrorState(snapshot.error.toString());
+                    }
 
-                  if (snapshot.connectionState == ConnectionState.waiting) {
-                    return _buildLoadingState();
-                  }
+                    if (snapshot.connectionState == ConnectionState.waiting) {
+                      return _buildLoadingState();
+                    }
 
-                  if (!snapshot.hasData || snapshot.data?.snapshot.value == null) {
-                    return _buildEmptyState(context);
-                  }
+                    if (!snapshot.hasData || snapshot.data?.snapshot.value == null) {
+                      return _buildEmptyState(context);
+                    }
 
-                  Map<dynamic, dynamic> patientsMap = 
-                      snapshot.data!.snapshot.value as Map<dynamic, dynamic>;
-                  List<Patient> patients = patientsMap.entries.map((entry) {
-                    return Patient.fromMap(Map<String, dynamic>.from(entry.value));
-                  }).toList();
+                    Map<dynamic, dynamic> patientsMap = 
+                        snapshot.data!.snapshot.value as Map<dynamic, dynamic>;
+                    List<Patient> patients = patientsMap.entries.map((entry) {
+                      return Patient.fromMap(Map<String, dynamic>.from(entry.value));
+                    }).toList();
 
-                  return _buildPatientsList(context, patients);
-                },
+                    return _buildPatientsList(context, patients);
+                  },
+                ),
               ),
-            ),
-          ],
+            ],
+          ),
         ),
       ),
     );
@@ -191,10 +192,7 @@ class PatientCard extends StatelessWidget {
             ),
             SizedBox(height: 24),
             ElevatedButton(
-              onPressed: () => Navigator.push(
-                context,
-                MaterialPageRoute(builder: (context) => AddPatientScreen()),
-              ),
+              onPressed: () => NavigationService.navigateTo(AppRoutes.addPatient),
               style: ElevatedButton.styleFrom(
                 backgroundColor: Theme.of(context).primaryColor,
                 foregroundColor: Colors.white,
@@ -239,11 +237,9 @@ class PatientCard extends StatelessWidget {
           ),
           child: InkWell(
             borderRadius: BorderRadius.circular(12),
-            onTap: () => Navigator.push(
-              context,
-              MaterialPageRoute(
-                builder: (context) => PatientDetails(patient: patient),
-              ),
+            onTap: () => NavigationService.navigateTo(
+              AppRoutes.patientDetails,
+              arguments: {'patient': patient},
             ),
             child: Padding(
               padding: EdgeInsets.all(12),

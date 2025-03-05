@@ -4,8 +4,9 @@ import 'package:audioplayers/audioplayers.dart';
 import '/utils/models.dart';
 import '../../registration/auth_service.dart';
 import '../../registration/firebase_service.dart';
-import '../../registration/login_page.dart';
-import '../../registration/register_page.dart';
+import '../../../utils/navigation_service.dart';
+import '../../../utils/app_routes.dart';
+import '../../../widgets/back_button.dart';
 
 class RecordingPlaybackScreen extends StatefulWidget {
   const RecordingPlaybackScreen({Key? key}) : super(key: key);
@@ -105,7 +106,7 @@ class _RecordingPlaybackScreenState extends State<RecordingPlaybackScreen> {
           content: Text('You need to be logged in to access recordings. Do you have an account?'),
           actions: [
             TextButton(
-              onPressed: () => Navigator.pop(context),
+              onPressed: () => NavigationService.goBack(),
               child: Text(
                 'Cancel',
                 style: TextStyle(color: Colors.grey[700]),
@@ -113,17 +114,12 @@ class _RecordingPlaybackScreenState extends State<RecordingPlaybackScreen> {
             ),
             TextButton(
               onPressed: () {
-                Navigator.pop(context);
-                Navigator.push(
-                  context,
-                  MaterialPageRoute(
-                    builder: (context) => LoginPage(),
-                    settings: RouteSettings(
-                      arguments: {
-                        'returnRoute': 'recording_playback',
-                      },
-                    ),
-                  ),
+                NavigationService.goBack();
+                NavigationService.navigateTo(
+                  AppRoutes.login,
+                  arguments: {
+                    'returnRoute': 'recording_playback',
+                  },
                 ).then((value) {
                   if (value == true) {
                     _loadPatients();
@@ -137,17 +133,12 @@ class _RecordingPlaybackScreenState extends State<RecordingPlaybackScreen> {
             ),
             ElevatedButton(
               onPressed: () {
-                Navigator.pop(context);
-                Navigator.push(
-                  context,
-                  MaterialPageRoute(
-                    builder: (context) => RegisterPage(),
-                    settings: RouteSettings(
-                      arguments: {
-                        'returnRoute': 'recording_playback',
-                      },
-                    ),
-                  ),
+                NavigationService.goBack();
+                NavigationService.navigateTo(
+                  AppRoutes.register,
+                  arguments: {
+                    'returnRoute': 'recording_playback',
+                  },
                 ).then((value) {
                   if (value == true) {
                     _loadPatients();
@@ -189,30 +180,33 @@ class _RecordingPlaybackScreenState extends State<RecordingPlaybackScreen> {
 
   @override
   Widget build(BuildContext context) {
-    return Scaffold(
-      appBar: AppBar(
-        title: Text(
-          "Recording Playback",
-          style: TextStyle(
-            fontWeight: FontWeight.w600,
-            color: Colors.black87,
+    return BackButtonHandler(
+      strategy: BackButtonHandlingStrategy.normal,
+      child: Scaffold(
+        appBar: AppBar(
+          title: Text(
+            "Recording Playback",
+            style: TextStyle(
+              fontWeight: FontWeight.w600,
+              color: Colors.black87,
+            ),
+          ),
+          elevation: 0,
+          backgroundColor: Colors.white,
+          foregroundColor: Colors.black87,
+          leading: IconButton(
+            icon: Icon(Icons.arrow_back_ios, size: 20),
+            onPressed: () => NavigationService.goBack(),
           ),
         ),
-        elevation: 0,
-        backgroundColor: Colors.white,
-        foregroundColor: Colors.black87,
-        leading: IconButton(
-          icon: Icon(Icons.arrow_back_ios, size: 20),
-          onPressed: () => Navigator.pop(context),
-        ),
-      ),
-      body: SafeArea(
-        child: Column(
-          children: [
-            _buildPatientSelector(),
-            if (_selectedPatient != null) _buildRecordingsList(),
-            if (_selectedRecording != null) _buildPlaybackControls(),
-          ],
+        body: SafeArea(
+          child: Column(
+            children: [
+              _buildPatientSelector(),
+              if (_selectedPatient != null) _buildRecordingsList(),
+              if (_selectedRecording != null) _buildPlaybackControls(),
+            ],
+          ),
         ),
       ),
     );
