@@ -8,17 +8,21 @@ import '../../utils/models.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import '../../utils/navigation_service.dart';
 import '../../widgets/back_button.dart';
+import 'package:logging/logging.dart' as logging;
+
+final _logger = logging.Logger('OxygenMonitoring');
 
 class OxygenMonitoring extends StatefulWidget {
   final String? preselectedPatientId;
 
-  const OxygenMonitoring({Key? key, this.preselectedPatientId}) : super(key: key);
+  const OxygenMonitoring({super.key, this.preselectedPatientId});
 
   @override
-  _OxygenMonitoringState createState() => _OxygenMonitoringState();
+  State<OxygenMonitoring> createState() => OxygenMonitoringState();
 }
 
-class _OxygenMonitoringState extends State<OxygenMonitoring> {
+// Changed from private to public class
+class OxygenMonitoringState extends State<OxygenMonitoring> {
   List<FlSpot> heartRateSpots = [];
   List<FlSpot> spO2Spots = [];
   double maxX = 3.0; // Changed to 3 seconds
@@ -48,19 +52,19 @@ class _OxygenMonitoringState extends State<OxygenMonitoring> {
         medicalCardNumber,
       );
       
-      if (patient != null) {
+      if (patient != null && mounted) {
         setState(() {
           selectedPatient = patient;
         });
       }
     } catch (e) {
-      print('Error loading patient details: $e');
+      _logger.warning('Error loading patient details: $e');
     }
   }
 
   void _startPeriodicUpdate() {
     Future.doWhile(() async {
-      await Future.delayed(Duration(milliseconds: 100));
+      await Future.delayed(const Duration(milliseconds: 100));
       if (mounted && isActive) {
         final bleManager = Provider.of<BLEManager>(context, listen: false);
         _updateGraphData(bleManager);
@@ -106,6 +110,8 @@ class _OxygenMonitoringState extends State<OxygenMonitoring> {
   }
 
   void _resetGraph() {
+    if (!mounted) return;
+    
     final bleManager = Provider.of<BLEManager>(context, listen: false);
     setState(() {
       isActive = false;
@@ -119,7 +125,7 @@ class _OxygenMonitoringState extends State<OxygenMonitoring> {
     bleManager.clearPulseOxReadings();
     
     // Start a new session after a brief delay
-    Future.delayed(Duration(milliseconds: 500), () {
+    Future.delayed(const Duration(milliseconds: 500), () {
       if (mounted) {
         setState(() {
           isActive = true;
@@ -140,21 +146,21 @@ class _OxygenMonitoringState extends State<OxygenMonitoring> {
         appBar: AppBar(
           title: Text(title),
           leading: IconButton(
-            icon: Icon(Icons.arrow_back),
+            icon: const Icon(Icons.arrow_back),
             onPressed: () => NavigationService.goBack(),
           ),
           actions: [
             IconButton(
-              icon: Icon(Icons.history),
-              onPressed: () => _showHistory(),
+              icon: const Icon(Icons.history),
+              onPressed: _showHistory,
             ),
             IconButton(
-              icon: Icon(Icons.refresh),
+              icon: const Icon(Icons.refresh),
               onPressed: _resetGraph,
             ),
             IconButton(
-              icon: Icon(Icons.save),
-              onPressed: () => _showSaveDialog(context),
+              icon: const Icon(Icons.save),
+              onPressed: _showSaveDialog,
             ),
           ],
         ),
@@ -167,7 +173,7 @@ class _OxygenMonitoringState extends State<OxygenMonitoring> {
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     _buildValueCards(bleManager),
-                    SizedBox(height: 20),
+                    const SizedBox(height: 20),
                     _buildGraphCard(
                       'Heart Rate',
                       heartRateSpots,
@@ -176,7 +182,7 @@ class _OxygenMonitoringState extends State<OxygenMonitoring> {
                       120,
                       'BPM',
                     ),
-                    SizedBox(height: 20),
+                    const SizedBox(height: 20),
                     _buildGraphCard(
                       'SpO2',
                       spO2Spots,
@@ -201,21 +207,21 @@ class _OxygenMonitoringState extends State<OxygenMonitoring> {
       children: [
         _buildValueCard(
           'Heart Rate',
-          '${bleManager.currentHeartRate.toStringAsFixed(1)}',
+          bleManager.currentHeartRate.toStringAsFixed(1),
           'BPM',
           Colors.red,
           Icons.favorite,
         ),
         _buildValueCard(
           'SpO2',
-          '${bleManager.currentSpO2.toStringAsFixed(1)}',
+          bleManager.currentSpO2.toStringAsFixed(1),
           '%',
           Colors.blue,
           Icons.water_drop,
         ),
         _buildValueCard(
           'Temperature',
-          '${bleManager.currentTemperature.toStringAsFixed(1)}',
+          bleManager.currentTemperature.toStringAsFixed(1),
           '°C',
           Colors.orange,
           Icons.thermostat,
@@ -239,15 +245,15 @@ class _OxygenMonitoringState extends State<OxygenMonitoring> {
           mainAxisSize: MainAxisSize.min,
           children: [
             Icon(icon, color: color, size: 24),
-            SizedBox(height: 8),
+            const SizedBox(height: 8),
             Text(
               title,
-              style: TextStyle(
+              style: const TextStyle(
                 fontSize: 14,
                 fontWeight: FontWeight.w500,
               ),
             ),
-            SizedBox(height: 4),
+            const SizedBox(height: 4),
             Row(
               mainAxisSize: MainAxisSize.min,
               children: [
@@ -259,7 +265,7 @@ class _OxygenMonitoringState extends State<OxygenMonitoring> {
                     color: color,
                   ),
                 ),
-                SizedBox(width: 4),
+                const SizedBox(width: 4),
                 Text(
                   unit,
                   style: TextStyle(
@@ -295,22 +301,22 @@ class _OxygenMonitoringState extends State<OxygenMonitoring> {
               children: [
                 Text(
                   title,
-                  style: TextStyle(
+                  style: const TextStyle(
                     fontSize: 18,
                     fontWeight: FontWeight.bold,
                   ),
                 ),
                 Text(
                   'Points: ${spots.length}',
-                  style: TextStyle(
+                  style: const TextStyle(
                     fontSize: 12,
                     color: Colors.grey,
                   ),
                 ),
               ],
             ),
-            SizedBox(height: 16),
-            Container(
+            const SizedBox(height: 16),
+            SizedBox(
               height: 200,
               child: LineChart(
                 LineChartData(
@@ -382,7 +388,7 @@ class _OxygenMonitoringState extends State<OxygenMonitoring> {
                         },
                       ),
                     ),
-                    rightTitles: AxisTitles(
+                    rightTitles: const AxisTitles(
                       sideTitles: SideTitles(showTitles: false),
                     ),
                     topTitles: AxisTitles(
@@ -405,7 +411,7 @@ class _OxygenMonitoringState extends State<OxygenMonitoring> {
                           ),
                         ],
                       ),
-                      sideTitles: SideTitles(showTitles: false),
+                      sideTitles: const SideTitles(showTitles: false),
                     ),
                   ),
                   borderData: FlBorderData(
@@ -421,10 +427,10 @@ class _OxygenMonitoringState extends State<OxygenMonitoring> {
                       isCurved: true,
                       color: color,
                       barWidth: 2,
-                      dotData: FlDotData(show: false),
+                      dotData: const FlDotData(show: false),
                       belowBarData: BarAreaData(
                         show: true,
-                        color: color.withOpacity(0.1),
+                        color: color.withAlpha(26), // Using withAlpha instead of withOpacity (0.1)
                       ),
                     ),
                   ],
@@ -438,11 +444,13 @@ class _OxygenMonitoringState extends State<OxygenMonitoring> {
   }
 
   Future<void> _showHistory() async {
+    if (!mounted) return;
+    
     final currentUser = FirebaseAuth.instance.currentUser;
 
     if (currentUser == null) {
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('User not logged in')),
+        const SnackBar(content: Text('User not logged in')),
       );
       return;
     }
@@ -458,13 +466,16 @@ class _OxygenMonitoringState extends State<OxygenMonitoring> {
       return;
     }
 
+    // Store context before async gap
+    final currentContext = context;
+    
     // Otherwise show dialog to select patient
     final patient = await showDialog<Patient>(
-      context: context,
-      builder: (context) => PatientSelectionDialog(),
+      context: currentContext,
+      builder: (dialogContext) => const PatientSelectionDialog(),
     );
 
-    if (patient != null) {
+    if (patient != null && mounted) {
       NavigationService.navigateTo(
         AppRoutes.pulseOxHistory,
         arguments: {
@@ -474,13 +485,15 @@ class _OxygenMonitoringState extends State<OxygenMonitoring> {
     }
   }
 
-  Future<void> _showSaveDialog(BuildContext context) async {
+  Future<void> _showSaveDialog() async {
+    if (!mounted) return;
+    
     final bleManager = Provider.of<BLEManager>(context, listen: false);
     final currentUser = FirebaseAuth.instance.currentUser;
 
     if (currentUser == null) {
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('User not logged in')),
+        const SnackBar(content: Text('User not logged in')),
       );
       return;
     }
@@ -491,21 +504,26 @@ class _OxygenMonitoringState extends State<OxygenMonitoring> {
       return;
     }
 
+    // Store context before async gap
+    final currentContext = context;
+    
     // Otherwise show dialog to select patient
     final patient = await showDialog<Patient>(
-      context: context,
-      builder: (context) => PatientSelectionDialog(),
+      context: currentContext,
+      builder: (dialogContext) => const PatientSelectionDialog(),
     );
 
-    if (patient != null) {
+    if (patient != null && mounted) {
       _savePulseOxData(currentUser.uid, patient, bleManager);
     }
   }
 
-  void _savePulseOxData(String uid, Patient patient, BLEManager bleManager) async {
+  Future<void> _savePulseOxData(String uid, Patient patient, BLEManager bleManager) async {
+    if (!mounted) return;
+    
     if (bleManager.currentSessionReadings.isEmpty) {
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('No data to save')),
+        const SnackBar(content: Text('No data to save')),
       );
       return;
     }
@@ -518,10 +536,14 @@ class _OxygenMonitoringState extends State<OxygenMonitoring> {
         bleManager.sessionAverages,
       );
       
+      if (!mounted) return;
+      
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Data saved successfully!')),
+        const SnackBar(content: Text('Data saved successfully!')),
       );
     } catch (e) {
+      if (!mounted) return;
+      
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(content: Text('Error saving data: $e')),
       );
@@ -530,11 +552,14 @@ class _OxygenMonitoringState extends State<OxygenMonitoring> {
 }
 
 class PatientSelectionDialog extends StatefulWidget {
+  const PatientSelectionDialog({super.key});
+
   @override
-  _PatientSelectionDialogState createState() => _PatientSelectionDialogState();
+  State<PatientSelectionDialog> createState() => PatientSelectionDialogState();
 }
 
-class _PatientSelectionDialogState extends State<PatientSelectionDialog> {
+// Changed from private to public class
+class PatientSelectionDialogState extends State<PatientSelectionDialog> {
   List<Patient> patients = [];
   bool isLoading = true;
   String? error;
@@ -559,11 +584,16 @@ class _PatientSelectionDialogState extends State<PatientSelectionDialog> {
 
     try {
       final loadedPatients = await firebaseService.getPatientsForUser(currentUser.uid);
+      
+      if (!mounted) return;
+      
       setState(() {
         patients = loadedPatients;
         isLoading = false;
       });
     } catch (e) {
+      if (!mounted) return;
+      
       setState(() {
         error = 'Error loading patients: $e';
         isLoading = false;
@@ -574,16 +604,16 @@ class _PatientSelectionDialogState extends State<PatientSelectionDialog> {
   @override
   Widget build(BuildContext context) {
     return AlertDialog(
-      title: Text('Select Patient'),
-      content: Container(
+      title: const Text('Select Patient'),
+      content: SizedBox(
         width: double.maxFinite,
         height: 300,
         child: isLoading
-            ? Center(child: CircularProgressIndicator())
+            ? const Center(child: CircularProgressIndicator())
             : error != null
-                ? Center(child: Text(error!, style: TextStyle(color: Colors.red)))
+                ? Center(child: Text(error!, style: const TextStyle(color: Colors.red)))
                 : patients.isEmpty
-                    ? Center(child: Text('No patients found'))
+                    ? const Center(child: Text('No patients found'))
                     : ListView.builder(
                         itemCount: patients.length,
                         itemBuilder: (context, index) {
@@ -593,7 +623,7 @@ class _PatientSelectionDialogState extends State<PatientSelectionDialog> {
                               backgroundColor: Theme.of(context).primaryColor,
                               child: Text(
                                 patient.fullName[0].toUpperCase(),
-                                style: TextStyle(color: Colors.white),
+                                style: const TextStyle(color: Colors.white),
                               ),
                             ),
                             title: Text(patient.fullName),
@@ -605,7 +635,7 @@ class _PatientSelectionDialogState extends State<PatientSelectionDialog> {
       ),
       actions: [
         TextButton(
-          child: Text('Cancel'),
+          child: const Text('Cancel'),
           onPressed: () => Navigator.of(context).pop(),
         ),
       ],

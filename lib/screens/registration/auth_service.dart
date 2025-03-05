@@ -1,24 +1,46 @@
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:flutter/foundation.dart';
+import 'package:logging/logging.dart' as logging;
+
+final _logger = logging.Logger('AuthService');
 
 class AuthService extends ChangeNotifier {
   final FirebaseAuth _auth = FirebaseAuth.instance;
-  static const String GUEST_KEY = 'is_guest_mode';
-  static const String LAST_LOGIN_KEY = 'last_login_time';
-  static const int MAX_FAILED_ATTEMPTS = 5;
-  static const String FAILED_ATTEMPTS_KEY = 'failed_login_attempts';
-  static const String LOCKOUT_TIME_KEY = 'login_lockout_time';
+  // Use lowerCamelCase for constant names
+  static const String guestKey = 'is_guest_mode';
+  static const String lastLoginKey = 'last_login_time';
+  static const int maxFailedAttempts = 5;
+  static const String failedAttemptsKey = 'failed_login_attempts';
+  static const String lockoutTimeKey = 'login_lockout_time';
 
   // Check if an email is already registered with Firebase Auth
   Future<bool> isEmailRegistered(String email) async {
     try {
-      // This method returns a list of sign-in methods available for the email
-      // If the list is empty, the email is not registered
-      final methods = await _auth.fetchSignInMethodsForEmail(email);
-      return methods.isNotEmpty;
+      // Note: We're using a simpler but less secure approach to avoid the deprecated method
+      // Try signing in with an invalid password - if we get user-not-found, the email isn't registered
+      try {
+        await _auth.signInWithEmailAndPassword(
+          email: email,
+          // Use an intentionally incorrect password
+          password: 'CheckingIfEmailExists_${DateTime.now().millisecondsSinceEpoch}',
+        );
+        // If we get here without an exception, something unexpected happened
+        return true;
+      } on FirebaseAuthException catch (e) {
+        if (e.code == 'user-not-found') {
+          // Email is not registered
+          return false;
+        } else if (e.code == 'wrong-password') {
+          // User exists but password is wrong (as expected)
+          return true;
+        } else {
+          _logger.warning('Error checking if email is registered: ${e.code}');
+          return false;
+        }
+      }
     } catch (e) {
-      print('Error checking if email is registered: $e');
+      _logger.severe('Error checking if email is registered: $e');
       return false; // Return false on error to not block registration
     }
   }
@@ -71,10 +93,10 @@ class AuthService extends ChangeNotifier {
       
       return userCredential.user;
     } on FirebaseAuthException catch (e) {
-      print('Error registering user: ${e.code} - ${e.message}');
+      _logger.warning('Error registering user: ${e.code} - ${e.message}');
       rethrow; // Rethrow to allow handling in UI
     } catch (e) {
-      print('Unexpected error registering user: $e');
+      _logger.severe('Unexpected error registering user: $e');
       throw FirebaseAuthException(
         code: 'unexpected-error',
         message: 'An unexpected error occurred. Please try again.'
@@ -122,8 +144,7 @@ class AuthService extends ChangeNotifier {
       // Check if email is verified
       if (credential.user != null && !credential.user!.emailVerified) {
         // You might want to handle this differently based on your app's needs
-        // Here we just notify about it, but still allow login
-        print('Warning: Email not verified');
+        _logger.warning('Warning: Email not verified');
       }
       
       // Reset failed attempts on successful login
@@ -162,7 +183,7 @@ class AuthService extends ChangeNotifier {
       // Notify listeners about the auth state change
       notifyListeners();
     } catch (e) {
-      print('Error entering guest mode: $e');
+      _logger.severe('Error entering guest mode: $e');
       rethrow;
     }
   }
@@ -178,7 +199,7 @@ class AuthService extends ChangeNotifier {
       // Notify listeners about the auth state change
       notifyListeners();
     } catch (e) {
-      print('Error during logout: $e');
+      _logger.severe('Error during logout: $e');
       rethrow;
     }
   }
@@ -195,13 +216,13 @@ class AuthService extends ChangeNotifier {
   // Check if current user is guest
   Future<bool> isGuest() async {
     final prefs = await SharedPreferences.getInstance();
-    return prefs.getBool(GUEST_KEY) ?? false;
+    return prefs.getBool(guestKey) ?? false;
   }
   
   // Get last login time
   Future<DateTime?> getLastLoginTime() async {
     final prefs = await SharedPreferences.getInstance();
-    final timestamp = prefs.getInt(LAST_LOGIN_KEY);
+    final timestamp = prefs.getInt(lastLoginKey);
     return timestamp != null 
         ? DateTime.fromMillisecondsSinceEpoch(timestamp)
         : null;
@@ -216,7 +237,7 @@ class AuthService extends ChangeNotifier {
         await user.sendEmailVerification();
       }
     } catch (e) {
-      print('Error sending verification email: $e');
+      _logger.severe('Error sending verification email: $e');
       rethrow;
     }
   }
@@ -227,7 +248,7 @@ class AuthService extends ChangeNotifier {
       await _auth.currentUser?.reload();
       return _auth.currentUser?.emailVerified ?? false;
     } catch (e) {
-      print('Error checking email verification: $e');
+      _logger.warning('Error checking email verification: $e');
       return false;
     }
   }
@@ -235,27 +256,27 @@ class AuthService extends ChangeNotifier {
   // Private helper to set guest mode
   Future<void> _setGuestMode(bool isGuest) async {
     final prefs = await SharedPreferences.getInstance();
-    await prefs.setBool(GUEST_KEY, isGuest);
+    await prefs.setBool(guestKey, isGuest);
   }
   
   // Private helper to update last login time
   Future<void> _updateLastLoginTime() async {
     final prefs = await SharedPreferences.getInstance();
-    await prefs.setInt(LAST_LOGIN_KEY, DateTime.now().millisecondsSinceEpoch);
+    await prefs.setInt(lastLoginKey, DateTime.now().millisecondsSinceEpoch);
   }
   
   // Private helper to track failed attempts
   Future<void> _incrementFailedAttempts() async {
     final prefs = await SharedPreferences.getInstance();
-    int attempts = prefs.getInt(FAILED_ATTEMPTS_KEY) ?? 0;
+    int attempts = prefs.getInt(failedAttemptsKey) ?? 0;
     attempts++;
-    await prefs.setInt(FAILED_ATTEMPTS_KEY, attempts);
+    await prefs.setInt(failedAttemptsKey, attempts);
     
     // Set lockout time if max attempts reached
-    if (attempts >= MAX_FAILED_ATTEMPTS) {
+    if (attempts >= maxFailedAttempts) {
       // Lock for 30 minutes
       final lockoutTime = DateTime.now().add(Duration(minutes: 30)).millisecondsSinceEpoch;
-      await prefs.setInt(LOCKOUT_TIME_KEY, lockoutTime);
+      await prefs.setInt(lockoutTimeKey, lockoutTime);
     }
   }
   
@@ -264,13 +285,13 @@ class AuthService extends ChangeNotifier {
     final prefs = await SharedPreferences.getInstance();
     
     // Get the number of failed attempts
-    int attempts = prefs.getInt(FAILED_ATTEMPTS_KEY) ?? 0;
-    if (attempts < MAX_FAILED_ATTEMPTS) {
+    int attempts = prefs.getInt(failedAttemptsKey) ?? 0;
+    if (attempts < maxFailedAttempts) {
       return false;
     }
     
     // Check if we're still in lockout period
-    int? lockoutTimeMs = prefs.getInt(LOCKOUT_TIME_KEY);
+    int? lockoutTimeMs = prefs.getInt(lockoutTimeKey);
     if (lockoutTimeMs == null) {
       return false;
     }
@@ -290,8 +311,8 @@ class AuthService extends ChangeNotifier {
   // Reset failed login attempts
   Future<void> _resetFailedAttempts() async {
     final prefs = await SharedPreferences.getInstance();
-    await prefs.remove(FAILED_ATTEMPTS_KEY);
-    await prefs.remove(LOCKOUT_TIME_KEY);
+    await prefs.remove(failedAttemptsKey);
+    await prefs.remove(lockoutTimeKey);
   }
   
   // Method to change password with current password verification
@@ -326,10 +347,10 @@ class AuthService extends ChangeNotifier {
       // Notify listeners about potential auth state change
       notifyListeners();
     } on FirebaseAuthException catch (e) {
-      print('Error changing password: ${e.code} - ${e.message}');
+      _logger.warning('Error changing password: ${e.code} - ${e.message}');
       rethrow;
     } catch (e) {
-      print('Unexpected error changing password: $e');
+      _logger.severe('Unexpected error changing password: $e');
       throw FirebaseAuthException(
         code: 'unexpected-error',
         message: 'An unexpected error occurred while changing password.'
@@ -342,10 +363,10 @@ class AuthService extends ChangeNotifier {
     try {
       await _auth.sendPasswordResetEmail(email: email);
     } on FirebaseAuthException catch (e) {
-      print('Error sending password reset email: ${e.code} - ${e.message}');
+      _logger.warning('Error sending password reset email: ${e.code} - ${e.message}');
       rethrow;
     } catch (e) {
-      print('Unexpected error sending reset email: $e');
+      _logger.severe('Unexpected error sending reset email: $e');
       throw FirebaseAuthException(
         code: 'unexpected-error',
         message: 'An unexpected error occurred. Please try again.'

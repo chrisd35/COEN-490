@@ -6,14 +6,20 @@ import 'package:firebase_auth/firebase_auth.dart';
 import 'package:intl/intl.dart';
 import '../../utils/navigation_service.dart';
 import '../../widgets/back_button.dart';
+// Add a logging package import
+import 'package:logging/logging.dart' as logging;
+
+// Create a logger instance
+final _logger = logging.Logger('PulseOxHistory');
 
 class PulseOxHistory extends StatefulWidget {
   final String? preselectedPatientId;
 
-  const PulseOxHistory({Key? key, this.preselectedPatientId}) : super(key: key);
+  // Use super parameter syntax for key
+  const PulseOxHistory({super.key, this.preselectedPatientId});
 
   @override
-  _PulseOxHistoryState createState() => _PulseOxHistoryState();
+  State<PulseOxHistory> createState() => _PulseOxHistoryState();
 }
 
 class _PulseOxHistoryState extends State<PulseOxHistory> {
@@ -51,6 +57,9 @@ class _PulseOxHistoryState extends State<PulseOxHistory> {
         medicalCardNumber,
       );
 
+      // Check if widget is still mounted before using setState
+      if (!mounted) return;
+      
       setState(() {
         sessions = loadedSessions;
         patientName = patient?.fullName ?? 'Unknown Patient';
@@ -60,7 +69,11 @@ class _PulseOxHistoryState extends State<PulseOxHistory> {
         }
       });
     } catch (e) {
-      print('Error loading sessions: $e');
+      _logger.severe('Error loading sessions: $e');
+      
+      // Check if widget is still mounted before using setState
+      if (!mounted) return;
+      
       setState(() {
         isLoading = false;
       });
@@ -75,12 +88,12 @@ class _PulseOxHistoryState extends State<PulseOxHistory> {
         appBar: AppBar(
           title: Text(patientName ?? 'Pulse Ox History'),
           leading: IconButton(
-            icon: Icon(Icons.arrow_back),
+            icon: const Icon(Icons.arrow_back),
             onPressed: () => NavigationService.goBack(),
           ),
         ),
         body: isLoading 
-            ? Center(child: CircularProgressIndicator())
+            ? const Center(child: CircularProgressIndicator())
             : sessions.isEmpty
                 ? Center(
                     child: Column(
@@ -91,7 +104,7 @@ class _PulseOxHistoryState extends State<PulseOxHistory> {
                           size: 64,
                           color: Colors.grey[400],
                         ),
-                        SizedBox(height: 16),
+                        const SizedBox(height: 16),
                         Text(
                           'No recorded sessions found',
                           style: TextStyle(
@@ -119,7 +132,7 @@ class _PulseOxHistoryState extends State<PulseOxHistory> {
                                   child: Text(
                                     DateFormat('MMM dd, yyyy - HH:mm:ss')
                                         .format(session.timestamp),
-                                    style: TextStyle(
+                                    style: const TextStyle(
                                       fontSize: 16,
                                     ),
                                   ),
@@ -138,7 +151,7 @@ class _PulseOxHistoryState extends State<PulseOxHistory> {
                         _buildAveragesCard(selectedSession!),
                         Expanded(
                           child: SingleChildScrollView(
-                            padding: EdgeInsets.all(16),
+                            padding: const EdgeInsets.all(16),
                             child: Column(
                               children: [
                                _buildGraphCard(
@@ -172,20 +185,20 @@ class _PulseOxHistoryState extends State<PulseOxHistory> {
 
   Widget _buildAveragesCard(PulseOxSession session) {
     return Card(
-      margin: EdgeInsets.all(16),
+      margin: const EdgeInsets.all(16),
       child: Padding(
-        padding: EdgeInsets.all(16),
+        padding: const EdgeInsets.all(16),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Text(
+            const Text(
               'Session Averages',
               style: TextStyle(
                 fontSize: 18,
                 fontWeight: FontWeight.bold,
               ),
             ),
-            SizedBox(height: 16),
+            const SizedBox(height: 16),
             Row(
               mainAxisAlignment: MainAxisAlignment.spaceAround,
               children: [
@@ -228,12 +241,12 @@ class _PulseOxHistoryState extends State<PulseOxHistory> {
     return Column(
       children: [
         Icon(icon, color: color),
-        SizedBox(height: 4),
+        const SizedBox(height: 4),
         Text(
           title,
           style: TextStyle(fontSize: 12, color: Colors.grey[600]),
         ),
-        SizedBox(height: 2),
+        const SizedBox(height: 2),
         Text(
           '$value $unit',
           style: TextStyle(
@@ -271,13 +284,13 @@ class _PulseOxHistoryState extends State<PulseOxHistory> {
           children: [
             Text(
               title,
-              style: TextStyle(
+              style: const TextStyle(
                 fontSize: 18,
                 fontWeight: FontWeight.bold,
               ),
             ),
-            SizedBox(height: 16),
-            Container(
+            const SizedBox(height: 16),
+            SizedBox(  // Changed from Container to SizedBox
               height: 200,
               child: LineChart(
                 LineChartData(
@@ -343,7 +356,7 @@ class _PulseOxHistoryState extends State<PulseOxHistory> {
                       dotData: FlDotData(show: false),
                       belowBarData: BarAreaData(
                         show: true,
-                        color: color.withOpacity(0.1),
+                        color: color.withAlpha(26), // Using withAlpha(26) instead of withOpacity(0.1)
                       ),
                     ),
                   ],

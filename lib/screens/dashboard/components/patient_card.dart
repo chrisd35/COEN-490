@@ -5,9 +5,11 @@ import '/utils/models.dart';
 import '../../../utils/navigation_service.dart';
 import '../../../utils/app_routes.dart';
 import '../../../widgets/back_button.dart';
-
 class PatientCard extends StatelessWidget {
   final DatabaseReference _database = FirebaseDatabase.instance.ref();
+  
+  // Add key parameter using super, but remove const since _database is non-constant
+  PatientCard({super.key});
 
   @override
   Widget build(BuildContext context) {
@@ -22,24 +24,24 @@ class PatientCard extends StatelessWidget {
             children: [
               // Custom App Bar
               Container(
-                padding: EdgeInsets.symmetric(horizontal: 8.0, vertical: 8.0),
+                padding: const EdgeInsets.symmetric(horizontal: 8.0, vertical: 8.0),
                 decoration: BoxDecoration(
                   color: Colors.white,
                   boxShadow: [
                     BoxShadow(
-                      color: Colors.black.withOpacity(0.05),
+                      color: Colors.black.withAlpha(13), // Using withAlpha(13) instead of withOpacity(0.05)
                       blurRadius: 10,
-                      offset: Offset(0, 2),
+                      offset: const Offset(0, 2),
                     ),
                   ],
                 ),
                 child: Row(
                   children: [
                     IconButton(
-                      icon: Icon(Icons.arrow_back_ios_new, size: 20),
+                      icon: const Icon(Icons.arrow_back_ios_new, size: 20),
                       onPressed: () => NavigationService.goBack(),
                     ),
-                    Expanded(
+                    const Expanded(
                       child: Text(
                         'Patient Records',
                         style: TextStyle(
@@ -103,8 +105,8 @@ class PatientCard extends StatelessWidget {
       child: Column(
         mainAxisAlignment: MainAxisAlignment.center,
         children: [
-          CircularProgressIndicator(),
-          SizedBox(height: 16),
+          const CircularProgressIndicator(),
+          const SizedBox(height: 16),
           Text(
             'Loading patients...',
             style: TextStyle(
@@ -120,7 +122,7 @@ class PatientCard extends StatelessWidget {
   Widget _buildErrorState(String error) {
     return Center(
       child: Padding(
-        padding: EdgeInsets.all(24),
+        padding: const EdgeInsets.all(24),
         child: Column(
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
@@ -129,8 +131,8 @@ class PatientCard extends StatelessWidget {
               size: 48,
               color: Colors.red[400],
             ),
-            SizedBox(height: 16),
-            Text(
+            const SizedBox(height: 16),
+            const Text(
               'Something went wrong',
               style: TextStyle(
                 fontSize: 18,
@@ -138,7 +140,7 @@ class PatientCard extends StatelessWidget {
                 color: Colors.black87,
               ),
             ),
-            SizedBox(height: 8),
+            const SizedBox(height: 8),
             Text(
               error,
               textAlign: TextAlign.center,
@@ -156,24 +158,24 @@ class PatientCard extends StatelessWidget {
   Widget _buildEmptyState(BuildContext context) {
     return Center(
       child: Padding(
-        padding: EdgeInsets.all(24),
+        padding: const EdgeInsets.all(24),
         child: Column(
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
             Container(
-              padding: EdgeInsets.all(16),
+              padding: const EdgeInsets.all(16),
               decoration: BoxDecoration(
                 color: Colors.blue[50],
                 shape: BoxShape.circle,
               ),
-              child: Icon(
+              child: const Icon(
                 Icons.people_outline_rounded,
                 size: 48,
                 color: Colors.blue,
               ),
             ),
-            SizedBox(height: 24),
-            Text(
+            const SizedBox(height: 24),
+            const Text(
               'No Patients Yet',
               style: TextStyle(
                 fontSize: 20,
@@ -181,7 +183,7 @@ class PatientCard extends StatelessWidget {
                 color: Colors.black87,
               ),
             ),
-            SizedBox(height: 8),
+            const SizedBox(height: 8),
             Text(
               'Add your first patient to get started',
               textAlign: TextAlign.center,
@@ -190,7 +192,7 @@ class PatientCard extends StatelessWidget {
                 color: Colors.grey[600],
               ),
             ),
-            SizedBox(height: 24),
+            const SizedBox(height: 24),
             ElevatedButton(
               onPressed: () => NavigationService.navigateTo(AppRoutes.addPatient),
               style: ElevatedButton.styleFrom(
@@ -200,9 +202,9 @@ class PatientCard extends StatelessWidget {
                 shape: RoundedRectangleBorder(
                   borderRadius: BorderRadius.circular(12),
                 ),
-                padding: EdgeInsets.symmetric(horizontal: 24, vertical: 12),
+                padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 12),
               ),
-              child: Text(
+              child: const Text(
                 'Add Patient',
                 style: TextStyle(
                   fontSize: 16,
@@ -218,7 +220,7 @@ class PatientCard extends StatelessWidget {
 
   Widget _buildPatientsList(BuildContext context, List<Patient> patients) {
     return ListView.builder(
-      padding: EdgeInsets.all(16),
+      padding: const EdgeInsets.all(16),
       itemCount: patients.length,
       itemBuilder: (context, index) {
         final patient = patients[index];
@@ -230,7 +232,7 @@ class PatientCard extends StatelessWidget {
 
         return Card(
           elevation: 0,
-          margin: EdgeInsets.only(bottom: 12),
+          margin: const EdgeInsets.only(bottom: 12),
           shape: RoundedRectangleBorder(
             borderRadius: BorderRadius.circular(12),
             side: BorderSide(color: Colors.grey[200]!),
@@ -242,7 +244,7 @@ class PatientCard extends StatelessWidget {
               arguments: {'patient': patient},
             ),
             child: Padding(
-              padding: EdgeInsets.all(12),
+              padding: const EdgeInsets.all(12),
               child: Row(
                 children: [
                   // Avatar with gradient background
@@ -253,7 +255,7 @@ class PatientCard extends StatelessWidget {
                       gradient: LinearGradient(
                         colors: [
                           Theme.of(context).primaryColor,
-                          Theme.of(context).primaryColor.withOpacity(0.7),
+                          Theme.of(context).primaryColor.withAlpha(179), // Using withAlpha(179) instead of withOpacity(0.7)
                         ],
                         begin: Alignment.topLeft,
                         end: Alignment.bottomRight,
@@ -263,7 +265,7 @@ class PatientCard extends StatelessWidget {
                     child: Center(
                       child: Text(
                         initials,
-                        style: TextStyle(
+                        style: const TextStyle(
                           color: Colors.white,
                           fontSize: 18,
                           fontWeight: FontWeight.bold,
@@ -271,20 +273,20 @@ class PatientCard extends StatelessWidget {
                       ),
                     ),
                   ),
-                  SizedBox(width: 16),
+                  const SizedBox(width: 16),
                   Expanded(
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
                         Text(
                           patient.fullName,
-                          style: TextStyle(
+                          style: const TextStyle(
                             fontSize: 16,
                             fontWeight: FontWeight.w600,
                             color: Colors.black87,
                           ),
                         ),
-                        SizedBox(height: 4),
+                        const SizedBox(height: 4),
                         Text(
                           'Medical Card: ${patient.medicalCardNumber}',
                           style: TextStyle(

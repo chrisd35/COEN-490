@@ -9,13 +9,19 @@ import '..//registration/firebase_service.dart';
 import '../../utils/navigation_service.dart';
 import '../../utils/app_routes.dart';
 import '../../widgets/back_button.dart';
+import 'package:logging/logging.dart' as logging;
+
+final _logger = logging.Logger('DashboardScreen');
 
 class DashboardScreen extends StatefulWidget {
+  const DashboardScreen({super.key});
+
   @override
-  _DashboardScreenState createState() => _DashboardScreenState();
+  State<DashboardScreen> createState() => DashboardScreenState();
 }
 
-class _DashboardScreenState extends State<DashboardScreen> {
+// Changed from private to public state class
+class DashboardScreenState extends State<DashboardScreen> {
   bool _wasConnected = false;
   final FirebaseService _firebaseService = FirebaseService();
   String _userName = '';
@@ -41,6 +47,8 @@ class _DashboardScreenState extends State<DashboardScreen> {
       // Check if in guest mode
       final isGuest = await authService.isGuest();
       
+      if (!mounted) return;
+      
       if (isGuest) {
         setState(() {
           _userName = 'Guest';
@@ -50,6 +58,9 @@ class _DashboardScreenState extends State<DashboardScreen> {
 
       if (user != null) {
         final userData = await _firebaseService.getUser(user.uid, user.email ?? '');
+        
+        if (!mounted) return;
+        
         if (userData != null) {
           setState(() {
             _userName = userData.fullName.split(' ')[0];
@@ -57,7 +68,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
         }
       }
     } catch (e) {
-      print('Error loading user name: $e');
+      _logger.warning('Error loading user name: $e');
     }
   }
 
@@ -77,27 +88,27 @@ class _DashboardScreenState extends State<DashboardScreen> {
             children: [
               // Custom App Bar
               Container(
-                padding: EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+                padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
                 decoration: BoxDecoration(
                   color: Colors.white,
                   boxShadow: [
                     BoxShadow(
-                      color: Colors.black.withOpacity(0.05),
+                      color: Colors.black.withAlpha(13), // Using withAlpha instead of withOpacity
                       blurRadius: 10,
-                      offset: Offset(0, 2),
+                      offset: const Offset(0, 2),
                     ),
                   ],
                 ),
                 child: Row(
                   children: [
-                    Text(
+                    const Text(
                       'Dashboard',
                       style: TextStyle(
                         fontSize: 24,
                         fontWeight: FontWeight.bold,
                       ),
                     ),
-                    Spacer(),
+                    const Spacer(),
                     // Bluetooth Connection Button
                     IconButton(
                       icon: Icon(Icons.bluetooth, color: Theme.of(context).primaryColor),
@@ -115,21 +126,21 @@ class _DashboardScreenState extends State<DashboardScreen> {
               // Main Content
               Expanded(
                 child: SingleChildScrollView(
-                  padding: EdgeInsets.all(24),
+                  padding: const EdgeInsets.all(24),
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
                       // BLE Connection Status Card
                       Container(
-                        padding: EdgeInsets.all(16),
+                        padding: const EdgeInsets.all(16),
                         decoration: BoxDecoration(
                           color: Colors.white,
                           borderRadius: BorderRadius.circular(16),
                           boxShadow: [
                             BoxShadow(
-                              color: Colors.black.withOpacity(0.05),
+                              color: Colors.black.withAlpha(13), // Using withAlpha instead of withOpacity
                               blurRadius: 10,
-                              offset: Offset(0, 2),
+                              offset: const Offset(0, 2),
                             ),
                           ],
                         ),
@@ -150,9 +161,9 @@ class _DashboardScreenState extends State<DashboardScreen> {
 
                                   return _buildConnectionStatus(
                                     isConnected: isConnected,
-                                    deviceName: connectedDevice.name.isEmpty
+                                    deviceName: connectedDevice.platformName.isEmpty
                                         ? "Unknown Device"
-                                        : connectedDevice.name,
+                                        : connectedDevice.platformName,
                                   );
                                 },
                               )
@@ -161,18 +172,18 @@ class _DashboardScreenState extends State<DashboardScreen> {
                                 deviceName: "No device connected",
                               ),
                       ),
-                      SizedBox(height: 32),
+                      const SizedBox(height: 32),
 
                       // Welcome Text
                       Text(
                         _userName.isEmpty ? 'Welcome' : 'Hello, $_userName',
-                        style: TextStyle(
+                        style: const TextStyle(
                           fontSize: 28,
                           fontWeight: FontWeight.bold,
                           color: Colors.black87,
                         ),
                       ),
-                      SizedBox(height: 8),
+                      const SizedBox(height: 8),
                       Text(
                         'What would you like to do today?',
                         style: TextStyle(
@@ -180,21 +191,21 @@ class _DashboardScreenState extends State<DashboardScreen> {
                           color: Colors.grey[600],
                         ),
                       ),
-                      SizedBox(height: 32),
+                      const SizedBox(height: 32),
 
                       // Feature Grid based on user type
                       FutureBuilder<bool>(
                         future: Provider.of<AuthService>(context, listen: false).isGuest(),
                         builder: (context, snapshot) {
                           if (snapshot.connectionState == ConnectionState.waiting) {
-                            return CircularProgressIndicator();
+                            return const CircularProgressIndicator();
                           }
 
                           final isGuest = snapshot.data ?? false;
 
                           return GridView.count(
                             shrinkWrap: true,
-                            physics: NeverScrollableScrollPhysics(),
+                            physics: const NeverScrollableScrollPhysics(),
                             crossAxisCount: 2,
                             mainAxisSpacing: 16,
                             crossAxisSpacing: 16,
@@ -219,25 +230,25 @@ class _DashboardScreenState extends State<DashboardScreen> {
   // Build feature cards for guest users
   List<Widget> _buildGuestFeatureCards() {
     return [
-      _FeatureCard(
+      FeatureCard(
         title: 'Murmur Record',
         icon: Icons.mic_rounded,
         color: Colors.orange,
         onTap: () => NavigationService.navigateTo(AppRoutes.murmurRecord),
       ),
-      _FeatureCard(
+      FeatureCard(
         title: 'ECG Monitoring',
         icon: Icons.monitor_heart_outlined,
         color: Colors.green,
         onTap: () => NavigationService.navigateTo(AppRoutes.ecgMonitoring),
       ),
-      _FeatureCard(
+      FeatureCard(
         title: 'Oxygen Monitoring',
         icon: Icons.air,
         color: Colors.blue,
         onTap: () => NavigationService.navigateTo(AppRoutes.oxygenMonitoring),
       ),
-      _FeatureCard(
+      FeatureCard(
         title: 'View Recordings',
         icon: Icons.playlist_play,
         color: Colors.purple,
@@ -249,67 +260,79 @@ class _DashboardScreenState extends State<DashboardScreen> {
   // Build feature cards for registered users
   List<Widget> _buildUserFeatureCards() {
     return [
-      _FeatureCard(
+      FeatureCard(
         title: 'Patient Folders',
         icon: Icons.folder_rounded,
         color: Colors.blue,
         onTap: () => NavigationService.navigateTo(AppRoutes.patientCard),
       ),
-      _FeatureCard(
+      FeatureCard(
         title: 'AI Murmur',
         icon: Icons.analytics_rounded,
         color: Colors.purple,
         onTap: () => NavigationService.navigateTo(AppRoutes.murmurChart),
       ),
-      _FeatureCard(
+      FeatureCard(
         title: 'Murmur Record',
         icon: Icons.mic_rounded,
         color: Colors.orange,
         onTap: () => NavigationService.navigateTo(AppRoutes.murmurRecord),
       ),
-      _FeatureCard(
+      FeatureCard(
         title: 'View Recordings',
         icon: Icons.playlist_play,
         color: Colors.teal,
-        onTap: () async {
-          try {
-            final uid = FirebaseAuth.instance.currentUser!.uid;
-            final patients = await _firebaseService.getPatientsForUser(uid);
-            
-            if (patients.isEmpty) {
-              ScaffoldMessenger.of(context).showSnackBar(
-                SnackBar(
-                  content: Text('Create a patient and save a recording to access playback history'),
-                  duration: Duration(seconds: 4),
-                ),
-              );
-              return;
-            }
-            
-            NavigationService.navigateTo(AppRoutes.recordingPlayback);
-          } catch (e) {
-            ScaffoldMessenger.of(context).showSnackBar(
-              SnackBar(
-                content: Text('Failed to check recordings: $e'),
-                backgroundColor: Colors.red,
-              ),
-            );
-          }
-        },
+        onTap: () => _handleViewRecordings(),
       ),
-      _FeatureCard(
+      FeatureCard(
         title: 'ECG Monitoring',
         icon: Icons.monitor_heart_outlined,
         color: Colors.green,
         onTap: () => NavigationService.navigateTo(AppRoutes.ecgMonitoring),
       ),
-      _FeatureCard(
+      FeatureCard(
         title: 'Oxygen Monitoring',
         icon: Icons.air,
         color: Colors.blue[700] ?? Colors.blue,
         onTap: () => NavigationService.navigateTo(AppRoutes.oxygenMonitoring),
       ),
     ];
+  }
+
+  // New method to handle view recordings flow with async operations
+  Future<void> _handleViewRecordings() async {
+    if (!mounted) return;
+    
+    try {
+      final user = FirebaseAuth.instance.currentUser;
+      if (user == null) return;
+      
+      final uid = user.uid;
+      final patients = await _firebaseService.getPatientsForUser(uid);
+      
+      if (!mounted) return;
+      
+      if (patients.isEmpty) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: const Text('Create a patient and save a recording to access playback history'),
+            duration: const Duration(seconds: 4),
+          ),
+        );
+        return;
+      }
+      
+      NavigationService.navigateTo(AppRoutes.recordingPlayback);
+    } catch (e) {
+      if (!mounted) return;
+      
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('Failed to check recordings: $e'),
+          backgroundColor: Colors.red,
+        ),
+      );
+    }
   }
 
   Widget _buildConnectionStatus({required bool isConnected, required String deviceName}) {
@@ -323,11 +346,11 @@ class _DashboardScreenState extends State<DashboardScreen> {
             shape: BoxShape.circle,
           ),
         ),
-        SizedBox(width: 12),
+        const SizedBox(width: 12),
         Expanded(
           child: Text(
             isConnected ? 'Connected to: $deviceName' : deviceName,
-            style: TextStyle(
+            style: const TextStyle(
               fontSize: 16,
               color: Colors.black87,
               fontWeight: FontWeight.w500,
@@ -339,10 +362,12 @@ class _DashboardScreenState extends State<DashboardScreen> {
   }
 
   void _showDisconnectionDialog() {
+    if (!mounted) return;
+    
     showDialog(
       context: context,
       barrierDismissible: false,
-      builder: (context) => AlertDialog(
+      builder: (dialogContext) => AlertDialog(
         shape: RoundedRectangleBorder(
           borderRadius: BorderRadius.circular(16),
         ),
@@ -351,13 +376,13 @@ class _DashboardScreenState extends State<DashboardScreen> {
           mainAxisSize: MainAxisSize.min,
           children: [
             Container(
-              padding: EdgeInsets.all(16),
+              padding: const EdgeInsets.all(16),
               decoration: BoxDecoration(
                 color: Colors.red[50],
-                borderRadius: BorderRadius.vertical(top: Radius.circular(16)),
+                borderRadius: const BorderRadius.vertical(top: Radius.circular(16)),
               ),
               child: Column(
-                children: [
+                children: const [
                   Icon(
                     Icons.bluetooth_disabled_rounded,
                     color: Colors.red,
@@ -376,7 +401,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
                 ],
               ),
             ),
-            Padding(
+            const Padding(
               padding: EdgeInsets.all(24),
               child: Text(
                 'Please reconnect your device to continue monitoring.',
@@ -388,36 +413,36 @@ class _DashboardScreenState extends State<DashboardScreen> {
               ),
             ),
             Padding(
-              padding: EdgeInsets.fromLTRB(24, 0, 24, 24),
+              padding: const EdgeInsets.fromLTRB(24, 0, 24, 24),
               child: Row(
                 mainAxisAlignment: MainAxisAlignment.spaceBetween,
                 children: [
                   Expanded(
                     child: TextButton(
-                      onPressed: () => Navigator.pop(context),
-                      child: Text(
+                      onPressed: () => Navigator.pop(dialogContext),
+                      child: const Text(
                         'Later',
                         style: TextStyle(fontSize: 16),
                       ),
                     ),
                   ),
-                  SizedBox(width: 16),
+                  const SizedBox(width: 16),
                   Expanded(
                     child: ElevatedButton(
                       onPressed: () {
-                        Navigator.pop(context);
+                        Navigator.pop(dialogContext);
                         NavigationService.navigateTo(AppRoutes.bleScreen);
                       },
                       style: ElevatedButton.styleFrom(
-                        backgroundColor: Theme.of(context).primaryColor,
+                        backgroundColor: Theme.of(dialogContext).primaryColor,
                         foregroundColor: Colors.white,
                         elevation: 0,
                         shape: RoundedRectangleBorder(
                           borderRadius: BorderRadius.circular(12),
                         ),
-                        padding: EdgeInsets.symmetric(vertical: 12),
+                        padding: const EdgeInsets.symmetric(vertical: 12),
                       ),
-                      child: Text(
+                      child: const Text(
                         'Connect',
                         style: TextStyle(
                           fontSize: 16,
@@ -435,13 +460,17 @@ class _DashboardScreenState extends State<DashboardScreen> {
     );
   }
 
-  void _showLogoutDialog() async {
+  Future<void> _showLogoutDialog() async {
+    if (!mounted) return;
+    
     final authService = Provider.of<AuthService>(context, listen: false);
     final isGuest = await authService.isGuest();
-
+    
+    if (!mounted) return;
+    
     showDialog(
       context: context,
-      builder: (context) => AlertDialog(
+      builder: (dialogContext) => AlertDialog(
         shape: RoundedRectangleBorder(
           borderRadius: BorderRadius.circular(16),
         ),
@@ -452,7 +481,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
         ),
         actions: [
           TextButton(
-            onPressed: () => Navigator.pop(context),
+            onPressed: () => Navigator.pop(dialogContext),
             child: Text(
               'Cancel',
               style: TextStyle(color: Colors.grey[700]),
@@ -461,7 +490,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
           ElevatedButton(
             onPressed: () async {
               try {
-                Navigator.pop(context); // Close dialog
+                Navigator.pop(dialogContext); // Close dialog
                 if (isGuest) {
                   // Simply navigate back to auth page for guests
                   NavigationService.navigateToAndRemoveUntil(AppRoutes.auth);
@@ -471,12 +500,14 @@ class _DashboardScreenState extends State<DashboardScreen> {
                   NavigationService.navigateToAndRemoveUntil(AppRoutes.auth);
                 }
               } catch (e) {
+                if (!mounted) return;
+                
                 ScaffoldMessenger.of(context).showSnackBar(
                   SnackBar(
-                    content: Text('Error logging out. Please try again.'),
+                    content: const Text('Error logging out. Please try again.'),
                     backgroundColor: Colors.red[400],
                     behavior: SnackBarBehavior.floating,
-                    margin: EdgeInsets.all(16),
+                    margin: const EdgeInsets.all(16),
                     shape: RoundedRectangleBorder(
                       borderRadius: BorderRadius.circular(8),
                     ),
@@ -485,7 +516,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
               }
             },
             style: ElevatedButton.styleFrom(
-              backgroundColor: Theme.of(context).primaryColor,
+              backgroundColor: Theme.of(dialogContext).primaryColor,
               foregroundColor: Colors.white,
               elevation: 0,
               shape: RoundedRectangleBorder(
@@ -500,18 +531,20 @@ class _DashboardScreenState extends State<DashboardScreen> {
   }
 
   void _showPlaybackLoginPrompt() {
+    if (!mounted) return;
+    
     showDialog(
       context: context,
-      builder: (BuildContext context) {
+      builder: (dialogContext) {
         return AlertDialog(
           shape: RoundedRectangleBorder(
             borderRadius: BorderRadius.circular(16),
           ),
-          title: Text('Login Required'),
-          content: Text('You need to be logged in to view recorded murmurs.'),
+          title: const Text('Login Required'),
+          content: const Text('You need to be logged in to view recorded murmurs.'),
           actions: [
             TextButton(
-              onPressed: () => Navigator.pop(context),
+              onPressed: () => Navigator.pop(dialogContext),
               child: Text(
                 'Cancel',
                 style: TextStyle(color: Colors.grey[700]),
@@ -519,7 +552,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
             ),
             ElevatedButton(
               onPressed: () {
-                Navigator.pop(context);
+                Navigator.pop(dialogContext);
                 NavigationService.navigateTo(
                   AppRoutes.login,
                   arguments: {
@@ -529,14 +562,14 @@ class _DashboardScreenState extends State<DashboardScreen> {
                 );
               },
               style: ElevatedButton.styleFrom(
-                backgroundColor: Theme.of(context).primaryColor,
+                backgroundColor: Theme.of(dialogContext).primaryColor,
                 foregroundColor: Colors.white,
                 elevation: 0,
                 shape: RoundedRectangleBorder(
                   borderRadius: BorderRadius.circular(12),
                 ),
               ),
-              child: Text('Login'),
+              child: const Text('Login'),
             ),
           ],
         );
@@ -545,13 +578,15 @@ class _DashboardScreenState extends State<DashboardScreen> {
   }
 }
 
-class _FeatureCard extends StatelessWidget {
+// Changed from private to public class
+class FeatureCard extends StatelessWidget {
   final String title;
   final IconData icon;
   final Color color;
   final VoidCallback onTap;
 
-  const _FeatureCard({
+  const FeatureCard({
+    super.key, // Added key parameter
     required this.title,
     required this.icon,
     required this.color,
@@ -567,7 +602,7 @@ class _FeatureCard extends StatelessWidget {
         onTap: onTap,
         borderRadius: BorderRadius.circular(16),
         child: Container(
-          padding: EdgeInsets.all(16),
+          padding: const EdgeInsets.all(16),
           decoration: BoxDecoration(
             borderRadius: BorderRadius.circular(16),
             border: Border.all(color: Colors.grey[200]!),
@@ -576,18 +611,18 @@ class _FeatureCard extends StatelessWidget {
             mainAxisAlignment: MainAxisAlignment.center,
             children: [
               Container(
-                padding: EdgeInsets.all(12),
+                padding: const EdgeInsets.all(12),
                 decoration: BoxDecoration(
-                  color: color.withOpacity(0.1),
+                  color: color.withAlpha(26), // Using withAlpha instead of withOpacity (0.1)
                   shape: BoxShape.circle,
                 ),
                 child: Icon(icon, size: 32, color: color),
               ),
-              SizedBox(height: 12),
+              const SizedBox(height: 12),
               Text(
                 title,
                 textAlign: TextAlign.center,
-                style: TextStyle(
+                style: const TextStyle(
                   fontSize: 16,
                   fontWeight: FontWeight.w600,
                   color: Colors.black87,

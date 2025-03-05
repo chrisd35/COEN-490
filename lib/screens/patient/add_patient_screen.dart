@@ -6,16 +6,23 @@ import '/utils/validation_utils.dart';
 import '../../utils/navigation_service.dart';
 import '../../utils/app_routes.dart';
 import '../../widgets/back_button.dart';
+// Add a logging package import
+import 'package:logging/logging.dart' as logging;
+
+// Create a logger instance
+final _logger = logging.Logger('AddPatientScreen');
 
 class AddPatientScreen extends StatefulWidget {
   final bool fromMurmurRecord;
 
-  AddPatientScreen({
-    Key? key,
+  // Use super parameter syntax for key and make constructor const
+  const AddPatientScreen({
+    super.key,
     this.fromMurmurRecord = false,
-  }) : super(key: key);
+  });
+  
   @override
-  _AddPatientScreenState createState() => _AddPatientScreenState();
+  State<AddPatientScreen> createState() => _AddPatientScreenState();
 }
 
 class _AddPatientScreenState extends State<AddPatientScreen> {
@@ -29,7 +36,7 @@ class _AddPatientScreenState extends State<AddPatientScreen> {
   final _phoneNumberController = TextEditingController();
   String? _selectedGender;
   bool _isLoading = false;
-  bool _isCheckingMedicareNumber = false;
+  // Remove unused _isCheckingMedicareNumber field
   String? _medicareNumberError;
 
   @override
@@ -64,18 +71,18 @@ class _AddPatientScreenState extends State<AddPatientScreen> {
       ),
       errorBorder: OutlineInputBorder(
         borderRadius: BorderRadius.circular(12),
-        borderSide: BorderSide(color: Colors.red),
+        borderSide: const BorderSide(color: Colors.red),
       ),
       filled: true,
       fillColor: Colors.grey[50],
-      contentPadding: EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+      contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
       errorText: errorText,
     );
   }
 
   // Method to check if Medicare number is already in use
   Future<bool> _isMedicareNumberUnique(String medicareNumber) async {
-    setState(() => _isCheckingMedicareNumber = true);
+    // Removed setState for _isCheckingMedicareNumber since it's not used in UI
     
     try {
       final uid = firebase_auth.FirebaseAuth.instance.currentUser?.uid;
@@ -91,12 +98,8 @@ class _AddPatientScreenState extends State<AddPatientScreen> {
       
       return isUnique;
     } catch (e) {
-      print('Error checking Medicare number uniqueness: $e');
+      _logger.severe('Error checking Medicare number uniqueness: $e');
       return true; // Assume unique on error to allow submission
-    } finally {
-      if (mounted) {
-        setState(() => _isCheckingMedicareNumber = false);
-      }
     }
   }
 
@@ -123,7 +126,7 @@ class _AddPatientScreenState extends State<AddPatientScreen> {
       strategy: BackButtonHandlingStrategy.normal,
       child: Scaffold(
         appBar: AppBar(
-          title: Text(
+          title: const Text(
             'Create New Patient',
             style: TextStyle(fontWeight: FontWeight.w600),
           ),
@@ -143,7 +146,7 @@ class _AddPatientScreenState extends State<AddPatientScreen> {
                     crossAxisAlignment: CrossAxisAlignment.stretch,
                     children: [
                       // Header
-                      Text(
+                      const Text(
                         'Patient Information',
                         style: TextStyle(
                           fontSize: 24,
@@ -151,7 +154,7 @@ class _AddPatientScreenState extends State<AddPatientScreen> {
                           color: Colors.black87,
                         ),
                       ),
-                      SizedBox(height: 24),
+                      const SizedBox(height: 24),
 
                       // Full Name
                       TextFormField(
@@ -160,7 +163,7 @@ class _AddPatientScreenState extends State<AddPatientScreen> {
                         autovalidateMode: AutovalidateMode.onUserInteraction,
                         validator: ValidationUtils.validateName,
                       ),
-                      SizedBox(height: 16),
+                      const SizedBox(height: 16),
 
                       // Email
                       TextFormField(
@@ -170,7 +173,7 @@ class _AddPatientScreenState extends State<AddPatientScreen> {
                         autovalidateMode: AutovalidateMode.onUserInteraction,
                         validator: ValidationUtils.validateEmail,
                       ),
-                      SizedBox(height: 16),
+                      const SizedBox(height: 16),
 
                       // Medical Card with uniqueness check
                       TextFormField(
@@ -188,14 +191,15 @@ class _AddPatientScreenState extends State<AddPatientScreen> {
                           }
                         },
                       ),
-                      SizedBox(height: 16),
+                      const SizedBox(height: 16),
 
                       // Date of Birth
                       GestureDetector(
                         onTap: () async {
+                          final initialDate = DateTime.now().subtract(const Duration(days: 365 * 30));
                           DateTime? pickedDate = await showDatePicker(
                             context: context,
-                            initialDate: DateTime.now().subtract(Duration(days: 365 * 30)), // Default to 30 years ago
+                            initialDate: initialDate, // Default to 30 years ago
                             firstDate: DateTime(1900),
                             lastDate: DateTime.now(),
                             builder: (context, child) {
@@ -209,7 +213,7 @@ class _AddPatientScreenState extends State<AddPatientScreen> {
                               );
                             },
                           );
-                          if (pickedDate != null) {
+                          if (pickedDate != null && mounted) {
                             setState(() {
                               _dateOfBirthController.text =
                                   "${pickedDate.toLocal()}".split(' ')[0];
@@ -228,7 +232,7 @@ class _AddPatientScreenState extends State<AddPatientScreen> {
                           ),
                         ),
                       ),
-                      SizedBox(height: 16),
+                      const SizedBox(height: 16),
 
                       // Gender Dropdown
                       DropdownButtonFormField<String>(
@@ -248,7 +252,7 @@ class _AddPatientScreenState extends State<AddPatientScreen> {
                         },
                         validator: (value) => value == null ? 'Gender is required' : null,
                       ),
-                      SizedBox(height: 16),
+                      const SizedBox(height: 16),
 
                       // Phone Number
                       TextFormField(
@@ -258,14 +262,14 @@ class _AddPatientScreenState extends State<AddPatientScreen> {
                         autovalidateMode: AutovalidateMode.onUserInteraction,
                         validator: ValidationUtils.validatePhoneNumber,
                       ),
-                      SizedBox(height: 32),
+                      const SizedBox(height: 32),
 
                       // Save Button
                       ElevatedButton(
                         onPressed: _isLoading ? null : _submitForm,
                         style: ElevatedButton.styleFrom(
                           backgroundColor: Colors.blue[700],
-                          padding: EdgeInsets.symmetric(vertical: 16),
+                          padding: const EdgeInsets.symmetric(vertical: 16),
                           shape: RoundedRectangleBorder(
                             borderRadius: BorderRadius.circular(12),
                           ),
@@ -277,10 +281,10 @@ class _AddPatientScreenState extends State<AddPatientScreen> {
                                 height: 24,
                                 child: CircularProgressIndicator(
                                   strokeWidth: 2,
-                                  valueColor: AlwaysStoppedAnimation<Color>(Colors.white),
+                                  valueColor: const AlwaysStoppedAnimation<Color>(Colors.white),
                                 ),
                               )
-                            : Text(
+                            : const Text(
                                 'Save Patient Information',
                                 style: TextStyle(
                                   fontSize: 16,
@@ -306,6 +310,8 @@ class _AddPatientScreenState extends State<AddPatientScreen> {
     String? medicareError = await _validateMedicareNumber(medicareNumber);
     
     if (medicareError != null) {
+      if (!mounted) return;
+      
       setState(() => _medicareNumberError = medicareError);
       _showErrorSnackBar(medicareError);
       return;
@@ -336,6 +342,8 @@ class _AddPatientScreenState extends State<AddPatientScreen> {
 
         await _firebaseService.savePatient(user.uid, newPatient);
 
+        if (!mounted) return;
+        
         _showSuccessSnackBar('Patient saved successfully!');
 
         if (widget.fromMurmurRecord) {
@@ -343,11 +351,16 @@ class _AddPatientScreenState extends State<AddPatientScreen> {
           NavigationService.goBackWithResult(newPatient);
         } else {
           // Use replaceTo instead of push to prevent going back to the form
-           NavigationService.replaceTo(
-    AppRoutes.patientDetails,
-    arguments: {'patient': newPatient}, );
+          NavigationService.replaceTo(
+            AppRoutes.patientDetails,
+            arguments: {'patient': newPatient},
+          );
         }
       } catch (e) {
+        _logger.severe('Error saving patient: $e');
+        
+        if (!mounted) return;
+        
         _showErrorSnackBar('Error saving patient: ${e.toString()}');
       } finally {
         if (mounted) {
@@ -366,7 +379,7 @@ class _AddPatientScreenState extends State<AddPatientScreen> {
         content: Text(message),
         backgroundColor: Colors.red[400],
         behavior: SnackBarBehavior.floating,
-        margin: EdgeInsets.all(16),
+        margin: const EdgeInsets.all(16),
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
       ),
     );
@@ -378,7 +391,7 @@ class _AddPatientScreenState extends State<AddPatientScreen> {
         content: Text(message),
         backgroundColor: Colors.green[400],
         behavior: SnackBarBehavior.floating,
-        margin: EdgeInsets.all(16),
+        margin: const EdgeInsets.all(16),
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
       ),
     );

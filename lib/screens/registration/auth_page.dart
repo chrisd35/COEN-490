@@ -6,11 +6,14 @@ import 'login_page.dart';
 import 'package:coen_490/screens/dashboard/dashboard_screen.dart';
 
 class AuthPage extends StatefulWidget {
+  const AuthPage({super.key});
+
   @override
-  _AuthPageState createState() => _AuthPageState();
+  State<AuthPage> createState() => AuthPageState();
 }
 
-class _AuthPageState extends State<AuthPage> with SingleTickerProviderStateMixin {
+// Changed from private to public class
+class AuthPageState extends State<AuthPage> with SingleTickerProviderStateMixin {
   late AnimationController _animationController;
   late Animation<double> _fadeAnimation;
   late Animation<Offset> _slideAnimation;
@@ -23,22 +26,22 @@ class _AuthPageState extends State<AuthPage> with SingleTickerProviderStateMixin
     // Initialize animation controller
     _animationController = AnimationController(
       vsync: this,
-      duration: Duration(milliseconds: 1500),
+      duration: const Duration(milliseconds: 1500),
     );
     
     // Create fade animation
     _fadeAnimation = Tween<double>(begin: 0.0, end: 1.0).animate(
       CurvedAnimation(
         parent: _animationController,
-        curve: Interval(0.0, 0.6, curve: Curves.easeOut),
+        curve: const Interval(0.0, 0.6, curve: Curves.easeOut),
       ),
     );
     
     // Create slide animation for buttons
-    _slideAnimation = Tween<Offset>(begin: Offset(0, 0.5), end: Offset.zero).animate(
+    _slideAnimation = Tween<Offset>(begin: const Offset(0, 0.5), end: Offset.zero).animate(
       CurvedAnimation(
         parent: _animationController,
-        curve: Interval(0.3, 0.8, curve: Curves.easeOutCubic),
+        curve: const Interval(0.3, 0.8, curve: Curves.easeOutCubic),
       ),
     );
     
@@ -46,7 +49,7 @@ class _AuthPageState extends State<AuthPage> with SingleTickerProviderStateMixin
     _scaleAnimation = Tween<double>(begin: 0.8, end: 1.0).animate(
       CurvedAnimation(
         parent: _animationController,
-        curve: Interval(0.0, 0.5, curve: Curves.easeOutBack),
+        curve: const Interval(0.0, 0.5, curve: Curves.easeOutBack),
       ),
     );
     
@@ -58,6 +61,33 @@ class _AuthPageState extends State<AuthPage> with SingleTickerProviderStateMixin
   void dispose() {
     _animationController.dispose();
     super.dispose();
+  }
+
+  // Method to handle guest sign-in with async safety
+  Future<void> _handleGuestSignIn() async {
+    try {
+      final authService = Provider.of<AuthService>(context, listen: false);
+      await authService.signInAsGuest();
+      
+      if (!mounted) return;
+      
+      Navigator.pushReplacement(
+        context,
+        MaterialPageRoute(builder: (context) => const DashboardScreen()),
+      );
+    } catch (e) {
+      if (!mounted) return;
+      
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: const Text('Error accessing guest mode. Please try again.'),
+          backgroundColor: Colors.red[400],
+          behavior: SnackBarBehavior.floating,
+          margin: const EdgeInsets.all(16),
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+        ),
+      );
+    }
   }
 
   @override
@@ -75,7 +105,7 @@ class _AuthPageState extends State<AuthPage> with SingleTickerProviderStateMixin
               );
             },
             child: Container(
-              decoration: BoxDecoration(
+              decoration: const BoxDecoration(
                 image: DecorationImage(
                   image: AssetImage('assets/images/homepage.jpg'),
                   fit: BoxFit.cover,
@@ -88,8 +118,8 @@ class _AuthPageState extends State<AuthPage> with SingleTickerProviderStateMixin
                     begin: Alignment.topCenter,
                     end: Alignment.bottomCenter,
                     colors: [
-                      Colors.black.withOpacity(0.1),
-                      Colors.black.withOpacity(0.6),
+                      Colors.black.withAlpha(26), // Using withAlpha instead of withOpacity(0.1)
+                      Colors.black.withAlpha(153), // Using withAlpha instead of withOpacity(0.6)
                     ],
                   ),
                 ),
@@ -120,7 +150,7 @@ class _AuthPageState extends State<AuthPage> with SingleTickerProviderStateMixin
                           },
                           child: TweenAnimationBuilder<double>(
                             tween: Tween<double>(begin: 0.0, end: 1.0),
-                            duration: Duration(milliseconds: 1800),
+                            duration: const Duration(milliseconds: 1800),
                             builder: (context, value, child) {
                               return Transform.rotate(
                                 angle: (1.0 - value) * 0.3,
@@ -130,7 +160,7 @@ class _AuthPageState extends State<AuthPage> with SingleTickerProviderStateMixin
                                 ),
                               );
                             },
-                            child: Icon(
+                            child: const Icon(
                               Icons.favorite_rounded,
                               size: 90,
                               color: Colors.white,
@@ -151,8 +181,8 @@ class _AuthPageState extends State<AuthPage> with SingleTickerProviderStateMixin
                               letterSpacing: 1.5,
                               shadows: [
                                 Shadow(
-                                  color: Colors.black.withOpacity(0.5),
-                                  offset: Offset(1, 1),
+                                  color: Colors.black.withAlpha(128), // Using withAlpha instead of withOpacity(0.5)
+                                  offset: const Offset(1, 1),
                                   blurRadius: 5,
                                 ),
                               ],
@@ -164,12 +194,12 @@ class _AuthPageState extends State<AuthPage> with SingleTickerProviderStateMixin
                         // Animated Tagline
                         SlideTransition(
                           position: Tween<Offset>(
-                            begin: Offset(0.0, 0.5),
+                            begin: const Offset(0.0, 0.5),
                             end: Offset.zero,
                           ).animate(
                             CurvedAnimation(
                               parent: _animationController,
-                              curve: Interval(0.2, 0.7, curve: Curves.easeOut),
+                              curve: const Interval(0.2, 0.7, curve: Curves.easeOut),
                             ),
                           ),
                           child: FadeTransition(
@@ -179,7 +209,7 @@ class _AuthPageState extends State<AuthPage> with SingleTickerProviderStateMixin
                               textAlign: TextAlign.center,
                               style: TextStyle(
                                 fontSize: 18,
-                                color: Colors.white.withOpacity(0.9),
+                                color: Colors.white.withAlpha(230), // Using withAlpha instead of withOpacity(0.9)
                                 letterSpacing: 0.5,
                               ),
                             ),
@@ -202,7 +232,7 @@ class _AuthPageState extends State<AuthPage> with SingleTickerProviderStateMixin
                             // Login Button with hover effect
                             TweenAnimationBuilder<double>(
                               tween: Tween<double>(begin: 0.0, end: 1.0),
-                              duration: Duration(milliseconds: 300),
+                              duration: const Duration(milliseconds: 300),
                               builder: (context, value, child) {
                                 return Transform.scale(
                                   scale: 0.95 + (0.05 * value),
@@ -218,20 +248,20 @@ class _AuthPageState extends State<AuthPage> with SingleTickerProviderStateMixin
                                     PageRouteBuilder(
                                       pageBuilder: (context, animation, secondaryAnimation) => LoginPage(),
                                       transitionsBuilder: (context, animation, secondaryAnimation, child) {
-                                        var begin = Offset(1.0, 0.0);
+                                        var begin = const Offset(1.0, 0.0);
                                         var end = Offset.zero;
                                         var curve = Curves.easeInOut;
                                         var tween = Tween(begin: begin, end: end).chain(CurveTween(curve: curve));
                                         return SlideTransition(position: animation.drive(tween), child: child);
                                       },
-                                      transitionDuration: Duration(milliseconds: 300),
+                                      transitionDuration: const Duration(milliseconds: 300),
                                     ),
                                   ),
                                   style: ElevatedButton.styleFrom(
                                     backgroundColor: Colors.white,
                                     foregroundColor: Colors.black87,
                                     elevation: 2,
-                                    shadowColor: Colors.black.withOpacity(0.3),
+                                    shadowColor: Colors.black.withAlpha(77), // Using withAlpha instead of withOpacity(0.3)
                                     shape: RoundedRectangleBorder(
                                       borderRadius: BorderRadius.circular(16),
                                     ),
@@ -251,7 +281,7 @@ class _AuthPageState extends State<AuthPage> with SingleTickerProviderStateMixin
                             // Sign Up Button with animation
                             TweenAnimationBuilder<double>(
                               tween: Tween<double>(begin: 0.0, end: 1.0),
-                              duration: Duration(milliseconds: 300),
+                              duration: const Duration(milliseconds: 300),
                               builder: (context, value, child) {
                                 return Transform.scale(
                                   scale: 0.95 + (0.05 * value),
@@ -267,13 +297,13 @@ class _AuthPageState extends State<AuthPage> with SingleTickerProviderStateMixin
                                     PageRouteBuilder(
                                       pageBuilder: (context, animation, secondaryAnimation) => RegisterPage(),
                                       transitionsBuilder: (context, animation, secondaryAnimation, child) {
-                                        var begin = Offset(1.0, 0.0);
+                                        var begin = const Offset(1.0, 0.0);
                                         var end = Offset.zero;
                                         var curve = Curves.easeInOut;
                                         var tween = Tween(begin: begin, end: end).chain(CurveTween(curve: curve));
                                         return SlideTransition(position: animation.drive(tween), child: child);
                                       },
-                                      transitionDuration: Duration(milliseconds: 300),
+                                      transitionDuration: const Duration(milliseconds: 300),
                                     ),
                                   ),
                                   style: ElevatedButton.styleFrom(
@@ -282,7 +312,7 @@ class _AuthPageState extends State<AuthPage> with SingleTickerProviderStateMixin
                                     elevation: 0,
                                     shape: RoundedRectangleBorder(
                                       borderRadius: BorderRadius.circular(16),
-                                      side: BorderSide(color: Colors.white, width: 2),
+                                      side: const BorderSide(color: Colors.white, width: 2),
                                     ),
                                   ),
                                   child: const Text(
@@ -301,7 +331,7 @@ class _AuthPageState extends State<AuthPage> with SingleTickerProviderStateMixin
                             // Guest Button with animation
                             TweenAnimationBuilder<double>(
                               tween: Tween<double>(begin: 0.0, end: 1.0),
-                              duration: Duration(milliseconds: 200),
+                              duration: const Duration(milliseconds: 200),
                               builder: (context, value, child) {
                                 return Opacity(
                                   opacity: 0.7 + (0.3 * value),
@@ -309,41 +339,22 @@ class _AuthPageState extends State<AuthPage> with SingleTickerProviderStateMixin
                                 );
                               },
                               child: TextButton(
-                                onPressed: () async {
-                                  try {
-                                    final authService = Provider.of<AuthService>(context, listen: false);
-                                    await authService.signInAsGuest();
-                                    Navigator.pushReplacement(
-                                      context,
-                                      MaterialPageRoute(builder: (context) => DashboardScreen()),
-                                    );
-                                  } catch (e) {
-                                    ScaffoldMessenger.of(context).showSnackBar(
-                                      SnackBar(
-                                        content: Text('Error accessing guest mode. Please try again.'),
-                                        backgroundColor: Colors.red[400],
-                                        behavior: SnackBarBehavior.floating,
-                                        margin: EdgeInsets.all(16),
-                                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
-                                      ),
-                                    );
-                                  }
-                                },
+                                onPressed: _handleGuestSignIn,
                                 style: TextButton.styleFrom(
                                   foregroundColor: Colors.white,
-                                  padding: EdgeInsets.symmetric(horizontal: 24, vertical: 12),
+                                  padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 12),
                                 ),
                                 child: Row(
                                   mainAxisSize: MainAxisSize.min,
                                   children: [
-                                    Icon(Icons.person_outline, size: 18),
-                                    SizedBox(width: 8),
+                                    const Icon(Icons.person_outline, size: 18),
+                                    const SizedBox(width: 8),
                                     Text(
                                       'Continue as Guest',
                                       style: TextStyle(
                                         fontSize: 16,
                                         decoration: TextDecoration.underline,
-                                        decorationColor: Colors.white.withOpacity(0.5),
+                                        decorationColor: Colors.white.withAlpha(128), // Using withAlpha instead of withOpacity(0.5)
                                       ),
                                     ),
                                   ],

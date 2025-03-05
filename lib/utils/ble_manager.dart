@@ -2,6 +2,9 @@ import 'package:flutter/material.dart';
 import 'package:flutter_blue_plus/flutter_blue_plus.dart';
 import 'dart:typed_data';
 import 'dart:async';
+import 'package:logging/logging.dart' as logging;
+
+final _logger = logging.Logger('BLEManager');
 
 class BLEManager extends ChangeNotifier {
   static final BLEManager _instance = BLEManager._internal();
@@ -12,20 +15,20 @@ class BLEManager extends ChangeNotifier {
   BluetoothDevice? _connectedDevice;
   bool _isRecording = false;
   List<int> _audioBuffer = [];
-  List<Map<String, dynamic>> _currentSessionReadings = [];
+  final List<Map<String, dynamic>> _currentSessionReadings = [];
 
   // Audio metrics
   double _currentAmplitude = 0;
   double _peakAmplitude = 0;
-  List<double> _recentAmplitudes = [];
+  final List<double> _recentAmplitudes = [];
 
   // Recording timing control
   DateTime? _recordingStartTime;
-  int _expectedSamples = 0;
+  // Removed _expectedSamples as it's not used
 
   // New ECG and PulseOx buffers and metrics
-  List<int> _ecgBuffer = [];
-  List<Map<String, dynamic>> _pulseOxReadings = [];
+  final List<int> _ecgBuffer = [];
+  final List<Map<String, dynamic>> _pulseOxReadings = [];
   double _currentHeartRate = 0;
   double _currentSpO2 = 0;
   double _currentTemperature = 0;
@@ -33,17 +36,17 @@ class BLEManager extends ChangeNotifier {
   // Session timing
   DateTime? _sessionStartTime;
 
-  // Constants
-  static const int SAMPLE_RATE = 4000;
-  static const int BITS_PER_SAMPLE = 16;
-  static const int CHANNELS = 1;
+  // Constants - renamed to lowerCamelCase
+  static const int sampleRate = 4000;
+  static const int bitsPerSample = 16;
+  static const int channels = 1;
 
-  // UUIDs
-  static const String SERVICE_UUID = "19B10000-E8F2-537E-4F6C-D104768A1214";
-  static const String AUDIO_CHARACTERISTIC_UUID = "19B10001-E8F2-537E-4F6C-D104768A1214";
-  static const String CONTROL_CHARACTERISTIC_UUID = "19B10002-E8F2-537E-4F6C-D104768A1214";
-  static const String PULSEOX_CHARACTERISTIC_UUID = "19B10003-E8F2-537E-4F6C-D104768A1214";
-  static const String ECG_CHARACTERISTIC_UUID = "19B10004-E8F2-537E-4F6C-D104768A1214";
+  // UUIDs - renamed to lowerCamelCase
+  static const String serviceUuid = "19B10000-E8F2-537E-4F6C-D104768A1214";
+  static const String audioCharacteristicUuid = "19B10001-E8F2-537E-4F6C-D104768A1214";
+  static const String controlCharacteristicUuid = "19B10002-E8F2-537E-4F6C-D104768A1214";
+  static const String pulseOxCharacteristicUuid = "19B10003-E8F2-537E-4F6C-D104768A1214";
+  static const String ecgCharacteristicUuid = "19B10004-E8F2-537E-4F6C-D104768A1214";
 
   // Characteristics
   BluetoothCharacteristic? _audioCharacteristic;
@@ -68,10 +71,10 @@ class BLEManager extends ChangeNotifier {
   double get currentHeartRate => _currentHeartRate;
   double get currentSpO2 => _currentSpO2;
   double get currentTemperature => _currentTemperature;
-   List<Map<String, dynamic>> get currentSessionReadings => _currentSessionReadings;
+  List<Map<String, dynamic>> get currentSessionReadings => _currentSessionReadings;
   DateTime? get sessionStartTime => _sessionStartTime;
 
-   Map<String, double> get sessionAverages {
+  Map<String, double> get sessionAverages {
     if (_currentSessionReadings.isEmpty) {
       return {
         'heartRate': 0,
@@ -107,7 +110,6 @@ class BLEManager extends ChangeNotifier {
     _currentAmplitude = 0;
     _peakAmplitude = 0;
     _recordingStartTime = null;
-    _expectedSamples = 0;
     notifyListeners();
   }
 
@@ -116,7 +118,7 @@ class BLEManager extends ChangeNotifier {
     notifyListeners();
   }
 
- void clearPulseOxReadings() {
+  void clearPulseOxReadings() {
     _currentSessionReadings.clear();
     _currentHeartRate = 0;
     _currentSpO2 = 0;
@@ -131,20 +133,20 @@ class BLEManager extends ChangeNotifier {
 
   Future<void> connectToDevice(BluetoothDevice device) async {
     try {
-      print("Attempting to connect to device: ${device.name}");
+      _logger.info("Attempting to connect to device: ${device.platformName}");
 
       int retryCount = 0;
       bool connected = false;
 
       while (!connected && retryCount < 3) {
         try {
-          await device.connect(timeout: Duration(seconds: 10));
+          await device.connect(timeout: const Duration(seconds: 10));
           connected = true;
         } catch (e) {
-          print("Connection attempt ${retryCount + 1} failed: $e");
+          _logger.warning("Connection attempt ${retryCount + 1} failed: $e");
           retryCount++;
           if (retryCount < 3) {
-            await Future.delayed(Duration(seconds: 2));
+            await Future.delayed(const Duration(seconds: 2));
           } else {
             rethrow;
           }
@@ -152,13 +154,13 @@ class BLEManager extends ChangeNotifier {
       }
 
       _connectedDevice = device;
-      await Future.delayed(Duration(milliseconds: 2000));
+      await Future.delayed(const Duration(milliseconds: 2000));
       await _setupServices(); // Changed from _setupAudioService to handle all services
 
       notifyListeners();
-      print("Successfully connected and setup device: ${device.name}");
+      _logger.info("Successfully connected and setup device: ${device.platformName}");
     } catch (e) {
-      print("Error connecting to device: $e");
+      _logger.severe("Error connecting to device: $e");
       rethrow;
     }
   }
@@ -171,8 +173,8 @@ class BLEManager extends ChangeNotifier {
     if (_connectedDevice == null) return;
 
     try {
-      print("Starting service discovery...");
-      await Future.delayed(Duration(milliseconds: 1000));
+      _logger.info("Starting service discovery...");
+      await Future.delayed(const Duration(milliseconds: 1000));
 
       bool characteristicsFound = false;
       int retryCount = 0;
@@ -180,30 +182,30 @@ class BLEManager extends ChangeNotifier {
 
       while (!characteristicsFound && retryCount < maxRetries) {
         List<BluetoothService> services = await _connectedDevice!.discoverServices();
-        print("\nAttempt ${retryCount + 1}: Found ${services.length} services");
+        _logger.info("\nAttempt ${retryCount + 1}: Found ${services.length} services");
 
         for (var service in services) {
           String serviceUuid = normalizeUuid(service.uuid.toString());
-          print("\nExamining Service: $serviceUuid");
+          _logger.info("\nExamining Service: $serviceUuid");
 
-          if (serviceUuid == normalizeUuid(SERVICE_UUID)) {
-            print("\nFound target service!");
+          if (serviceUuid == normalizeUuid(BLEManager.serviceUuid)) {
+            _logger.info("\nFound target service!");
 
             for (var char in service.characteristics) {
               String charUuid = normalizeUuid(char.uuid.toString());
-              if (charUuid == normalizeUuid(CONTROL_CHARACTERISTIC_UUID)) {
+              if (charUuid == normalizeUuid(BLEManager.controlCharacteristicUuid)) {
                 _controlCharacteristic = char;
-                print("Found control characteristic");
-              } else if (charUuid == normalizeUuid(AUDIO_CHARACTERISTIC_UUID)) {
+                _logger.info("Found control characteristic");
+              } else if (charUuid == normalizeUuid(BLEManager.audioCharacteristicUuid)) {
                 _audioCharacteristic = char;
-                print("Found audio characteristic");
-              } else if (charUuid == normalizeUuid(PULSEOX_CHARACTERISTIC_UUID)) {
+                _logger.info("Found audio characteristic");
+              } else if (charUuid == normalizeUuid(BLEManager.pulseOxCharacteristicUuid)) {
                 _pulseOxCharacteristic = char;
-                print("Found PulseOx characteristic");
+                _logger.info("Found PulseOx characteristic");
                 _setupPulseOxNotifications();
-              } else if (charUuid == normalizeUuid(ECG_CHARACTERISTIC_UUID)) {
+              } else if (charUuid == normalizeUuid(BLEManager.ecgCharacteristicUuid)) {
                 _ecgCharacteristic = char;
-                print("Found ECG characteristic");
+                _logger.info("Found ECG characteristic");
                 _setupECGNotifications();
               }
             }
@@ -219,7 +221,7 @@ class BLEManager extends ChangeNotifier {
         if (!characteristicsFound) {
           retryCount++;
           if (retryCount < maxRetries) {
-            await Future.delayed(Duration(seconds: 1));
+            await Future.delayed(const Duration(seconds: 1));
           }
         }
       }
@@ -228,7 +230,7 @@ class BLEManager extends ChangeNotifier {
         throw Exception("Failed to find required characteristics");
       }
     } catch (e) {
-      print("Error in _setupServices: $e");
+      _logger.severe("Error in _setupServices: $e");
       rethrow;
     }
   }
@@ -239,11 +241,11 @@ class BLEManager extends ChangeNotifier {
 
     try {
         Duration elapsed = DateTime.now().difference(_recordingStartTime!);
-        int totalExpectedSamples = (SAMPLE_RATE * elapsed.inMilliseconds) ~/ 1000;
+        int totalExpectedSamples = (sampleRate * elapsed.inMilliseconds) ~/ 1000;
         int expectedBufferSize = totalExpectedSamples * 2;
 
         if (_audioBuffer.length >= expectedBufferSize) {
-            print("Buffer full, skipping new data");
+            _logger.info("Buffer full, skipping new data");
             return;
         }
 
@@ -251,7 +253,7 @@ class BLEManager extends ChangeNotifier {
         int bytesToAdd = data.length;
         if (bytesToAdd > remainingSpace) {
             bytesToAdd = remainingSpace;
-            print("Truncating incoming data to fit buffer");
+            _logger.info("Truncating incoming data to fit buffer");
         }
 
         Int16List samples = Int16List(bytesToAdd ~/ 2);
@@ -274,23 +276,23 @@ class BLEManager extends ChangeNotifier {
         
         _audioBuffer.addAll(data.sublist(0, bytesToAdd));
 
-        if (_audioBuffer.length % (SAMPLE_RATE * 2) == 0) {
-            print("Buffer status: ${_audioBuffer.length} bytes / $expectedBufferSize expected");
-            print("Current time: ${elapsed.inSeconds} seconds");
+        if (_audioBuffer.length % (sampleRate * 2) == 0) {
+            _logger.info("Buffer status: ${_audioBuffer.length} bytes / $expectedBufferSize expected");
+            _logger.info("Current time: ${elapsed.inSeconds} seconds");
         }
 
         notifyListeners();
     } catch (e) {
-        print("Error processing audio data: $e");
+        _logger.severe("Error processing audio data: $e");
     }
   }
 
   // Add new methods for processing ECG and PulseOx data
- void _setupPulseOxNotifications() async {
+  void _setupPulseOxNotifications() async {
     if (_pulseOxCharacteristic == null) return;
 
     await _pulseOxCharacteristic!.setNotifyValue(true);
-    _pulseOxSubscription = _pulseOxCharacteristic!.value.listen(
+    _pulseOxSubscription = _pulseOxCharacteristic!.lastValueStream.listen(
       (data) {
         if (data.length >= 12) { // 3 float32 values
           ByteData byteData = ByteData.sublistView(Uint8List.fromList(data));
@@ -313,12 +315,12 @@ class BLEManager extends ChangeNotifier {
         }
       },
       onError: (error) {
-        print("Error in PulseOx notifications: $error");
+        _logger.severe("Error in PulseOx notifications: $error");
       },
     );
   }
 
-   void startNewSession() {
+  void startNewSession() {
     _currentSessionReadings.clear();
     _sessionStartTime = DateTime.now();
     notifyListeners();
@@ -329,42 +331,41 @@ class BLEManager extends ChangeNotifier {
     notifyListeners();
   }
 
-
   Future<void> _setupECGNotifications() async {
     if (_ecgCharacteristic == null) return;
 
     await _ecgCharacteristic!.setNotifyValue(true);
-    _ecgSubscription = _ecgCharacteristic!.value.listen(
+    _ecgSubscription = _ecgCharacteristic!.lastValueStream.listen(
       (data) {
-        print("Received ECG data, length: ${data.length} bytes");
+        _logger.info("Received ECG data, length: ${data.length} bytes");
         if (data.length >= 6) { // int16 + uint32
           ByteData byteData = ByteData.sublistView(Uint8List.fromList(data));
           int ecgValue = byteData.getInt16(0, Endian.little);
           int timestamp = byteData.getUint32(2, Endian.little);
           
-          print("ECG Reading:");
-          print("  Value: $ecgValue");
-          print("  Timestamp: $timestamp");
+          _logger.info("ECG Reading:");
+          _logger.info("  Value: $ecgValue");
+          _logger.info("  Timestamp: $timestamp");
           
           _ecgBuffer.add(ecgValue);
           notifyListeners();
         } else {
-          print("Received incomplete ECG data packet: ${data.length} bytes");
+          _logger.warning("Received incomplete ECG data packet: ${data.length} bytes");
           // Print raw data for debugging
-          print("Raw data: ${data.map((b) => b.toRadixString(16).padLeft(2, '0')).join(' ')}");
+          _logger.warning("Raw data: ${data.map((b) => b.toRadixString(16).padLeft(2, '0')).join(' ')}");
         }
       },
       onError: (error) {
-        print("Error in ECG notifications: $error");
+        _logger.severe("Error in ECG notifications: $error");
       },
     );
-    print("ECG notifications setup complete");
+    _logger.info("ECG notifications setup complete");
   }
 
   // Keep existing startRecording and stopRecording methods exactly as they are
   Future<void> startRecording() async {
     try {
-      print("Starting recording...");
+      _logger.info("Starting recording...");
       clearAudioBuffer();
       _recordingStartTime = DateTime.now();
 
@@ -377,46 +378,47 @@ class BLEManager extends ChangeNotifier {
       }
 
       await _controlCharacteristic!.write([0x01], withoutResponse: true);
-      print("Sent start command to control characteristic");
+      _logger.info("Sent start command to control characteristic");
 
       await _audioCharacteristic!.setNotifyValue(true);
-      _audioSubscription = _audioCharacteristic!.value.listen(
+      _audioSubscription = _audioCharacteristic!.lastValueStream.listen(
         (value) {
           if (_isRecording) {
             _processAudioData(value);
           }
         },
         onError: (error) {
-          print("Error in audio listener: $error");
+          _logger.severe("Error in audio listener: $error");
         },
       );
 
       _isRecording = true;
       notifyListeners();
-      print("Recording started successfully");
+      _logger.info("Recording started successfully");
     } catch (e) {
-      print("Error in startRecording: $e");
+      _logger.severe("Error in startRecording: $e");
       rethrow;
     }
   }
+  
   Future<List<int>> stopRecording() async {
     if (_connectedDevice == null) {
       throw Exception("No device connected");
     }
 
     try {
-        print("Stopping recording...");
+        _logger.info("Stopping recording...");
         
         Duration totalDuration = DateTime.now().difference(_recordingStartTime!);
         int durationSeconds = ((totalDuration.inMilliseconds + 500) / 1000).floor();
-        int expectedSamples = SAMPLE_RATE * durationSeconds;
+        int expectedSamples = sampleRate * durationSeconds;
         int expectedBytes = expectedSamples * 2;
         
-        print("Recording summary:");
-        print("Duration: $durationSeconds seconds");
-        print("Expected samples: $expectedSamples");
-        print("Expected bytes: $expectedBytes");
-        print("Current buffer size: ${_audioBuffer.length}");
+        _logger.info("Recording summary:");
+        _logger.info("Duration: $durationSeconds seconds");
+        _logger.info("Expected samples: $expectedSamples");
+        _logger.info("Expected bytes: $expectedBytes");
+        _logger.info("Current buffer size: ${_audioBuffer.length}");
 
         await _audioSubscription?.cancel();
         _audioSubscription = null;
@@ -432,21 +434,21 @@ class BLEManager extends ChangeNotifier {
         _isRecording = false;
 
         if (_audioBuffer.length > expectedBytes) {
-            print("Trimming buffer from ${_audioBuffer.length} to $expectedBytes bytes");
+            _logger.info("Trimming buffer from ${_audioBuffer.length} to $expectedBytes bytes");
             _audioBuffer = _audioBuffer.sublist(0, expectedBytes);
         }
 
         List<int> recordedData = List<int>.from(_audioBuffer);
         
-        print("Final recording stats:");
-        print("Buffer size: ${recordedData.length} bytes");
-        print("Sample count: ${recordedData.length ~/ 2}");
-        print("Actual duration: ${recordedData.length / (2 * SAMPLE_RATE)} seconds");
+        _logger.info("Final recording stats:");
+        _logger.info("Buffer size: ${recordedData.length} bytes");
+        _logger.info("Sample count: ${recordedData.length ~/ 2}");
+        _logger.info("Actual duration: ${recordedData.length / (2 * sampleRate)} seconds");
 
         clearAudioBuffer();
         return recordedData;
     } catch (e) {
-        print("Error in stopRecording: $e");
+        _logger.severe("Error in stopRecording: $e");
         rethrow;
     }
   }
@@ -473,12 +475,11 @@ class BLEManager extends ChangeNotifier {
         clearAudioBuffer();
         notifyListeners();
       } catch (e) {
-        print("Error disconnecting: $e");
+        _logger.severe("Error disconnecting: $e");
         rethrow;
       }
     }
   }
-
 
   Stream<BluetoothConnectionState> getDeviceState(BluetoothDevice device) {
     return device.connectionState;

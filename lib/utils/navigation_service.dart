@@ -42,46 +42,10 @@ class NavigationService {
   
   /// Pop until a specific route
   static void popUntil(String routeName) {
-    navigatorKey.currentState!.popUntil(RouteName(routeName) as RoutePredicate);
+    navigatorKey.currentState!.popUntil((route) => route.settings.name == routeName);
   }
 }
 
-/// Helper class to check route names
-class RouteName extends Route<dynamic> {
-  final String name;
-  
-  RouteName(this.name);
-  
-  @override
-  bool operator ==(Object other) {
-    if (other is Route) {
-      return other.settings.name == name;
-    }
-    return false;
-  }
-  
-  @override
-  int get hashCode => name.hashCode;
-  
-  @override
-  RouteSettings get settings => RouteSettings(name: name);
-  
-  @override
-  bool get opaque => false;
-  
-  @override
-  bool get maintainState => false;
-  
-  @override
-  Duration get transitionDuration => Duration.zero;
-  
-  @override
-  Widget buildPage(BuildContext context, Animation<double> animation, Animation<double> secondaryAnimation) {
-    throw UnimplementedError();
-  }
-  
-  @override
-  Widget buildTransitions(BuildContext context, Animation<double> animation, Animation<double> secondaryAnimation, Widget child) {
-    throw UnimplementedError();
-  }
-}
+/// Helper class to check route names - Note: This is not needed with the improved popUntil implementation
+/// This class was removed since it had incorrect override annotations and wasn't necessary
+/// We replaced it with a simpler implementation using a closure in popUntil

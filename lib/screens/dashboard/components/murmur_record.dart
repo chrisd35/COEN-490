@@ -11,21 +11,24 @@ import '/utils/models.dart';
 import '../../../utils/navigation_service.dart';
 import '../../../utils/app_routes.dart';
 import '../../../widgets/back_button.dart';
+import 'package:logging/logging.dart' as logging;
+
+final _logger = logging.Logger('MurmurRecord');
 
 class MurmurRecord extends StatefulWidget {
   final String? preselectedPatientId;
 
   const MurmurRecord({
-    Key? key,
+    super.key,
     this.preselectedPatientId,
-  }) : super(key: key);
+  });
 
   @override
-  _MurmurRecordState createState() => _MurmurRecordState();
+  State<MurmurRecord> createState() => MurmurRecordState();
 }
 
-class _MurmurRecordState extends State<MurmurRecord> {
-
+// Changed from private to public state class
+class MurmurRecordState extends State<MurmurRecord> {
   final AudioPlayer _audioPlayer = AudioPlayer();
   final FirebaseService _firebaseService = FirebaseService();
   bool _isRecording = false;
@@ -33,7 +36,7 @@ class _MurmurRecordState extends State<MurmurRecord> {
   bool _isPlaying = false;
   bool _cameFromPatientDetails = false;
   List<int>? _recordedAudioData;
-  double _bufferSize = 0;
+  // Removed _bufferSize as it wasn't being used
   Duration _recordingDuration = Duration.zero;
   Timer? _recordingTimer;
 
@@ -58,42 +61,88 @@ class _MurmurRecordState extends State<MurmurRecord> {
     });
   }
 
+  // Add a new method to handle the back button press
+  Future<void> _handleBackButton() async {
+    if (_isPlaying) {
+      await _audioPlayer.stop();
+      if (mounted) {
+        setState(() {
+          _isPlaying = false;
+        });
+      }
+    }
+    
+    // If we came from patient details, just go back
+    if (_cameFromPatientDetails) {
+      NavigationService.goBack();
+      return;
+    }
+    
+    // Otherwise, use the original login logic for guests
+    if (!mounted) return;
+    
+    final authService = Provider.of<AuthService>(context, listen: false);
+    final isGuest = await authService.isGuest();
+    
+    if (!mounted) return;
+    
+    if (!isGuest) {
+      // If logged in, go to dashboard
+      NavigationService.navigateToAndRemoveUntil(AppRoutes.dashboard);
+    } else {
+      // If guest, just go back
+      NavigationService.goBack();
+    }
+  }
+  
   void _startRecording() async {
+    if (!mounted) return;
+    
     final bleManager = Provider.of<BLEManager>(context, listen: false);
     if (bleManager.connectedDevice != null) {
       try {
         await bleManager.startRecording();
+        
+        if (!mounted) return;
+        
         setState(() {
           _isRecording = true;
           _hasRecordingCompleted = false;
-          _bufferSize = 0;
           _recordingDuration = Duration.zero;
         });
 
         _startBufferSizeMonitoring();
         
         // Use a more precise timer
-        _recordingTimer = Timer.periodic(Duration(milliseconds: 100), (timer) {
-          setState(() {
-            // Round to nearest second for display
-            int totalMs = timer.tick * 100;
-            _recordingDuration = Duration(milliseconds: totalMs);
-          });
+        _recordingTimer = Timer.periodic(const Duration(milliseconds: 100), (timer) {
+          if (mounted) {
+            setState(() {
+              // Round to nearest second for display
+              int totalMs = timer.tick * 100;
+              _recordingDuration = Duration(milliseconds: totalMs);
+            });
+          } else {
+            // Cancel timer if widget is no longer mounted
+            timer.cancel();
+          }
         });
       } catch (e) {
-        _showErrorSnackBar("Failed to start recording: $e");
+        if (mounted) {
+          _showErrorSnackBar("Failed to start recording: $e");
+        }
       }
     } else {
-      _showErrorSnackBar("No device connected");
+      if (mounted) {
+        _showErrorSnackBar("No device connected");
+      }
     }
   }
 
   void _startBufferSizeMonitoring() {
-    Stream.periodic(Duration(milliseconds: 100)).listen((_) {
-      if (_isRecording) {
-        final bleManager = Provider.of<BLEManager>(context, listen: false);
+    Stream.periodic(const Duration(milliseconds: 100)).listen((_) {
+      if (_isRecording && mounted) {
         setState(() {
-          _bufferSize = bleManager.audioBuffer.length.toDouble();
+          // We're just monitoring buffer state, no need to store it in a field
         });
       }
     });
@@ -106,23 +155,28 @@ class _MurmurRecordState extends State<MurmurRecord> {
 
       // Get the final duration in whole seconds
       int durationSeconds = ((_recordingDuration.inMilliseconds + 500) / 1000).floor();
-      print("Final recording duration: $durationSeconds seconds");
+      _logger.info("Final recording duration: $durationSeconds seconds");
 
       List<int> audioData = await bleManager.stopRecording();
 
       if (audioData.isEmpty) {
-        _showErrorSnackBar("No audio data recorded");
+        if (mounted) {
+          _showErrorSnackBar("No audio data recorded");
+        }
         return;
       }
 
-      setState(() {
-        _isRecording = false;
-        _hasRecordingCompleted = true;
-        _recordedAudioData = audioData;
-      });
-
+      if (mounted) {
+        setState(() {
+          _isRecording = false;
+          _hasRecordingCompleted = true;
+          _recordedAudioData = audioData;
+        });
+      }
     } catch (e) {
-      _showErrorSnackBar("Failed to stop recording: $e");
+      if (mounted) {
+        _showErrorSnackBar("Failed to stop recording: $e");
+      }
     }
   }
   
@@ -139,7 +193,7 @@ class _MurmurRecordState extends State<MurmurRecord> {
         // Convert the raw audio data to WAV format
         final wavData = _firebaseService.createWavFile(
           _recordedAudioData!,
-          sampleRate: BLEManager.SAMPLE_RATE,
+          sampleRate: BLEManager.sampleRate,
           bitsPerSample: 16,
           channels: 1,
         );
@@ -158,6 +212,8 @@ class _MurmurRecordState extends State<MurmurRecord> {
   }
 
   void _showSaveRecordingDialog() async {
+    if (!mounted) return;
+    
     final authService = Provider.of<AuthService>(context, listen: false);
     if (authService.getCurrentUser() == null) {
       _showLoginPrompt();
@@ -173,43 +229,58 @@ class _MurmurRecordState extends State<MurmurRecord> {
     }
 
     // Show loading while fetching patients
-    showDialog(
+    if (!mounted) return;
+    
+    await showDialog(
       context: context,
       barrierDismissible: false,
-      builder: (context) => Center(child: CircularProgressIndicator()),
+      builder: (context) => const Center(child: CircularProgressIndicator()),
     );
+
+    // Early return if widget is unmounted after dialog
+    if (!mounted) return;
 
     try {
       // Fetch patients list
       List<Patient> patients = await _firebaseService.getPatientsForUser(uid);
-      Navigator.pop(context); // Remove loading dialog
+      
+      // Check if widget is still mounted before proceeding
+      if (!mounted) return;
+      
+      // Close the loading dialog
+      Navigator.of(context).pop();
+      
+      // Check if widget is still mounted after closing dialog
+      if (!mounted) return;
 
       if (patients.isEmpty) {
         _showNoPatientDialog();
         return;
       }
       
+      if (!mounted) return;
+      
       showDialog(
         context: context,
-        builder: (BuildContext context) {
+        builder: (dialogContext) { // Use dialogContext to avoid context references
           return AlertDialog(
-            title: Text('Save Recording'),
+            title: const Text('Save Recording'),
             content: Column(
               mainAxisSize: MainAxisSize.min,
               children: [
                 ListTile(
-                  leading: Icon(Icons.person_add),
-                  title: Text('Create New Patient'),
+                  leading: const Icon(Icons.person_add),
+                  title: const Text('Create New Patient'),
                   onTap: () {
-                    Navigator.pop(context);
+                    Navigator.pop(dialogContext);
                     _navigateToCreatePatient();
                   },
                 ),
                 ListTile(
-                  leading: Icon(Icons.people),
-                  title: Text('Select Existing Patient'),
+                  leading: const Icon(Icons.people),
+                  title: const Text('Select Existing Patient'),
                   onTap: () {
-                    Navigator.pop(context);
+                    Navigator.pop(dialogContext);
                     _showPatientSelectionDialog(uid, patients);
                   },
                 ),
@@ -217,15 +288,25 @@ class _MurmurRecordState extends State<MurmurRecord> {
             ),
             actions: [
               TextButton(
-                child: Text('Cancel'),
-                onPressed: () => Navigator.pop(context),
+                child: const Text('Cancel'),
+                onPressed: () => Navigator.pop(dialogContext),
               ),
             ],
           );
         },
       );
     } catch (e) {
-      Navigator.pop(context); // Remove loading dialog
+      // Check if widget is still mounted before using context
+      if (!mounted) return;
+      
+      // Try to dismiss the loading dialog if it's still showing
+      try {
+        Navigator.of(context).pop();
+      } catch (_) {
+        // Dialog may have been dismissed already, ignore errors
+      }
+      
+      if (!mounted) return;
       _showErrorSnackBar("Failed to load patients: $e");
     }
   }
@@ -247,11 +328,13 @@ class _MurmurRecordState extends State<MurmurRecord> {
   }
 
   void _showPatientSelectionDialog(String uid, List<Patient> patients) {
+    if (!mounted) return;
+    
     showDialog(
       context: context,
       builder: (BuildContext context) {
         return AlertDialog(
-          title: Text('Select Patient'),
+          title: const Text('Select Patient'),
           content: SizedBox(
             width: double.maxFinite,
             height: 300, // Fixed height for scrollable list
@@ -273,7 +356,7 @@ class _MurmurRecordState extends State<MurmurRecord> {
           ),
           actions: [
             TextButton(
-              child: Text('Cancel'),
+              child: const Text('Cancel'),
               onPressed: () => Navigator.pop(context),
             ),
           ],
@@ -283,19 +366,21 @@ class _MurmurRecordState extends State<MurmurRecord> {
   }
 
   void _showNoPatientDialog() {
+    if (!mounted) return;
+    
     showDialog(
       context: context,
       builder: (BuildContext dialogContext) { // Use dialogContext instead of context
         return AlertDialog(
-          title: Text('No Patients Found'),
-          content: Text('Would you like to create a new patient?'),
+          title: const Text('No Patients Found'),
+          content: const Text('Would you like to create a new patient?'),
           actions: [
             TextButton(
-              child: Text('Cancel'),
+              child: const Text('Cancel'),
               onPressed: () => Navigator.pop(dialogContext),
             ),
             TextButton(
-              child: Text('Create Patient'),
+              child: const Text('Create Patient'),
               onPressed: () {
                 Navigator.pop(dialogContext);
                 if (mounted) { // Check if still mounted
@@ -310,44 +395,75 @@ class _MurmurRecordState extends State<MurmurRecord> {
   }
 
   Future<void> _saveRecordingToPatient(String uid, String patientId) async {
-    if (_recordedAudioData == null) return;
-
-    _showLoadingDialog("Saving recording...");
+    if (_recordedAudioData == null || !mounted) return;
+    
+    // Get data before showing dialog
+    final bleManager = Provider.of<BLEManager>(context, listen: false);
+    final roundedDuration = ((_recordingDuration.inMilliseconds + 500) / 1000).floor();
+    final audioData = List<int>.from(_recordedAudioData!);
+    
+    if (!mounted) return;
+    
+    // Show loading dialog
+    await _showLoadingDialog("Saving recording...");
+    
+    // Check if still mounted after dialog is shown
+    if (!mounted) return;
 
     try {
-      final bleManager = Provider.of<BLEManager>(context, listen: false);
-      
-      // Round the duration to nearest second
-      int durationSeconds = ((_recordingDuration.inMilliseconds + 500) / 1000).floor();
-      
       await _firebaseService.saveRecording(
         uid,
         patientId,
         DateTime.now(),
-        _recordedAudioData!,
+        audioData,
         {
-          'duration': durationSeconds,
-          'sampleRate': BLEManager.SAMPLE_RATE,
-          'bitsPerSample': BLEManager.BITS_PER_SAMPLE,
-          'channels': BLEManager.CHANNELS,
+          'duration': roundedDuration,
+          'sampleRate': BLEManager.sampleRate,
+          'bitsPerSample': BLEManager.bitsPerSample,
+          'channels': BLEManager.channels,
           'peakAmplitude': bleManager.peakAmplitude,
         },
       );
 
-      Navigator.pop(context); // Close loading dialog
+      // Check if still mounted before proceeding
+      if (!mounted) return;
+      
+      // Close loading dialog
+      try {
+        Navigator.of(context).pop();
+      } catch (_) {
+        // Dialog may have been dismissed already, ignore errors
+      }
+      
+      if (!mounted) return;
+      
       _showSuccessSnackBar("Recording saved successfully");
+      
+      if (!mounted) return;
       
       setState(() {
         _hasRecordingCompleted = false;
         _recordedAudioData = null;
       });
     } catch (e) {
-      Navigator.pop(context);
+      // Check if still mounted before using context
+      if (!mounted) return;
+      
+      // Try to dismiss the dialog
+      try {
+        Navigator.of(context).pop();
+      } catch (_) {
+        // Dialog may have been dismissed already, ignore errors
+      }
+      
+      if (!mounted) return;
       _showErrorSnackBar("Failed to save recording: $e");
     }
   }
 
   void _showLoginPrompt() {
+    if (!mounted) return;
+    
     showDialog(
       context: context,
       builder: (BuildContext context) {
@@ -355,8 +471,8 @@ class _MurmurRecordState extends State<MurmurRecord> {
           shape: RoundedRectangleBorder(
             borderRadius: BorderRadius.circular(16),
           ),
-          title: Text('Login Required'),
-          content: Text('You need to be logged in to save recordings. Do you have an account?'),
+          title: const Text('Login Required'),
+          content: const Text('You need to be logged in to save recordings. Do you have an account?'),
           actions: [
             TextButton(
               onPressed: () => Navigator.pop(context),
@@ -375,7 +491,7 @@ class _MurmurRecordState extends State<MurmurRecord> {
                     'pendingAction': 'save_recording',
                   },
                 ).then((value) {
-                  if (value == true) {
+                  if (value == true && mounted) {
                     // User has successfully logged in, show save dialog again
                     _showSaveRecordingDialog();
                   }
@@ -396,7 +512,7 @@ class _MurmurRecordState extends State<MurmurRecord> {
                     'pendingAction': 'save_recording',
                   },
                 ).then((value) {
-                  if (value == true) {
+                  if (value == true && mounted) {
                     // User has successfully registered, show save dialog again
                     _showSaveRecordingDialog();
                   }
@@ -410,7 +526,7 @@ class _MurmurRecordState extends State<MurmurRecord> {
                   borderRadius: BorderRadius.circular(12),
                 ),
               ),
-              child: Text('Create New Account'),
+              child: const Text('Create New Account'),
             ),
           ],
         );
@@ -418,16 +534,18 @@ class _MurmurRecordState extends State<MurmurRecord> {
     );
   }
 
-  void _showLoadingDialog(String message) {
-    showDialog(
+  Future<void> _showLoadingDialog(String message) async {
+    if (!mounted) return;
+    
+    await showDialog(
       context: context,
       barrierDismissible: false,
-      builder: (BuildContext context) {
+      builder: (dialogContext) {
         return AlertDialog(
           content: Row(
             children: [
-              CircularProgressIndicator(),
-              SizedBox(width: 20),
+              const CircularProgressIndicator(),
+              const SizedBox(width: 20),
               Text(message),
             ],
           ),
@@ -437,40 +555,44 @@ class _MurmurRecordState extends State<MurmurRecord> {
   }
 
   void _showSuccessSnackBar(String message) {
+    if (!mounted) return;
+    
     ScaffoldMessenger.of(context).showSnackBar(
       SnackBar(
         content: Text(message),
         backgroundColor: Colors.green,
         behavior: SnackBarBehavior.fixed,
-        duration: Duration(seconds: 2),
+        duration: const Duration(seconds: 2),
       ),
     );
   }
 
   void _showErrorSnackBar(String message) {
+    if (!mounted) return;
+    
     ScaffoldMessenger.of(context).showSnackBar(
       SnackBar(
         content: Text(message),
         backgroundColor: Colors.red[400],
         behavior: SnackBarBehavior.fixed,
-        duration: Duration(seconds: 2),
+        duration: const Duration(seconds: 2),
       ),
     );
   }
 
   @override
-void dispose() {
-  // Stop audio playback when navigating away
-  if (_isPlaying) {
-    _audioPlayer.stop();
+  void dispose() {
+    // Stop audio playback when navigating away
+    if (_isPlaying) {
+      _audioPlayer.stop();
+    }
+    _audioPlayer.dispose();
+    _recordingTimer?.cancel();
+    super.dispose();
   }
-  _audioPlayer.dispose();
-  _recordingTimer?.cancel();
-  super.dispose();
-}
 
   Widget _buildWaveform(BuildContext context, BLEManager bleManager) {
-    return Container(
+    return SizedBox(
       height: 120,
       child: LineChart(
         LineChartData(
@@ -488,7 +610,7 @@ void dispose() {
               dotData: FlDotData(show: false),
               belowBarData: BarAreaData(
                 show: true,
-                color: Colors.blue[700]!.withOpacity(0.1),
+                color: Colors.blue[700]!.withAlpha(26), // Using withAlpha instead of withOpacity
               ),
             ),
           ],
@@ -510,7 +632,7 @@ void dispose() {
             color: Colors.grey[800],
           ),
         ),
-        SizedBox(height: 8),
+        const SizedBox(height: 8),
         Consumer<BLEManager>(
           builder: (context, bleManager, child) {
             // Calculate percentage but clamp it to 100%
@@ -530,7 +652,7 @@ void dispose() {
 
   @override
   Widget build(BuildContext context) {
-   return BackButtonHandler(
+    return BackButtonHandler(
       strategy: BackButtonHandlingStrategy.normal,
       child: Scaffold(
         appBar: AppBar(
@@ -538,7 +660,7 @@ void dispose() {
             widget.preselectedPatientId != null 
                 ? "Record Patient Murmur"
                 : "Murmur Analysis",
-            style: TextStyle(
+            style: const TextStyle(
               fontWeight: FontWeight.w600,
               color: Colors.black87,
             ),
@@ -547,32 +669,9 @@ void dispose() {
           backgroundColor: Colors.white,
           foregroundColor: Colors.black87,
           leading: IconButton(
-            icon: Icon(Icons.arrow_back_ios, size: 20),
-            onPressed: () async {
-
-              if (_isPlaying) {
-      await _audioPlayer.stop();
-      setState(() {
-        _isPlaying = false;
-      });
-    }
-              // If we came from patient details, just go back
-              if (_cameFromPatientDetails) {
-                NavigationService.goBack();
-                return;
-              }
-              
-              // Otherwise, use the original login logic for guests
-              final authService = Provider.of<AuthService>(context, listen: false);
-              final isGuest = await authService.isGuest();
-              
-              if (!isGuest) {
-                // If logged in, go to dashboard
-                NavigationService.navigateToAndRemoveUntil(AppRoutes.dashboard);
-              } else {
-                // If guest, just go back
-                NavigationService.goBack();
-              }
+            icon: const Icon(Icons.arrow_back_ios, size: 20),
+            onPressed: () {
+              _handleBackButton();
             },
           ),
         ),
@@ -581,18 +680,18 @@ void dispose() {
             children: [
               Container(
                 width: double.infinity,
-                padding: EdgeInsets.all(24),
+                padding: const EdgeInsets.all(24),
                 decoration: BoxDecoration(
                   color: Colors.white,
-                  borderRadius: BorderRadius.only(
+                  borderRadius: const BorderRadius.only(
                     bottomLeft: Radius.circular(24),
                     bottomRight: Radius.circular(24),
                   ),
                   boxShadow: [
                     BoxShadow(
-                      color: Colors.black.withOpacity(0.05),
+                      color: Colors.black.withAlpha(13), // Using withAlpha instead of withOpacity
                       blurRadius: 10,
-                      offset: Offset(0, 5),
+                      offset: const Offset(0, 5),
                     ),
                   ],
                 ),
@@ -601,7 +700,7 @@ void dispose() {
                     return Column(
                       children: [
                         _buildWaveform(context, bleManager),
-                        SizedBox(height: 16),
+                        const SizedBox(height: 16),
                         _buildRecordingStatus(),
                       ],
                     );
@@ -611,7 +710,7 @@ void dispose() {
               Expanded(
                 child: Center(
                   child: AnimatedSwitcher(
-                    duration: Duration(milliseconds: 300),
+                    duration: const Duration(milliseconds: 300),
                     child: _buildMainContent(),
                   ),
                 ),
@@ -644,17 +743,17 @@ void dispose() {
           height: 120,
           decoration: BoxDecoration(
             shape: BoxShape.circle,
-            color: Colors.red.withOpacity(0.1),
+            color: Colors.red.withAlpha(26), // Using withAlpha instead of withOpacity (0.1)
           ),
           child: Center(
             child: Container(
               width: 80,
               height: 80,
-              decoration: BoxDecoration(
+              decoration: const BoxDecoration(
                 shape: BoxShape.circle,
                 color: Colors.red,
               ),
-              child: Icon(
+              child: const Icon(
                 Icons.mic,
                 color: Colors.white,
                 size: 40,
@@ -662,7 +761,7 @@ void dispose() {
             ),
           ),
         ),
-        SizedBox(height: 24),
+        const SizedBox(height: 24),
         Text(
           "Recording in progress...",
           style: TextStyle(
@@ -684,15 +783,15 @@ void dispose() {
           height: 120,
           decoration: BoxDecoration(
             shape: BoxShape.circle,
-            color: Colors.green.withOpacity(0.1),
+            color: Colors.green.withAlpha(26), // Using withAlpha instead of withOpacity
           ),
-          child: Icon(
+          child: const Icon(
             Icons.check_circle_outline,
             color: Colors.green,
             size: 60,
           ),
         ),
-        SizedBox(height: 24),
+        const SizedBox(height: 24),
         Text(
           "Recording completed!",
           style: TextStyle(
@@ -701,7 +800,7 @@ void dispose() {
             fontWeight: FontWeight.w500,
           ),
         ),
-        SizedBox(height: 8),
+        const SizedBox(height: 8),
         Text(
           "Would you like to save this recording?",
           style: TextStyle(
@@ -709,7 +808,7 @@ void dispose() {
             color: Colors.grey[600],
           ),
         ),
-        SizedBox(height: 16),
+        const SizedBox(height: 16),
         IconButton(
           icon: Icon(
             _isPlaying ? Icons.pause_circle : Icons.play_circle,
@@ -731,7 +830,7 @@ void dispose() {
           height: 120,
           decoration: BoxDecoration(
             shape: BoxShape.circle,
-            color: Colors.blue[700]!.withOpacity(0.1),
+            color: Colors.blue[700]!.withAlpha(26), // Using withAlpha instead of withOpacity
           ),
           child: Icon(
             Icons.mic_none,
@@ -739,7 +838,7 @@ void dispose() {
             size: 48,
           ),
         ),
-        SizedBox(height: 24),
+        const SizedBox(height: 24),
         Text(
           "Tap the button below to start recording",
           style: TextStyle(
@@ -756,36 +855,36 @@ void dispose() {
       return FloatingActionButton.extended(
         onPressed: _stopRecording,
         backgroundColor: Colors.red,
-        label: Text("Stop Recording"),
-        icon: Icon(Icons.stop),
+        label: const Text("Stop Recording"),
+        icon: const Icon(Icons.stop),
       );
     } else if (_hasRecordingCompleted) {
       return Row(
         mainAxisSize: MainAxisSize.min,
         children: [
           FloatingActionButton.extended(
-  onPressed: () {
-    // Stop audio if playing
-    if (_isPlaying) {
-      _audioPlayer.stop();
-    }
-    setState(() {
-      _hasRecordingCompleted = false;
-      _recordedAudioData = null;
-      _isPlaying = false;
-    });
-  },
-  backgroundColor: Colors.red,
-  label: Text("Discard"),
-  icon: Icon(Icons.delete),
-  heroTag: null,
-),
-          SizedBox(width: 16),
+            onPressed: () {
+              // Stop audio if playing
+              if (_isPlaying) {
+                _audioPlayer.stop();
+              }
+              setState(() {
+                _hasRecordingCompleted = false;
+                _recordedAudioData = null;
+                _isPlaying = false;
+              });
+            },
+            backgroundColor: Colors.red,
+            label: const Text("Discard"),
+            icon: const Icon(Icons.delete),
+            heroTag: null,
+          ),
+          const SizedBox(width: 16),
           FloatingActionButton.extended(
             onPressed: _showSaveRecordingDialog,
             backgroundColor: Colors.green,
-            label: Text("Save Recording"),
-            icon: Icon(Icons.save),
+            label: const Text("Save Recording"),
+            icon: const Icon(Icons.save),
             heroTag: null,
           ),
         ],
@@ -794,8 +893,8 @@ void dispose() {
       return FloatingActionButton.extended(
         onPressed: _startRecording,
         backgroundColor: Colors.blue[700],
-        label: Text("Start Recording"),
-        icon: Icon(Icons.mic),
+        label: const Text("Start Recording"),
+        icon: const Icon(Icons.mic),
       );
     }
   }

@@ -8,6 +8,9 @@ import 'package:firebase_auth/firebase_auth.dart';
 import '../../utils/models.dart';
 import '../../utils/navigation_service.dart';
 import '../../widgets/back_button.dart';
+import 'package:logging/logging.dart' as logging;
+
+final _logger = logging.Logger('ECGMonitoring');
 
 class ECGMonitoring extends StatefulWidget {
   final String? uid;
@@ -15,17 +18,18 @@ class ECGMonitoring extends StatefulWidget {
   final BLEManager bleManager;
 
   const ECGMonitoring({
-    Key? key,
+    super.key,
     this.uid,
     this.preselectedPatientId,
     required this.bleManager,
-  }) : super(key: key);
+  });
 
   @override
-  _ECGMonitoringState createState() => _ECGMonitoringState();
+  State<ECGMonitoring> createState() => ECGMonitoringState();
 }
 
-class _ECGMonitoringState extends State<ECGMonitoring> {
+// Made state class public
+class ECGMonitoringState extends State<ECGMonitoring> {
   final List<Point<double>> _points = [];
   final double minY = 0;
   final double maxY = 4095;
@@ -64,13 +68,13 @@ class _ECGMonitoringState extends State<ECGMonitoring> {
         medicalCardNumber,
       );
       
-      if (patient != null) {
+      if (patient != null && mounted) {
         setState(() {
           selectedPatient = patient;
         });
       }
     } catch (e) {
-      print('Error loading patient details: $e');
+      _logger.warning('Error loading patient details: $e');
     }
   }
 
@@ -103,7 +107,7 @@ class _ECGMonitoringState extends State<ECGMonitoring> {
       if (scrollController.hasClients) {
         scrollController.animateTo(
           scrollController.position.maxScrollExtent,
-          duration: Duration(milliseconds: 200),
+          duration: const Duration(milliseconds: 200),
           curve: Curves.easeOut,
         );
       }
@@ -111,28 +115,28 @@ class _ECGMonitoringState extends State<ECGMonitoring> {
   }
   
   Widget _buildMetricsPanel() {
-    return Container(
-      padding: EdgeInsets.all(16),
+    return Padding(
+      padding: const EdgeInsets.all(16),
       child: Row(
         mainAxisAlignment: MainAxisAlignment.spaceEvenly,
         children: [
           _buildMetricCard(
             'Heart Rate',
-            '${currentHeartRate.toStringAsFixed(1)}',
+            currentHeartRate.toStringAsFixed(1),
             'BPM',
             Icons.favorite,
             Colors.red,
           ),
           _buildMetricCard(
             'R-R Interval',
-            '${rrInterval.toStringAsFixed(3)}',
+            rrInterval.toStringAsFixed(3),
             'sec',
             Icons.timeline,
             Colors.blue,
           ),
           _buildMetricCard(
             'Signal Quality',
-            '${signalQuality.toStringAsFixed(1)}',
+            signalQuality.toStringAsFixed(1),
             '%',
             Icons.signal_cellular_alt,
             Colors.green,
@@ -151,12 +155,12 @@ class _ECGMonitoringState extends State<ECGMonitoring> {
           mainAxisSize: MainAxisSize.min,
           children: [
             Icon(icon, color: color, size: 24),
-            SizedBox(height: 8),
+            const SizedBox(height: 8),
             Text(
               title,
-              style: TextStyle(fontSize: 12, fontWeight: FontWeight.w500),
+              style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w500),
             ),
-            SizedBox(height: 4),
+            const SizedBox(height: 4),
             Row(
               mainAxisSize: MainAxisSize.min,
               children: [
@@ -168,10 +172,10 @@ class _ECGMonitoringState extends State<ECGMonitoring> {
                     color: color,
                   ),
                 ),
-                SizedBox(width: 4),
+                const SizedBox(width: 4),
                 Text(
                   unit,
-                  style: TextStyle(fontSize: 12),
+                  style: const TextStyle(fontSize: 12),
                 ),
               ],
             ),
@@ -200,11 +204,13 @@ class _ECGMonitoringState extends State<ECGMonitoring> {
   }
 
   Future<void> _showSaveDialog() async {
+    if (!mounted) return;
+    
     final currentUser = FirebaseAuth.instance.currentUser;
 
     if (currentUser == null) {
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('User not logged in')),
+        const SnackBar(content: Text('User not logged in')),
       );
       return;
     }
@@ -215,21 +221,26 @@ class _ECGMonitoringState extends State<ECGMonitoring> {
       return;
     }
 
+    // Store context before async gap
+    final currentContext = context;
+    
     // Otherwise show dialog to select patient
     final patient = await showDialog<Patient>(
-      context: context,
-      builder: (context) => PatientSelectionDialog(),
+      context: currentContext,
+      builder: (dialogContext) => const PatientSelectionDialog(),
     );
 
-    if (patient != null) {
+    if (patient != null && mounted) {
       _saveECGToPatient(currentUser.uid, patient);
     }
   }
 
   void _saveECGToPatient(String uid, Patient patient) async {
+    if (!mounted) return;
+    
     if (_points.isEmpty) {
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('No ECG data to save')),
+        const SnackBar(content: Text('No ECG data to save')),
       );
       return;
     }
@@ -248,10 +259,14 @@ class _ECGMonitoringState extends State<ECGMonitoring> {
         },
       );
 
+      if (!mounted) return;
+      
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('ECG Recording saved successfully')),
+        const SnackBar(content: Text('ECG Recording saved successfully')),
       );
     } catch (e) {
+      if (!mounted) return;
+      
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(content: Text('Error saving ECG recording: $e')),
       );
@@ -259,11 +274,13 @@ class _ECGMonitoringState extends State<ECGMonitoring> {
   }
 
   void _showHistory() async {
+    if (!mounted) return;
+    
     final currentUser = FirebaseAuth.instance.currentUser;
 
     if (currentUser == null) {
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('User not logged in')),
+        const SnackBar(content: Text('User not logged in')),
       );
       return;
     }
@@ -279,13 +296,16 @@ class _ECGMonitoringState extends State<ECGMonitoring> {
       return;
     }
 
+    // Store context before async gap
+    final currentContext = context;
+    
     // Otherwise show dialog to select patient
     final patient = await showDialog<Patient>(
-      context: context,
-      builder: (context) => PatientSelectionDialog(),
+      context: currentContext,
+      builder: (dialogContext) => const PatientSelectionDialog(),
     );
 
-    if (patient != null) {
+    if (patient != null && mounted) {
       NavigationService.navigateTo(
         AppRoutes.ecgHistory,
         arguments: {
@@ -399,24 +419,24 @@ class _ECGMonitoringState extends State<ECGMonitoring> {
           title: Text(title),
           actions: [
             IconButton(
-              icon: Icon(Icons.history),
+              icon: const Icon(Icons.history),
               onPressed: _showHistory,
             ),
             IconButton(
-              icon: Icon(Icons.save),
+              icon: const Icon(Icons.save),
               onPressed: _showSaveDialog,
             ),
             IconButton(
-              icon: Icon(Icons.zoom_in),
+              icon: const Icon(Icons.zoom_in),
               onPressed: () => _adjustZoom(0.1),
             ),
             IconButton(
-              icon: Icon(Icons.zoom_out),
+              icon: const Icon(Icons.zoom_out),
               onPressed: () => _adjustZoom(-0.1),
             ),
             // Added Reset Button to clear the screen/graph and metrics
             IconButton(
-              icon: Icon(Icons.refresh),
+              icon: const Icon(Icons.refresh),
               onPressed: _resetDisplay,
             ),
           ],
@@ -433,14 +453,14 @@ class _ECGMonitoringState extends State<ECGMonitoring> {
                     style: Theme.of(context).textTheme.titleLarge,
                   ),
                   Container(
-                    padding: EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                    padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
                     decoration: BoxDecoration(
                       color: isConnected ? Colors.green : Colors.red,
                       borderRadius: BorderRadius.circular(12),
                     ),
                     child: Text(
                       isConnected ? 'Connected' : 'Disconnected',
-                      style: TextStyle(color: Colors.white),
+                      style: const TextStyle(color: Colors.white),
                     ),
                   ),
                 ],
@@ -451,7 +471,7 @@ class _ECGMonitoringState extends State<ECGMonitoring> {
               child: SingleChildScrollView(
                 controller: scrollController,
                 scrollDirection: Axis.horizontal,
-                child: Container(
+                child: SizedBox(
                   width: _points.length * 2.0 * zoomLevel, // Adjust width based on zoom
                   child: CustomPaint(
                     painter: ECGPainter(
@@ -480,7 +500,7 @@ class ECGPainter extends CustomPainter {
   // (Optional) sample rate for X-axis labeling. Update if needed.
   final double sampleRate;
 
-  ECGPainter({
+  const ECGPainter({
     required this.points,
     required this.minY,
     required this.maxY,
@@ -491,10 +511,10 @@ class ECGPainter extends CustomPainter {
   @override
   void paint(Canvas canvas, Size size) {
     // Define margins for axes
-    final double leftMargin = 50;
-    final double rightMargin = 10;
-    final double topMargin = 10;
-    final double bottomMargin = 40;
+    const double leftMargin = 50;
+    const double rightMargin = 10;
+    const double topMargin = 10;
+    const double bottomMargin = 40;
 
     // Determine the plotting area
     final double plotWidth = size.width - leftMargin - rightMargin;
@@ -547,12 +567,12 @@ class ECGPainter extends CustomPainter {
 
   void _drawGrid(Canvas canvas, double left, double top, double width, double height, Paint paint) {
     // Draw vertical grid lines (every 50 pixels in plot coordinates)
-    double gridSpacingX = 50.0;
+    const double gridSpacingX = 50.0;
     for (double x = left; x <= left + width; x += gridSpacingX) {
       canvas.drawLine(Offset(x, top), Offset(x, top + height), paint);
     }
     // Draw horizontal grid lines (every 50 pixels in plot coordinates)
-    double gridSpacingY = 50.0;
+    const double gridSpacingY = 50.0;
     for (double y = top; y <= top + height; y += gridSpacingY) {
       canvas.drawLine(Offset(left, y), Offset(left + width, y), paint);
     }
@@ -565,7 +585,7 @@ class ECGPainter extends CustomPainter {
     );
 
     // Y-Axis Title
-    textPainter.text = TextSpan(
+    textPainter.text = const TextSpan(
       text: 'Voltage (ADC)',
       style: TextStyle(color: Colors.black, fontSize: 12, fontWeight: FontWeight.bold),
     );
@@ -577,12 +597,12 @@ class ECGPainter extends CustomPainter {
     canvas.restore();
 
     // Y-Axis Labels (let's show 5 labels)
-    int numYLabels = 5;
+    const int numYLabels = 5;
     for (int i = 0; i <= numYLabels; i++) {
       double value = minY + (maxY - minY) * i / numYLabels;
       textPainter.text = TextSpan(
         text: value.toStringAsFixed(0),
-        style: TextStyle(color: Colors.black, fontSize: 10),
+        style: const TextStyle(color: Colors.black, fontSize: 10),
       );
       textPainter.layout();
       double y = top + height - ((value - minY) / (maxY - minY) * height);
@@ -590,7 +610,7 @@ class ECGPainter extends CustomPainter {
     }
 
     // X-Axis Title
-    textPainter.text = TextSpan(
+    textPainter.text = const TextSpan(
       text: 'Time (s)',
       style: TextStyle(color: Colors.black, fontSize: 12, fontWeight: FontWeight.bold),
     );
@@ -598,7 +618,7 @@ class ECGPainter extends CustomPainter {
     textPainter.paint(canvas, Offset(left + width / 2 - textPainter.width / 2, top + height + 20));
 
     // X-Axis Labels (5 labels; time computed using sampleRate)
-    int numXLabels = 5;
+    const int numXLabels = 5;
     for (int i = 0; i <= numXLabels; i++) {
       double fraction = i / numXLabels;
       double x = left + fraction * width;
@@ -606,7 +626,7 @@ class ECGPainter extends CustomPainter {
       double timeInSeconds = (fraction * points.length) / sampleRate;
       textPainter.text = TextSpan(
         text: timeInSeconds.toStringAsFixed(1),
-        style: TextStyle(color: Colors.black, fontSize: 10),
+        style: const TextStyle(color: Colors.black, fontSize: 10),
       );
       textPainter.layout();
       textPainter.paint(canvas, Offset(x - textPainter.width / 2, top + height + 25));
@@ -618,11 +638,14 @@ class ECGPainter extends CustomPainter {
 }
 
 class PatientSelectionDialog extends StatefulWidget {
+  const PatientSelectionDialog({super.key});
+
   @override
-  _PatientSelectionDialogState createState() => _PatientSelectionDialogState();
+  State<PatientSelectionDialog> createState() => PatientSelectionDialogState();
 }
 
-class _PatientSelectionDialogState extends State<PatientSelectionDialog> {
+// Made state class public
+class PatientSelectionDialogState extends State<PatientSelectionDialog> {
   List<Patient> patients = [];
   bool isLoading = true;
   String? error;
@@ -647,11 +670,16 @@ class _PatientSelectionDialogState extends State<PatientSelectionDialog> {
 
     try {
       final loadedPatients = await firebaseService.getPatientsForUser(currentUser.uid);
+      
+      if (!mounted) return;
+      
       setState(() {
         patients = loadedPatients;
         isLoading = false;
       });
     } catch (e) {
+      if (!mounted) return;
+      
       setState(() {
         error = 'Error loading patients: $e';
         isLoading = false;
@@ -662,16 +690,16 @@ class _PatientSelectionDialogState extends State<PatientSelectionDialog> {
   @override
   Widget build(BuildContext context) {
     return AlertDialog(
-      title: Text('Select Patient'),
-      content: Container(
+      title: const Text('Select Patient'),
+      content: SizedBox(
         width: double.maxFinite,
         height: 300,
         child: isLoading
-            ? Center(child: CircularProgressIndicator())
+            ? const Center(child: CircularProgressIndicator())
             : error != null
-                ? Center(child: Text(error!, style: TextStyle(color: Colors.red)))
+                ? Center(child: Text(error!, style: const TextStyle(color: Colors.red)))
                 : patients.isEmpty
-                    ? Center(child: Text('No patients found'))
+                    ? const Center(child: Text('No patients found'))
                     : ListView.builder(
                         itemCount: patients.length,
                         itemBuilder: (context, index) {
@@ -681,7 +709,7 @@ class _PatientSelectionDialogState extends State<PatientSelectionDialog> {
                               backgroundColor: Theme.of(context).primaryColor,
                               child: Text(
                                 patient.fullName[0].toUpperCase(),
-                                style: TextStyle(color: Colors.white),
+                                style: const TextStyle(color: Colors.white),
                               ),
                             ),
                             title: Text(patient.fullName),
@@ -693,7 +721,7 @@ class _PatientSelectionDialogState extends State<PatientSelectionDialog> {
       ),
       actions: [
         TextButton(
-          child: Text('Cancel'),
+          child: const Text('Cancel'),
           onPressed: () => Navigator.of(context).pop(),
         ),
       ],

@@ -6,20 +6,27 @@ import '../../utils/models.dart';
 import 'auth_service.dart';
 import '/utils/validation_utils.dart';
 import 'email_verification_screen.dart';
+// Add a logging package import
+import 'package:logging/logging.dart' as logging;
+
+// Create a logger instance
+final _logger = logging.Logger('AccountProfilePage');
 
 class AccountProfilePage extends StatefulWidget {
   final String? selectedRole;
   final String? returnRoute;
   final String? pendingAction;
 
-  AccountProfilePage({
+  // Use const constructor with key parameter using super
+  const AccountProfilePage({
+    super.key,
     this.selectedRole,
     this.returnRoute,
     this.pendingAction,
   });
 
   @override
-  _AccountProfilePageState createState() => _AccountProfilePageState();
+  State<AccountProfilePage> createState() => _AccountProfilePageState();
 }
 
 class _AccountProfilePageState extends State<AccountProfilePage> {
@@ -50,15 +57,14 @@ class _AccountProfilePageState extends State<AccountProfilePage> {
   bool _isEmailValid = false;
   String? _emailError;
   Timer? _emailDebounce;
+  bool _isRolePreselected = false;
 
   @override
   void initState() {
     super.initState();
     _selectedRole = widget.selectedRole;
-     _isRolePreselected = widget.selectedRole != null;
-     
+    _isRolePreselected = widget.selectedRole != null;
   }
-  bool _isRolePreselected = false;
 
   @override
   void dispose() {
@@ -108,34 +114,35 @@ class _AccountProfilePageState extends State<AccountProfilePage> {
   }
   
   // Email availability checker
- Future<void> _checkEmailAvailability() async {
-  final email = _emailController.text.trim();
-  
-  if (email.isEmpty) {
-    setState(() {
-      _isEmailValid = false;
-      _emailError = null;
-    });
-    return;
-  }
-  
-  // Use the comprehensive format validation
-  bool isFormatValid = ValidationUtils.isEmailFormatValid(email);
-  if (!isFormatValid) {
-    setState(() {
-      _isEmailValid = false;
-      _emailError = null; // Don't show error yet, validator will show it on submission
-    });
-    return;
-  }
-  
-  setState(() => _isCheckingEmail = true);
-  
-  try {
-    // Check if email is already registered
-    bool isRegistered = await _authService.isEmailRegistered(email);
+  Future<void> _checkEmailAvailability() async {
+    final email = _emailController.text.trim();
     
-    if (mounted) {
+    if (email.isEmpty) {
+      setState(() {
+        _isEmailValid = false;
+        _emailError = null;
+      });
+      return;
+    }
+    
+    // Use the comprehensive format validation
+    bool isFormatValid = ValidationUtils.isEmailFormatValid(email);
+    if (!isFormatValid) {
+      setState(() {
+        _isEmailValid = false;
+        _emailError = null; // Don't show error yet, validator will show it on submission
+      });
+      return;
+    }
+    
+    setState(() => _isCheckingEmail = true);
+    
+    try {
+      // Check if email is already registered
+      bool isRegistered = await _authService.isEmailRegistered(email);
+      
+      if (!mounted) return;
+      
       setState(() {
         _emailError = isRegistered ? 
             'This email is already registered. Please try logging in or use a different email.' : 
@@ -143,17 +150,17 @@ class _AccountProfilePageState extends State<AccountProfilePage> {
         _isEmailValid = !isRegistered && isFormatValid;  // Only valid if properly formatted AND not registered
         _isCheckingEmail = false;
       });
-    }
-  } catch (e) {
-    if (mounted) {
+    } catch (e) {
+      _logger.severe('Error checking email availability: $e');
+      
+      if (!mounted) return;
+      
       setState(() {
         _isEmailValid = false;
         _isCheckingEmail = false;
       });
     }
   }
-}
-
 
   @override
   Widget build(BuildContext context) {
@@ -168,10 +175,10 @@ class _AccountProfilePageState extends State<AccountProfilePage> {
               child: Row(
                 children: [
                   IconButton(
-                    icon: Icon(Icons.arrow_back_ios_new, size: 20),
+                    icon: const Icon(Icons.arrow_back_ios_new, size: 20),
                     onPressed: () => Navigator.pop(context),
                   ),
-                  Expanded(
+                  const Expanded(
                     child: Text(
                       'Create Your Profile',
                       style: TextStyle(
@@ -181,7 +188,7 @@ class _AccountProfilePageState extends State<AccountProfilePage> {
                       textAlign: TextAlign.center,
                     ),
                   ),
-                  SizedBox(width: 48),
+                  const SizedBox(width: 48),
                 ],
               ),
             ),
@@ -202,7 +209,7 @@ class _AccountProfilePageState extends State<AccountProfilePage> {
                             children: [
                               CircleAvatar(
                                 radius: 50,
-                                backgroundColor: Theme.of(context).primaryColor.withOpacity(0.1),
+                                backgroundColor: Theme.of(context).primaryColor.withAlpha(26), // Using withAlpha(26) instead of withOpacity(0.1)
                                 child: Icon(
                                   Icons.person_outline_rounded,
                                   size: 50,
@@ -213,12 +220,12 @@ class _AccountProfilePageState extends State<AccountProfilePage> {
                                 bottom: 0,
                                 right: 0,
                                 child: Container(
-                                  padding: EdgeInsets.all(4),
+                                  padding: const EdgeInsets.all(4),
                                   decoration: BoxDecoration(
                                     color: Theme.of(context).primaryColor,
                                     shape: BoxShape.circle,
                                   ),
-                                  child: Icon(
+                                  child: const Icon(
                                     Icons.add_a_photo_rounded,
                                     size: 20,
                                     color: Colors.white,
@@ -228,7 +235,7 @@ class _AccountProfilePageState extends State<AccountProfilePage> {
                             ],
                           ),
                         ),
-                        SizedBox(height: 32),
+                        const SizedBox(height: 32),
 
                         // Form Fields with improved validation
                         _buildTextField(
@@ -237,48 +244,48 @@ class _AccountProfilePageState extends State<AccountProfilePage> {
                           prefixIcon: Icons.person_outline_rounded,
                           validator: ValidationUtils.validateName,
                         ),
-                        SizedBox(height: 16),
+                        const SizedBox(height: 16),
 
                         // Email field with real-time availability check
-                      _buildTextField(
-  controller: _emailController,
-  label: 'Email',
-  prefixIcon: Icons.email_outlined,
-  keyboardType: TextInputType.emailAddress,
-  validator: ValidationUtils.validateEmail,
-  errorText: _emailError,
-  suffix: _isCheckingEmail 
-  ? SizedBox(
-      height: 16, 
-      width: 16, 
-      child: CircularProgressIndicator(strokeWidth: 2),
-    ) 
-  : _emailController.text.isNotEmpty && 
-    _isEmailValid && 
-    _emailError == null && 
-    ValidationUtils.isEmailFormatValid(_emailController.text.trim())
-    ? Icon(Icons.check_circle, color: Colors.green, size: 20)
-    : _emailController.text.isNotEmpty && 
-      (!_isEmailValid || _emailError != null || !ValidationUtils.isEmailFormatValid(_emailController.text.trim()))
-      ? Icon(Icons.error, color: Colors.red, size: 20)
-      : null,
-  onChanged: (value) {
-    // Clear previous validations
-    if (_emailError != null || _isEmailValid) {
-      setState(() {
-        _emailError = null;
-        _isEmailValid = false;  // Reset validation state when email changes
-      });
-    }
-    
-    // Debounce the check to avoid too many requests
-    if (_emailDebounce?.isActive ?? false) _emailDebounce!.cancel();
-    _emailDebounce = Timer(Duration(milliseconds: 800), () {
-      _checkEmailAvailability();
-    });
-  },
-),
-                        SizedBox(height: 16),
+                        _buildTextField(
+                          controller: _emailController,
+                          label: 'Email',
+                          prefixIcon: Icons.email_outlined,
+                          keyboardType: TextInputType.emailAddress,
+                          validator: ValidationUtils.validateEmail,
+                          errorText: _emailError,
+                          suffix: _isCheckingEmail 
+                            ? const SizedBox(
+                                height: 16, 
+                                width: 16, 
+                                child: CircularProgressIndicator(strokeWidth: 2),
+                              ) 
+                            : _emailController.text.isNotEmpty && 
+                              _isEmailValid && 
+                              _emailError == null && 
+                              ValidationUtils.isEmailFormatValid(_emailController.text.trim())
+                              ? const Icon(Icons.check_circle, color: Colors.green, size: 20)
+                              : _emailController.text.isNotEmpty && 
+                                (!_isEmailValid || _emailError != null || !ValidationUtils.isEmailFormatValid(_emailController.text.trim()))
+                                ? const Icon(Icons.error, color: Colors.red, size: 20)
+                                : null,
+                          onChanged: (value) {
+                            // Clear previous validations
+                            if (_emailError != null || _isEmailValid) {
+                              setState(() {
+                                _emailError = null;
+                                _isEmailValid = false;  // Reset validation state when email changes
+                              });
+                            }
+                            
+                            // Debounce the check to avoid too many requests
+                            if (_emailDebounce?.isActive ?? false) _emailDebounce!.cancel();
+                            _emailDebounce = Timer(const Duration(milliseconds: 800), () {
+                              _checkEmailAvailability();
+                            });
+                          },
+                        ),
+                        const SizedBox(height: 16),
 
                         _buildTextField(
                           controller: _passwordController,
@@ -324,7 +331,7 @@ class _AccountProfilePageState extends State<AccountProfilePage> {
                               ],
                             ),
                           ),
-                        SizedBox(height: 16),
+                        const SizedBox(height: 16),
 
                         _buildTextField(
                           controller: _confirmPasswordController,
@@ -350,18 +357,18 @@ class _AccountProfilePageState extends State<AccountProfilePage> {
                             return null;
                           },
                         ),
-                        SizedBox(height: 16),
+                        const SizedBox(height: 16),
 
                         // Date of Birth with improved validation
                         GestureDetector(
                           onTap: () async {
                             DateTime? pickedDate = await showDatePicker(
                               context: context,
-                              initialDate: DateTime.now().subtract(Duration(days: 365 * 18)), // Default to 18 years ago
+                              initialDate: DateTime.now().subtract(const Duration(days: 365 * 18)), // Default to 18 years ago
                               firstDate: DateTime(1900),
                               lastDate: DateTime.now(),
                             );
-                            if (pickedDate != null) {
+                            if (pickedDate != null && mounted) {
                               setState(() {
                                 _dateOfBirthController.text =
                                     "${pickedDate.toLocal()}".split(' ')[0];
@@ -377,14 +384,14 @@ class _AccountProfilePageState extends State<AccountProfilePage> {
                             ),
                           ),
                         ),
-                        SizedBox(height: 16),
+                        const SizedBox(height: 16),
 
                         // Gender Dropdown
                         _buildDropdownField(
                           value: _selectedGender,
                           label: 'Gender',
                           prefixIcon: Icons.person_outline_rounded,
-                          items: ['Male', 'Female', 'Other'],
+                          items: const ['Male', 'Female', 'Other'],
                           onChanged: (value) {
                             setState(() {
                               _selectedGender = value;
@@ -392,23 +399,23 @@ class _AccountProfilePageState extends State<AccountProfilePage> {
                           },
                           validator: (value) => value == null ? 'Required' : null,
                         ),
-                        SizedBox(height: 16),
+                        const SizedBox(height: 16),
 
                         // Role Dropdown
                         _buildDropdownField(
-  value: _selectedRole,
-  label: 'Role',
-  prefixIcon: Icons.work_outline_rounded,
-  items: ['Medical Professional', 'Student'],
-  onChanged: _isRolePreselected ? null : (value) {
-    setState(() {
-      _selectedRole = value;
-    });
-  },
-  validator: (value) => value == null ? 'Required' : null,
-  isPreselected: _isRolePreselected,
-),
-                        SizedBox(height: 16),
+                          value: _selectedRole,
+                          label: 'Role',
+                          prefixIcon: Icons.work_outline_rounded,
+                          items: const ['Medical Professional', 'Student'],
+                          onChanged: _isRolePreselected ? null : (value) {
+                            setState(() {
+                              _selectedRole = value;
+                            });
+                          },
+                          validator: (value) => value == null ? 'Required' : null,
+                          isPreselected: _isRolePreselected,
+                        ),
+                        const SizedBox(height: 16),
 
                         _buildTextField(
                           controller: _phoneNumberController,
@@ -417,7 +424,7 @@ class _AccountProfilePageState extends State<AccountProfilePage> {
                           keyboardType: TextInputType.phone,
                           validator: ValidationUtils.validatePhoneNumber,
                         ),
-                        SizedBox(height: 32),
+                        const SizedBox(height: 32),
 
                         // Submit Button
                         SizedBox(
@@ -434,7 +441,7 @@ class _AccountProfilePageState extends State<AccountProfilePage> {
                               ),
                             ),
                             child: _isLoading
-                                ? SizedBox(
+                                ? const SizedBox(
                                     width: 24,
                                     height: 24,
                                     child: CircularProgressIndicator(
@@ -442,7 +449,7 @@ class _AccountProfilePageState extends State<AccountProfilePage> {
                                       valueColor: AlwaysStoppedAnimation<Color>(Colors.white),
                                     ),
                                   )
-                                : Text(
+                                : const Text(
                                     'Create Account',
                                     style: TextStyle(
                                       fontSize: 16,
@@ -501,7 +508,7 @@ class _AccountProfilePageState extends State<AccountProfilePage> {
         ),
         errorBorder: OutlineInputBorder(
           borderRadius: BorderRadius.circular(12),
-          borderSide: BorderSide(color: Colors.red),
+          borderSide: const BorderSide(color: Colors.red),
         ),
         filled: true,
         fillColor: Colors.white,
@@ -513,56 +520,56 @@ class _AccountProfilePageState extends State<AccountProfilePage> {
 
   // Helper method to build consistent dropdown fields
   Widget _buildDropdownField({
-  required String? value,
-  required String label,
-  required IconData prefixIcon,
-  required List<String> items,
-  required void Function(String?)? onChanged,
-  required String? Function(String?)? validator,
-  bool isPreselected = false,  // New parameter to indicate if this field was pre-selected
-}) {
-  return DropdownButtonFormField<String>(
-    value: value,
-    autovalidateMode: AutovalidateMode.onUserInteraction,
-    decoration: InputDecoration(
-      labelText: label,
-      prefixIcon: Icon(prefixIcon, color: Colors.grey[600], size: 22),
-      border: OutlineInputBorder(
-        borderRadius: BorderRadius.circular(12),
-        borderSide: BorderSide(color: Colors.grey[300]!),
+    required String? value,
+    required String label,
+    required IconData prefixIcon,
+    required List<String> items,
+    required void Function(String?)? onChanged,
+    required String? Function(String?)? validator,
+    bool isPreselected = false,  // Parameter to indicate if this field was pre-selected
+  }) {
+    return DropdownButtonFormField<String>(
+      value: value,
+      autovalidateMode: AutovalidateMode.onUserInteraction,
+      decoration: InputDecoration(
+        labelText: label,
+        prefixIcon: Icon(prefixIcon, color: Colors.grey[600], size: 22),
+        border: OutlineInputBorder(
+          borderRadius: BorderRadius.circular(12),
+          borderSide: BorderSide(color: Colors.grey[300]!),
+        ),
+        enabledBorder: OutlineInputBorder(
+          borderRadius: BorderRadius.circular(12),
+          borderSide: BorderSide(color: isPreselected ? Theme.of(context).primaryColor : Colors.grey[300]!),
+        ),
+        focusedBorder: OutlineInputBorder(
+          borderRadius: BorderRadius.circular(12),
+          borderSide: BorderSide(color: Theme.of(context).primaryColor),
+        ),
+        errorBorder: OutlineInputBorder(
+          borderRadius: BorderRadius.circular(12),
+          borderSide: const BorderSide(color: Colors.red),
+        ),
+        filled: true,
+        fillColor: isPreselected ? Colors.grey[50] : Colors.white,
+        // Add a suffix icon to indicate it's preselected
+        suffixIcon: isPreselected 
+            ? const Tooltip(
+                message: 'Role pre-selected',
+                child: Icon(Icons.check_circle, color: Colors.green, size: 20),
+              ) 
+            : null,
       ),
-      enabledBorder: OutlineInputBorder(
-        borderRadius: BorderRadius.circular(12),
-        borderSide: BorderSide(color: isPreselected ? Theme.of(context).primaryColor : Colors.grey[300]!),
-      ),
-      focusedBorder: OutlineInputBorder(
-        borderRadius: BorderRadius.circular(12),
-        borderSide: BorderSide(color: Theme.of(context).primaryColor),
-      ),
-      errorBorder: OutlineInputBorder(
-        borderRadius: BorderRadius.circular(12),
-        borderSide: BorderSide(color: Colors.red),
-      ),
-      filled: true,
-      fillColor: isPreselected ? Colors.grey[50] : Colors.white,
-      // Add a suffix icon to indicate it's preselected
-      suffixIcon: isPreselected 
-          ? Tooltip(
-              message: 'Role pre-selected',
-              child: Icon(Icons.check_circle, color: Colors.green, size: 20),
-            ) 
-          : null,
-    ),
-    items: items.map((String item) {
-      return DropdownMenuItem(
-        value: item,
-        child: Text(item),
-      );
-    }).toList(),
-    onChanged: isPreselected ? null : onChanged,  // Disable dropdown if preselected
-    validator: validator,
-  );
-}
+      items: items.map((String item) {
+        return DropdownMenuItem(
+          value: item,
+          child: Text(item),
+        );
+      }).toList(),
+      onChanged: isPreselected ? null : onChanged,  // Disable dropdown if preselected
+      validator: validator,
+    );
+  }
 
   // Submit form logic with improved error handling
   void _submitForm() async {
@@ -588,6 +595,8 @@ class _AccountProfilePageState extends State<AccountProfilePage> {
       try {
         bool isRegistered = await _authService.isEmailRegistered(email);
         
+        if (!mounted) return;
+        
         if (isRegistered) {
           _showErrorMessage('This email is already registered. Please try logging in or use a different email.');
           setState(() => _isLoading = false);
@@ -597,6 +606,8 @@ class _AccountProfilePageState extends State<AccountProfilePage> {
         // Proceed with registration
         final user = await _authService.register(email, password);
 
+        if (!mounted) return;
+        
         if (user != null) {
           // Format phone number
           String formattedPhone = ValidationUtils.formatPhoneNumber(_phoneNumberController.text);
@@ -614,11 +625,10 @@ class _AccountProfilePageState extends State<AccountProfilePage> {
 
           await _firebaseService.saveUser(newUser);
 
+          if (!mounted) return;
+          
           _formKey.currentState!.reset();
           _showSuccessMessage('Account created successfully! Please verify your email.');
-
-          // Important: Check mounted before accessing context
-          if (!mounted) return;
 
           // Check if we need to return to murmur record
           final returnToMurmurRecord = widget.returnRoute == 'murmur_record';
@@ -637,6 +647,10 @@ class _AccountProfilePageState extends State<AccountProfilePage> {
           }
         }
       } on firebase_auth.FirebaseAuthException catch (e) {
+        _logger.severe('Firebase auth exception: ${e.code}');
+        
+        if (!mounted) return;
+        
         String errorMessage;
         
         switch (e.code) {
@@ -659,6 +673,8 @@ class _AccountProfilePageState extends State<AccountProfilePage> {
         _showErrorMessage(errorMessage);
       }
     } catch (e) {
+      _logger.severe('Unexpected error during registration: $e');
+      
       if (!mounted) return;
       _showErrorMessage('Registration failed. Please check your information and try again.');
     } finally {
@@ -674,7 +690,7 @@ class _AccountProfilePageState extends State<AccountProfilePage> {
         content: Text(message),
         backgroundColor: Colors.green,
         behavior: SnackBarBehavior.floating,
-        margin: EdgeInsets.all(16),
+        margin: const EdgeInsets.all(16),
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
       ),
     );
@@ -686,7 +702,7 @@ class _AccountProfilePageState extends State<AccountProfilePage> {
         content: Text(message),
         backgroundColor: Colors.red[400],
         behavior: SnackBarBehavior.floating,
-        margin: EdgeInsets.all(16),
+        margin: const EdgeInsets.all(16),
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
       ),
     );

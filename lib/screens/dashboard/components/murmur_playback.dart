@@ -7,14 +7,20 @@ import '../../registration/firebase_service.dart';
 import '../../../utils/navigation_service.dart';
 import '../../../utils/app_routes.dart';
 import '../../../widgets/back_button.dart';
+// Add a logging package import
+import 'package:logging/logging.dart' as logging;
+
+// Create a logger instance
+final _logger = logging.Logger('RecordingPlaybackScreen');
 
 class RecordingPlaybackScreen extends StatefulWidget {
   final String? preselectedPatientId;
 
-  const RecordingPlaybackScreen({Key? key, this.preselectedPatientId}) : super(key: key);
+  // Use super parameter syntax for key
+  const RecordingPlaybackScreen({super.key, this.preselectedPatientId});
 
   @override
-  _RecordingPlaybackScreenState createState() => _RecordingPlaybackScreenState();
+  State<RecordingPlaybackScreen> createState() => _RecordingPlaybackScreenState();
 }
 
 class _RecordingPlaybackScreenState extends State<RecordingPlaybackScreen> {
@@ -55,6 +61,9 @@ class _RecordingPlaybackScreenState extends State<RecordingPlaybackScreen> {
         medicalCardNumber,
       );
       
+      // Check if widget is still mounted before using setState
+      if (!mounted) return;
+      
       if (patient != null) {
         setState(() {
           _selectedPatient = patient;
@@ -64,24 +73,30 @@ class _RecordingPlaybackScreenState extends State<RecordingPlaybackScreen> {
         await _loadRecordings(patient);
       }
     } catch (e) {
+      _logger.severe("Failed to load patient: $e");
+      
+      if (!mounted) return;
       _showErrorSnackBar("Failed to load patient: $e");
     }
   }
 
   void _setupAudioPlayer() {
     _audioPlayer.onPlayerStateChanged.listen((state) {
+      if (!mounted) return;
       setState(() {
         _isPlaying = state == PlayerState.playing;
       });
     });
 
     _audioPlayer.onDurationChanged.listen((newDuration) {
+      if (!mounted) return;
       setState(() {
         _duration = newDuration;
       });
     });
 
     _audioPlayer.onPositionChanged.listen((newPosition) {
+      if (!mounted) return;
       setState(() {
         _position = newPosition;
       });
@@ -104,10 +119,15 @@ class _RecordingPlaybackScreenState extends State<RecordingPlaybackScreen> {
       final uid = authService.getCurrentUser()!.uid;
       final patients = await _firebaseService.getPatientsForUser(uid);
       
+      if (!mounted) return;
+      
       setState(() {
         _patients = patients;
       });
     } catch (e) {
+      _logger.severe("Failed to load patients: $e");
+      
+      if (!mounted) return;
       _showErrorSnackBar("Failed to load patients: $e");
     }
   }
@@ -121,10 +141,15 @@ class _RecordingPlaybackScreenState extends State<RecordingPlaybackScreen> {
         patient.medicalCardNumber
       );
       
+      if (!mounted) return;
+      
       setState(() {
         _recordings = recordings;
       });
     } catch (e) {
+      _logger.severe("Failed to load recordings: $e");
+      
+      if (!mounted) return;
       _showErrorSnackBar("Failed to load recordings: $e");
     }
   }
@@ -137,8 +162,8 @@ class _RecordingPlaybackScreenState extends State<RecordingPlaybackScreen> {
           shape: RoundedRectangleBorder(
             borderRadius: BorderRadius.circular(16),
           ),
-          title: Text('Login Required'),
-          content: Text('You need to be logged in to access recordings. Do you have an account?'),
+          title: const Text('Login Required'),
+          content: const Text('You need to be logged in to access recordings. Do you have an account?'),
           actions: [
             TextButton(
               onPressed: () => NavigationService.goBack(),
@@ -188,7 +213,7 @@ class _RecordingPlaybackScreenState extends State<RecordingPlaybackScreen> {
                   borderRadius: BorderRadius.circular(12),
                 ),
               ),
-              child: Text('Create New Account'),
+              child: const Text('Create New Account'),
             ),
           ],
         );
@@ -202,7 +227,7 @@ class _RecordingPlaybackScreenState extends State<RecordingPlaybackScreen> {
         content: Text(message),
         backgroundColor: Colors.red[400],
         behavior: SnackBarBehavior.fixed,
-        duration: Duration(seconds: 2),
+        duration: const Duration(seconds: 2),
       ),
     );
   }
@@ -225,7 +250,7 @@ class _RecordingPlaybackScreenState extends State<RecordingPlaybackScreen> {
         appBar: AppBar(
           title: Text(
             title,
-            style: TextStyle(
+            style: const TextStyle(
               fontWeight: FontWeight.w600,
               color: Colors.black87,
             ),
@@ -234,7 +259,7 @@ class _RecordingPlaybackScreenState extends State<RecordingPlaybackScreen> {
           backgroundColor: Colors.white,
           foregroundColor: Colors.black87,
           leading: IconButton(
-            icon: Icon(Icons.arrow_back_ios, size: 20),
+            icon: const Icon(Icons.arrow_back_ios, size: 20),
             onPressed: () => NavigationService.goBack(),
           ),
         ),
@@ -253,37 +278,37 @@ class _RecordingPlaybackScreenState extends State<RecordingPlaybackScreen> {
 
   Widget _buildPatientSelector() {
     if (_patients == null) {
-      return Center(child: CircularProgressIndicator());
+      return const Center(child: CircularProgressIndicator());
     }
 
     if (_patients!.isEmpty) {
-      return Center(
+      return const Center(
         child: Padding(
-          padding: const EdgeInsets.all(16.0),
+          padding: EdgeInsets.all(16.0),
           child: Text("No patients found"),
         ),
       );
     }
 
     return Card(
-      margin: EdgeInsets.all(16),
+      margin: const EdgeInsets.all(16),
       child: Padding(
-        padding: EdgeInsets.all(16),
+        padding: const EdgeInsets.all(16),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Text(
+            const Text(
               "Select Patient",
               style: TextStyle(
                 fontSize: 18,
                 fontWeight: FontWeight.bold,
               ),
             ),
-            SizedBox(height: 8),
+            const SizedBox(height: 8),
             DropdownButton<Patient>(
               isExpanded: true,
               value: _selectedPatient,
-              hint: Text("Choose a patient"),
+              hint: const Text("Choose a patient"),
               onChanged: (Patient? patient) {
                 setState(() {
                   _selectedPatient = patient;
@@ -309,13 +334,13 @@ class _RecordingPlaybackScreenState extends State<RecordingPlaybackScreen> {
 
   Widget _buildRecordingsList() {
     if (_recordings == null) {
-      return Center(child: CircularProgressIndicator());
+      return const Center(child: CircularProgressIndicator());
     }
 
     if (_recordings!.isEmpty) {
-      return Center(
+      return const Center(
         child: Padding(
-          padding: const EdgeInsets.all(16.0),
+          padding: EdgeInsets.all(16.0),
           child: Text("No recordings found for this patient"),
         ),
       );
@@ -324,12 +349,12 @@ class _RecordingPlaybackScreenState extends State<RecordingPlaybackScreen> {
     return Expanded(
       child: ListView.builder(
         itemCount: _recordings!.length,
-        padding: EdgeInsets.all(16),
+        padding: const EdgeInsets.all(16),
         itemBuilder: (context, index) {
           final recording = _recordings![index];
           return Card(
             child: ListTile(
-              leading: Icon(Icons.audio_file),
+              leading: const Icon(Icons.audio_file),
               title: Text("Recording ${index + 1}"),
               subtitle: Text(recording.timestamp.toString()),
               trailing: IconButton(
@@ -356,14 +381,14 @@ class _RecordingPlaybackScreenState extends State<RecordingPlaybackScreen> {
     }
 
     return Container(
-      padding: EdgeInsets.all(16),
+      padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
         color: Colors.white,
         boxShadow: [
           BoxShadow(
-            color: Colors.black.withOpacity(0.1),
+            color: Colors.black.withAlpha(26), // Using withAlpha(26) instead of withOpacity(0.1)
             blurRadius: 10,
-            offset: Offset(0, -5),
+            offset: const Offset(0, -5),
           ),
         ],
       ),
@@ -409,6 +434,8 @@ class _RecordingPlaybackScreenState extends State<RecordingPlaybackScreen> {
       }
       await _audioPlayer.play(UrlSource(recording.downloadUrl!));
     } catch (e) {
+      _logger.severe("Failed to play recording: $e");
+      if (!mounted) return;
       _showErrorSnackBar("Failed to play recording: $e");
     }
   }
