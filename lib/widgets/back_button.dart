@@ -10,16 +10,16 @@ class BackButtonHandler extends StatefulWidget {
   final Duration doubleTapTimeout;
 
   const BackButtonHandler({
-    Key? key,
+    super.key,
     required this.child,
     required this.strategy,
     this.snackBarMessage,
     this.onBackPressed,
     this.doubleTapTimeout = const Duration(seconds: 2),
-  }) : super(key: key);
+  });
 
   @override
-  _BackButtonHandlerState createState() => _BackButtonHandlerState();
+  State<BackButtonHandler> createState() => _BackButtonHandlerState();
 }
 
 class _BackButtonHandlerState extends State<BackButtonHandler> {
@@ -27,49 +27,64 @@ class _BackButtonHandlerState extends State<BackButtonHandler> {
 
   @override
   Widget build(BuildContext context) {
-    return WillPopScope(
-      onWillPop: () async {
-        switch (widget.strategy) {
-          case BackButtonHandlingStrategy.block:
-            // Simply block back navigation
-            return false;
-            
-          case BackButtonHandlingStrategy.doubleTapToExit:
+    switch (widget.strategy) {
+      case BackButtonHandlingStrategy.normal:
+        // Allow normal pop behavior.
+        return PopScope(
+          canPop: true,
+          child: widget.child,
+        );
+      case BackButtonHandlingStrategy.block:
+        // Block pop entirely.
+        return PopScope(
+          canPop: false,
+          child: widget.child,
+        );
+      case BackButtonHandlingStrategy.doubleTapToExit:
+        return PopScope(
+          canPop: false,
+          onPopInvokedWithResult: (bool didPop, Object? result) async {
             final now = DateTime.now();
-            if (_lastBackPressTime == null || 
+            if (_lastBackPressTime == null ||
                 now.difference(_lastBackPressTime!) > widget.doubleTapTimeout) {
               _lastBackPressTime = now;
               ScaffoldMessenger.of(context).showSnackBar(
                 SnackBar(
-                  content: Text(widget.snackBarMessage ?? 'Press back again to exit'),
+                  content:
+                      Text(widget.snackBarMessage ?? 'Press back again to exit'),
                   duration: widget.doubleTapTimeout,
                   behavior: SnackBarBehavior.floating,
-                  margin: EdgeInsets.all(16),
-                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                  margin: const EdgeInsets.all(16),
+                  shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(8)),
                 ),
               );
-              return false;
+            } else {
+              // On the second back tap within the timeout, manually pop the route.
+              Navigator.of(context).pop();
             }
-            return true;
-            
-          case BackButtonHandlingStrategy.exitApp:
-            SystemNavigator.pop(); // Exit the app
-            return false;
-            
-          case BackButtonHandlingStrategy.custom:
+          },
+          child: widget.child,
+        );
+      case BackButtonHandlingStrategy.exitApp:
+        return PopScope(
+          canPop: false,
+          onPopInvokedWithResult: (bool didPop, Object? result) async {
+            SystemNavigator.pop(); // Exit the app.
+          },
+          child: widget.child,
+        );
+      case BackButtonHandlingStrategy.custom:
+        return PopScope(
+          canPop: false,
+          onPopInvokedWithResult: (bool didPop, Object? result) async {
             if (widget.onBackPressed != null) {
               widget.onBackPressed!();
             }
-            return false;
-            
-          case BackButtonHandlingStrategy.normal:
-          default:
-            // Default behavior, allow pop
-            return true;
-        }
-      },
-      child: widget.child,
-    );
+          },
+          child: widget.child,
+        );
+    }
   }
 }
 
@@ -77,16 +92,12 @@ class _BackButtonHandlerState extends State<BackButtonHandler> {
 enum BackButtonHandlingStrategy {
   /// Allow normal back navigation
   normal,
-  
   /// Block back navigation completely
   block,
-  
   /// Require double tap to exit, with snackbar feedback
   doubleTapToExit,
-  
   /// Exit the application
   exitApp,
-  
   /// Execute custom code
   custom,
 }

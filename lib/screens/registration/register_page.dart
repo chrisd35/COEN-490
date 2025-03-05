@@ -1,14 +1,21 @@
 import 'package:flutter/material.dart';
-import 'auth_service.dart';
 import 'account_profile_page.dart';
+// Add a logging package import
+import 'package:logging/logging.dart' as logging;
+
+// Create a logger instance
+final _logger = logging.Logger('RegisterPage');
 
 class RegisterPage extends StatefulWidget {
+  // Use super parameter syntax for key
+  const RegisterPage({super.key});
+
   @override
-  _RegisterPageState createState() => _RegisterPageState();
+  State<RegisterPage> createState() => _RegisterPageState();
 }
 
 class _RegisterPageState extends State<RegisterPage> with SingleTickerProviderStateMixin {
-  final _authService = AuthService();
+  // Removed unused _authService field
   late AnimationController _animationController;
   late Animation<double> _fadeAnimation;
   late Animation<Offset> _slideAnimation;
@@ -20,7 +27,7 @@ class _RegisterPageState extends State<RegisterPage> with SingleTickerProviderSt
     // Initialize animations
     _animationController = AnimationController(
       vsync: this,
-      duration: Duration(milliseconds: 600),
+      duration: const Duration(milliseconds: 600),
     );
     
     _fadeAnimation = Tween<double>(begin: 0.0, end: 1.0).animate(
@@ -30,7 +37,7 @@ class _RegisterPageState extends State<RegisterPage> with SingleTickerProviderSt
       ),
     );
     
-    _slideAnimation = Tween<Offset>(begin: Offset(0, 0.1), end: Offset.zero).animate(
+    _slideAnimation = Tween<Offset>(begin: const Offset(0, 0.1), end: Offset.zero).animate(
       CurvedAnimation(
         parent: _animationController,
         curve: Curves.easeOutCubic,
@@ -45,6 +52,36 @@ class _RegisterPageState extends State<RegisterPage> with SingleTickerProviderSt
   void dispose() {
     _animationController.dispose();
     super.dispose();
+  }
+  
+  // Extract navigation to a separate method to avoid async gap issues
+  void _navigateToProfile(String role, Map<String, dynamic>? args) {
+    _logger.info('$role role selected');
+    Navigator.push(
+      context,
+      PageRouteBuilder(
+        pageBuilder: (context, animation, secondaryAnimation) => 
+          AccountProfilePage(
+            selectedRole: role,
+            returnRoute: args?['returnRoute'],
+            pendingAction: args?['pendingAction'],
+          ),
+        transitionsBuilder: (context, animation, secondaryAnimation, child) {
+          const begin = Offset(1.0, 0.0);
+          const end = Offset.zero;
+          const curve = Curves.easeInOut;
+          var tween = Tween(begin: begin, end: end).chain(CurveTween(curve: curve));
+          return SlideTransition(position: animation.drive(tween), child: child);
+        },
+        transitionDuration: const Duration(milliseconds: 300),
+      ),
+    ).then((result) {
+      // This code runs after the future completes, but in a sync context
+      if (mounted && result == true && args?['returnRoute'] == 'murmur_record') {
+        _logger.info('Registration successful, returning to murmur record');
+        Navigator.pop(context, true);
+      }
+    });
   }
 
   @override
@@ -63,10 +100,10 @@ class _RegisterPageState extends State<RegisterPage> with SingleTickerProviderSt
               child: Row(
                 children: [
                   IconButton(
-                    icon: Icon(Icons.arrow_back_ios_new, size: 20),
+                    icon: const Icon(Icons.arrow_back_ios_new, size: 20),
                     onPressed: () => Navigator.pop(context),
                   ),
-                  Expanded(
+                  const Expanded(
                     child: Text(
                       'Create Account',
                       style: TextStyle(
@@ -76,7 +113,7 @@ class _RegisterPageState extends State<RegisterPage> with SingleTickerProviderSt
                       textAlign: TextAlign.center,
                     ),
                   ),
-                  SizedBox(width: 48),
+                  const SizedBox(width: 48),
                 ],
               ),
             ),
@@ -118,34 +155,7 @@ class _RegisterPageState extends State<RegisterPage> with SingleTickerProviderSt
                             title: 'Medical Professional',
                             description: 'Healthcare providers, doctors, and medical staff',
                             icon: Icons.medical_services_rounded,
-                            onTap: () async {
-                              final result = await Navigator.push(
-                                context,
-                                PageRouteBuilder(
-                                  pageBuilder: (context, animation, secondaryAnimation) => 
-                                    AccountProfilePage(
-                                      selectedRole: 'Medical Professional',
-                                      returnRoute: args?['returnRoute'],
-                                      pendingAction: args?['pendingAction'],
-                                    ),
-                                  transitionsBuilder: (context, animation, secondaryAnimation, child) {
-                                    const begin = Offset(1.0, 0.0);
-                                    const end = Offset.zero;
-                                    const curve = Curves.easeInOut;
-                                    var tween = Tween(begin: begin, end: end).chain(CurveTween(curve: curve));
-                                    return SlideTransition(position: animation.drive(tween), child: child);
-                                  },
-                                  transitionDuration: Duration(milliseconds: 300),
-                                ),
-                              );
-                              
-                              // If registration was successful and we're returning to murmur record
-                              if (result == true && args?['returnRoute'] == 'murmur_record') {
-                                if (context.mounted) {
-                                  Navigator.pop(context, true);  // Return success to MurmurRecord
-                                }
-                              }
-                            },
+                            onTap: () => _navigateToProfile('Medical Professional', args),
                           ),
                           const SizedBox(height: 16),
 
@@ -154,32 +164,7 @@ class _RegisterPageState extends State<RegisterPage> with SingleTickerProviderSt
                             title: 'Student',
                             description: 'Medical students and healthcare learners',
                             icon: Icons.school_rounded,
-                            onTap: () async {
-                              final result = await Navigator.push(
-                                context,
-                                PageRouteBuilder(
-                                  pageBuilder: (context, animation, secondaryAnimation) => 
-                                    AccountProfilePage(
-                                      selectedRole: 'Student',
-                                      returnRoute: args?['returnRoute'],
-                                      pendingAction: args?['pendingAction'],
-                                    ),
-                                  transitionsBuilder: (context, animation, secondaryAnimation, child) {
-                                    const begin = Offset(1.0, 0.0);
-                                    const end = Offset.zero;
-                                    const curve = Curves.easeInOut;
-                                    var tween = Tween(begin: begin, end: end).chain(CurveTween(curve: curve));
-                                    return SlideTransition(position: animation.drive(tween), child: child);
-                                  },
-                                  transitionDuration: Duration(milliseconds: 300),
-                                ),
-                              );
-                              
-                              // If registration was successful and we're returning to murmur record
-                              if (result == true && args?['returnRoute'] == 'murmur_record') {
-                                Navigator.pop(context, true);  // Pop RegisterPage with success
-                              }
-                            },
+                            onTap: () => _navigateToProfile('Student', args),
                           ),
                         ],
                       ),
@@ -203,6 +188,7 @@ class _RoleCard extends StatelessWidget {
   final VoidCallback onTap;
 
   const _RoleCard({
+    // No need to add key parameter for private widgets
     required this.title,
     required this.description,
     required this.icon,
@@ -213,13 +199,13 @@ class _RoleCard extends StatelessWidget {
   Widget build(BuildContext context) {
     return TweenAnimationBuilder<double>(
       tween: Tween<double>(begin: 0.95, end: 1.0),
-      duration: Duration(milliseconds: 200),
+      duration: const Duration(milliseconds: 200),
       builder: (context, scale, child) {
         return Transform.scale(
           scale: scale,
           child: Card(
             elevation: 2,
-            shadowColor: Colors.black.withOpacity(0.1),
+            shadowColor: Colors.black.withAlpha(26), // Using withAlpha(26) instead of withOpacity(0.1)
             shape: RoundedRectangleBorder(
               borderRadius: BorderRadius.circular(16),
               side: BorderSide(color: Colors.grey[200]!),
@@ -227,16 +213,16 @@ class _RoleCard extends StatelessWidget {
             child: InkWell(
               onTap: onTap,
               borderRadius: BorderRadius.circular(16),
-              splashColor: Theme.of(context).primaryColor.withOpacity(0.1),
-              highlightColor: Theme.of(context).primaryColor.withOpacity(0.05),
+              splashColor: Theme.of(context).primaryColor.withAlpha(26), // Using withAlpha(26) instead of withOpacity(0.1)
+              highlightColor: Theme.of(context).primaryColor.withAlpha(13), // Using withAlpha(13) instead of withOpacity(0.05)
               child: Padding(
                 padding: const EdgeInsets.all(20),
                 child: Row(
                   children: [
                     Container(
-                      padding: EdgeInsets.all(12),
+                      padding: const EdgeInsets.all(12),
                       decoration: BoxDecoration(
-                        color: Theme.of(context).primaryColor.withOpacity(0.1),
+                        color: Theme.of(context).primaryColor.withAlpha(26), // Using withAlpha(26) instead of withOpacity(0.1)
                         borderRadius: BorderRadius.circular(12),
                       ),
                       child: Icon(
@@ -252,7 +238,7 @@ class _RoleCard extends StatelessWidget {
                         children: [
                           Text(
                             title,
-                            style: TextStyle(
+                            style: const TextStyle(
                               fontSize: 18,
                               fontWeight: FontWeight.w600,
                               color: Colors.black87,

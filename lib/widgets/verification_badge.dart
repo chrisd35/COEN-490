@@ -4,20 +4,21 @@ class VerificationBadge extends StatelessWidget {
   final bool isVerified;
   final VoidCallback? onTapResend;
 
+  // Use super parameter syntax for key
   const VerificationBadge({
-    Key? key,
+    super.key,
     required this.isVerified,
     this.onTapResend,
-  }) : super(key: key);
+  });
 
   @override
   Widget build(BuildContext context) {
     return Container(
-      padding: EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
       decoration: BoxDecoration(
         color: isVerified 
-            ? Colors.green.withOpacity(0.1) 
-            : Colors.orange.withOpacity(0.1),
+            ? Colors.green.withAlpha(26) // Using withAlpha(26) instead of withOpacity(0.1)
+            : Colors.orange.withAlpha(26), // Using withAlpha(26) instead of withOpacity(0.1)
         borderRadius: BorderRadius.circular(16),
         border: Border.all(
           color: isVerified ? Colors.green : Colors.orange,
@@ -32,7 +33,7 @@ class VerificationBadge extends StatelessWidget {
             size: 16,
             color: isVerified ? Colors.green : Colors.orange,
           ),
-          SizedBox(width: 6),
+          const SizedBox(width: 6),
           Text(
             isVerified ? 'Verified' : 'Unverified',
             style: TextStyle(
@@ -42,10 +43,10 @@ class VerificationBadge extends StatelessWidget {
             ),
           ),
           if (!isVerified && onTapResend != null) ...[
-            SizedBox(width: 8),
+            const SizedBox(width: 8),
             GestureDetector(
               onTap: onTapResend,
-              child: Text(
+              child: const Text(
                 'Resend',
                 style: TextStyle(
                   fontSize: 12,

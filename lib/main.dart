@@ -6,6 +6,11 @@ import 'utils/ble_manager.dart';
 import 'screens/registration/auth_service.dart';  
 import 'utils/navigation_service.dart';
 import 'utils/app_routes.dart';
+// Add a logging package import
+import 'package:logging/logging.dart' as logging;
+
+// Create a logger instance
+final _logger = logging.Logger('Navigation');
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -24,12 +29,15 @@ void main() async {
           create: (_) => AuthService(),
         ),
       ],
-      child: MyApp(),
+      child: const MyApp(),
     ),
   );
 }
 
 class MyApp extends StatelessWidget {
+  // Add key parameter using super
+  const MyApp({super.key});
+  
   @override
   Widget build(BuildContext context) {
     return MaterialApp(
@@ -38,7 +46,7 @@ class MyApp extends StatelessWidget {
         primarySwatch: Colors.blue,
         scaffoldBackgroundColor: Colors.grey[50],
         fontFamily: 'Poppins',
-        appBarTheme: AppBarTheme(
+        appBarTheme: const AppBarTheme(
           backgroundColor: Colors.white,
           foregroundColor: Colors.black87,
           elevation: 0,
@@ -48,10 +56,10 @@ class MyApp extends StatelessWidget {
             backgroundColor: Colors.blue,
             foregroundColor: Colors.white,
             elevation: 0,
-            textStyle: TextStyle(
+            textStyle: const TextStyle(
               fontWeight: FontWeight.bold,
             ),
-            padding: EdgeInsets.symmetric(vertical: 16),
+            padding: const EdgeInsets.symmetric(vertical: 16),
             shape: RoundedRectangleBorder(
               borderRadius: BorderRadius.circular(12),
             ),
@@ -85,25 +93,25 @@ class MyApp extends StatelessWidget {
 class _NavigationHistoryObserver extends NavigatorObserver {
   @override
   void didPush(Route<dynamic> route, Route<dynamic>? previousRoute) {
-    print('NAVIGATION: Pushed ${route.settings.name} (from ${previousRoute?.settings.name})');
+    _logger.info('Pushed ${route.settings.name} (from ${previousRoute?.settings.name})');
     super.didPush(route, previousRoute);
   }
 
   @override
   void didPop(Route<dynamic> route, Route<dynamic>? previousRoute) {
-    print('NAVIGATION: Popped ${route.settings.name} (back to ${previousRoute?.settings.name})');
+    _logger.info('Popped ${route.settings.name} (back to ${previousRoute?.settings.name})');
     super.didPop(route, previousRoute);
   }
 
   @override
   void didReplace({Route<dynamic>? newRoute, Route<dynamic>? oldRoute}) {
-    print('NAVIGATION: Replaced ${oldRoute?.settings.name} with ${newRoute?.settings.name}');
+    _logger.info('Replaced ${oldRoute?.settings.name} with ${newRoute?.settings.name}');
     super.didReplace(newRoute: newRoute, oldRoute: oldRoute);
   }
 
   @override
   void didRemove(Route<dynamic> route, Route<dynamic>? previousRoute) {
-    print('NAVIGATION: Removed ${route.settings.name}');
+    _logger.info('Removed ${route.settings.name}');
     super.didRemove(route, previousRoute);
   }
 }

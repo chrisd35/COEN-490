@@ -1,6 +1,10 @@
 // No special imports needed for basic validation utilities
-
 import 'package:coen_490/screens/registration/firebase_service.dart';
+// Add a logging package import
+import 'package:logging/logging.dart' as logging;
+
+// Create a logger instance
+final _logger = logging.Logger('ValidationUtils');
 
 class ValidationUtils {
   // Email validation with regex
@@ -85,7 +89,7 @@ class ValidationUtils {
       }
       
       // Check if person is too old (e.g., > 120 years)
-      final oneHundredTwentyYearsAgo = DateTime.now().subtract(Duration(days: 365 * 120));
+      final oneHundredTwentyYearsAgo = DateTime.now().subtract(const Duration(days: 365 * 120));
       if (parsedDate.isBefore(oneHundredTwentyYearsAgo)) {
         return 'Please enter a valid date of birth';
       }
@@ -141,34 +145,36 @@ class ValidationUtils {
     
     return phone; // Return original if can't format
   }
-  static Future<String?> validateEmailAvailability(String email) async {
-  // First do basic validation
-  String? basicValidation = validateEmail(email);
-  if (basicValidation != null) {
-    return basicValidation;
-  }
   
-  // Then check availability
-  try {
-    final FirebaseService firebaseService = FirebaseService();
-    bool isInUse = await firebaseService.isEmailInUse(email);
-    
-    if (isInUse) {
-      return 'This email is already registered. Please use a different email or try logging in.';
+  static Future<String?> validateEmailAvailability(String email) async {
+    // First do basic validation
+    String? basicValidation = validateEmail(email);
+    if (basicValidation != null) {
+      return basicValidation;
     }
     
-    return null;
-  } catch (e) {
-    print('Error validating email availability: $e');
-    return null; // On error, allow the form to proceed
+    // Then check availability
+    try {
+      final FirebaseService firebaseService = FirebaseService();
+      bool isInUse = await firebaseService.isEmailInUse(email);
+      
+      if (isInUse) {
+        return 'This email is already registered. Please use a different email or try logging in.';
+      }
+      
+      return null;
+    } catch (e) {
+      _logger.warning('Error validating email availability: $e');
+      return null; // On error, allow the form to proceed
+    }
   }
-}
-static bool isEmailFormatValid(String email) {
-  // More comprehensive RFC 5322 compliant email regex
-  final emailRegex = RegExp(
-    r'^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$'
-  );
   
-  return emailRegex.hasMatch(email);
-}
+  static bool isEmailFormatValid(String email) {
+    // More comprehensive RFC 5322 compliant email regex
+    final emailRegex = RegExp(
+      r'^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$'
+    );
+    
+    return emailRegex.hasMatch(email);
+  }
 }

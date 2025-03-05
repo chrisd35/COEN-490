@@ -4,17 +4,23 @@ import '../registration/auth_service.dart';
 import '../../utils/navigation_service.dart';
 import '../../utils/app_routes.dart';
 import '../../widgets/back_button.dart';
+// Add a logging package import
+import 'package:logging/logging.dart' as logging;
+
+// Create a logger instance
+final _logger = logging.Logger('EmailVerificationScreen');
 
 class EmailVerificationScreen extends StatefulWidget {
   final String email;
 
+  // Use super parameter syntax for key
   const EmailVerificationScreen({
-    Key? key,
+    super.key,
     required this.email,
-  }) : super(key: key);
+  });
 
   @override
-  _EmailVerificationScreenState createState() => _EmailVerificationScreenState();
+  State<EmailVerificationScreen> createState() => _EmailVerificationScreenState();
 }
 
 class _EmailVerificationScreenState extends State<EmailVerificationScreen> {
@@ -65,12 +71,16 @@ class _EmailVerificationScreenState extends State<EmailVerificationScreen> {
       if (isVerified) {
         _timer?.cancel();
         // Navigate to dashboard after verification
-        Future.delayed(Duration(seconds: 2), () {
+        // Check if widget is still mounted before using a delayed function
+        if (!mounted) return;
+        
+        Future.delayed(const Duration(seconds: 2), () {
+          if (!mounted) return;
           NavigationService.navigateToAndRemoveUntil(AppRoutes.dashboard);
         });
       }
     } catch (e) {
-      print('Error checking verification status: $e');
+      _logger.severe('Error checking verification status: $e');
     }
   }
 
@@ -84,12 +94,20 @@ class _EmailVerificationScreenState extends State<EmailVerificationScreen> {
 
     try {
       await _authService.sendEmailVerification();
+      
+      if (!mounted) return;
+      
       _showSnackBar('Verification email sent to ${widget.email}');
       
       // Start cooldown timer
       _cooldownTimer = Timer.periodic(
         const Duration(seconds: 1),
         (timer) {
+          if (!mounted) {
+            timer.cancel();
+            return;
+          }
+          
           if (_resendCooldown > 0) {
             setState(() {
               _resendCooldown--;
@@ -103,6 +121,10 @@ class _EmailVerificationScreenState extends State<EmailVerificationScreen> {
         },
       );
     } catch (e) {
+      _logger.severe('Error sending verification email: $e');
+      
+      if (!mounted) return;
+      
       setState(() {
         _canResendEmail = true;
       });
@@ -114,7 +136,7 @@ class _EmailVerificationScreenState extends State<EmailVerificationScreen> {
     ScaffoldMessenger.of(context).showSnackBar(
       SnackBar(
         content: Text(message),
-        duration: Duration(seconds: 4),
+        duration: const Duration(seconds: 4),
         behavior: SnackBarBehavior.floating,
         shape: RoundedRectangleBorder(
           borderRadius: BorderRadius.circular(10),
@@ -129,7 +151,7 @@ class _EmailVerificationScreenState extends State<EmailVerificationScreen> {
       strategy: BackButtonHandlingStrategy.block,
       child: Scaffold(
         appBar: AppBar(
-          title: Text('Email Verification'),
+          title: const Text('Email Verification'),
           automaticallyImplyLeading: false, // Disable back button
         ),
         body: Padding(
@@ -143,18 +165,18 @@ class _EmailVerificationScreenState extends State<EmailVerificationScreen> {
                 size: 80,
                 color: _isVerified ? Colors.green : Theme.of(context).primaryColor,
               ),
-              SizedBox(height: 24),
+              const SizedBox(height: 24),
               Text(
                 _isVerified
                     ? 'Email Verified!'
                     : 'Verify Your Email',
-                style: TextStyle(
+                style: const TextStyle(
                   fontSize: 24,
                   fontWeight: FontWeight.bold,
                 ),
                 textAlign: TextAlign.center,
               ),
-              SizedBox(height: 16),
+              const SizedBox(height: 16),
               Text(
                 _isVerified
                     ? 'Your email has been successfully verified. Redirecting you to the dashboard...'
@@ -165,7 +187,7 @@ class _EmailVerificationScreenState extends State<EmailVerificationScreen> {
                 ),
                 textAlign: TextAlign.center,
               ),
-              SizedBox(height: 32),
+              const SizedBox(height: 32),
               if (!_isVerified) ...[
                 Text(
                   'Didn\'t receive the email? Check your spam folder or click below to resend.',
@@ -175,11 +197,11 @@ class _EmailVerificationScreenState extends State<EmailVerificationScreen> {
                   ),
                   textAlign: TextAlign.center,
                 ),
-                SizedBox(height: 24),
+                const SizedBox(height: 24),
                 ElevatedButton(
                   onPressed: _canResendEmail ? _resendVerificationEmail : null,
                   style: ElevatedButton.styleFrom(
-                    padding: EdgeInsets.symmetric(horizontal: 32, vertical: 12),
+                    padding: const EdgeInsets.symmetric(horizontal: 32, vertical: 12),
                     shape: RoundedRectangleBorder(
                       borderRadius: BorderRadius.circular(8),
                     ),
@@ -188,16 +210,16 @@ class _EmailVerificationScreenState extends State<EmailVerificationScreen> {
                     _canResendEmail
                         ? 'Resend Verification Email'
                         : 'Resend in $_resendCooldown seconds',
-                    style: TextStyle(fontSize: 16),
+                    style: const TextStyle(fontSize: 16),
                   ),
                 ),
-                SizedBox(height: 16),
+                const SizedBox(height: 16),
                 TextButton(
                   onPressed: () {
                     _authService.logout();
                     NavigationService.navigateToAndRemoveUntil(AppRoutes.auth);
                   },
-                  child: Text('Cancel and Return to Login'),
+                  child: const Text('Cancel and Return to Login'),
                 ),
               ],
             ],

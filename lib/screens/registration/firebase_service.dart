@@ -1,9 +1,11 @@
-import 'package:firebase_auth/firebase_auth.dart' as firebase_auth;
 import 'package:firebase_core/firebase_core.dart';
 import 'package:firebase_database/firebase_database.dart';
 import 'package:firebase_storage/firebase_storage.dart';
 import 'dart:typed_data';
 import '/utils/models.dart';
+import 'package:logging/logging.dart' as logging;
+
+final _logger = logging.Logger('FirebaseService');
 
 class FirebaseService {
   final DatabaseReference _database;
@@ -25,9 +27,9 @@ class FirebaseService {
           .child('users')
           .child(user.uid)
           .set(user.toMap());
-      print('User saved successfully!');
+      _logger.info('User saved successfully!');
     } catch (e) {
-      print('Error saving user: $e');
+      _logger.severe('Error saving user: $e');
       rethrow;
     }
   }
@@ -42,11 +44,11 @@ class FirebaseService {
       if (snapshot.exists && snapshot.value != null) {
         return User.fromMap(snapshot.value as Map<dynamic, dynamic>);
       } else {
-        print('User not found');
+        _logger.warning('User not found');
         return null;
       }
     } catch (e) {
-      print('Error fetching user: $e');
+      _logger.severe('Error fetching user: $e');
       return null;
     }
   }
@@ -88,7 +90,7 @@ Future<void> savePatient(String uid, Patient patient) async {
     } catch (e) {
       // If the error is not our custom exception for duplication, rethrow it
       if (e is! Exception || e.toString() != 'Exception: A patient with this medical card number already exists') {
-        print('Error checking for duplicate: $e');
+        _logger.warning('Error checking for duplicate: $e');
       } else {
         rethrow; // Rethrow our duplication error
       }
@@ -102,9 +104,9 @@ Future<void> savePatient(String uid, Patient patient) async {
         .child(sanitizedMedicalCard)
         .set(patient.toMap());
     
-    print('Patient saved successfully!');
+    _logger.info('Patient saved successfully!');
   } catch (e) {
-    print('Error saving patient: $e');
+    _logger.severe('Error saving patient: $e');
     rethrow;
   }
 }
@@ -122,36 +124,30 @@ Future<void> savePatient(String uid, Patient patient) async {
       if (snapshot.exists && snapshot.value != null) {
         return Patient.fromMap(snapshot.value as Map<dynamic, dynamic>);
       } else {
-        print('Patient not found');
+        _logger.warning('Patient not found');
         return null;
       }
     } catch (e) {
-      print('Error fetching patient: $e');
+      _logger.severe('Error fetching patient: $e');
       return null;
     }
   }
 
   Future<bool> isEmailInUse(String email) async {
   try {
-    // First check with Firebase Auth directly
-    // This will throw an error if the email exists
-    try {
-      final methods = await firebase_auth.FirebaseAuth.instance.fetchSignInMethodsForEmail(email);
-      return methods.isNotEmpty;
-    } catch (e) {
-      // Ignore specific errors and continue checking database
-      print('Error checking with Firebase Auth: $e');
-    }
+    // Check only with the database approach to avoid using deprecated method
+    // This approach won't have the same security guarantees as Firebase Auth's checks
+    // but avoids using the deprecated fetchSignInMethodsForEmail method
     
     // Additional check in your database for extra safety
-    // This is helpful if you store user data in your own database
     final snapshot = await _database.child('users').get();
     
     if (snapshot.exists && snapshot.value != null) {
       final users = snapshot.value as Map<dynamic, dynamic>;
       
       // Search through all users to find matching email
-      for (var userData in users.values) {
+      for (var entry in users.entries) {
+        var userData = entry.value;
         if (userData is Map && 
             userData.containsKey('email') && 
             userData['email'] == email) {
@@ -162,7 +158,7 @@ Future<void> savePatient(String uid, Patient patient) async {
     
     return false;
   } catch (e) {
-    print('Error checking if email is in use: $e');
+    _logger.severe('Error checking if email is in use: $e');
     return false; // Return false on error to avoid blocking legitimate registrations
   }
 }
@@ -208,9 +204,9 @@ Future<void> savePatient(String uid, Patient patient) async {
         .child(sanitizedMedicalCard)
         .update(patient.toMap());
     
-    print('Patient updated successfully!');
+    _logger.info('Patient updated successfully!');
   } catch (e) {
-    print('Error updating patient: $e');
+    _logger.severe('Error updating patient: $e');
     rethrow;
   }
 }
@@ -231,24 +227,24 @@ Future<void> savePatient(String uid, Patient patient) async {
     List<Patient> patients = [];
     
     try {
-      patientsMap.entries.forEach((entry) {
+      for (var entry in patientsMap.entries) {
         try {
           Patient patient = Patient.fromMap(entry.value as Map<dynamic, dynamic>);
           patients.add(patient);
         } catch (e) {
           // Log error for this entry but continue processing other entries
-          print('Error parsing patient data: $e');
+          _logger.warning('Error parsing patient data: $e');
         }
-      });
+      }
     } catch (e) {
-      print('Error iterating through patients: $e');
+      _logger.severe('Error iterating through patients: $e');
     }
 
     // Sort by full name (case insensitive)
     patients.sort((a, b) => a.fullName.toLowerCase().compareTo(b.fullName.toLowerCase()));
     return patients;
   } catch (e) {
-    print('Error fetching patients: $e');
+    _logger.severe('Error fetching patients: $e');
     rethrow;
   }
 }
@@ -266,12 +262,11 @@ Future<bool> isMedicareNumberRegistered(String uid, String medicareNumber) async
     
     return snapshot.exists && snapshot.value != null;
   } catch (e) {
-    print('Error checking Medicare number: $e');
+    _logger.severe('Error checking Medicare number: $e');
     return false; // Assume not registered on error
   }
 }
 
-// Method to delete a patient record with confirmation requirement
 Future<void> deletePatient(String uid, String medicareNumber, String confirmationText) async {
   try {
     // Require exact confirmation text for deletion
@@ -301,9 +296,9 @@ Future<void> deletePatient(String uid, String medicareNumber, String confirmatio
         .child(sanitizedMedicalCard)
         .remove();
     
-    print('Patient deleted successfully!');
+    _logger.info('Patient deleted successfully!');
   } catch (e) {
-    print('Error deleting patient: $e');
+    _logger.severe('Error deleting patient: $e');
     rethrow;
   }
 }
@@ -312,14 +307,14 @@ Future<void> deletePatient(String uid, String medicareNumber, String confirmatio
     int expectedSamples = sampleRate * duration;
     int expectedBytes = expectedSamples * 2;
     
-    print("Audio Debug Info:");
-    print("Sample Rate: $sampleRate Hz");
-    print("Duration: $duration seconds");
-    print("Expected samples: $expectedSamples");
-    print("Expected bytes: $expectedBytes");
-    print("Actual bytes received: ${audioData.length}");
-    print("Actual samples (bytes/2): ${audioData.length ~/ 2}");
-    print("Calculated duration: ${audioData.length / (2 * sampleRate)} seconds");
+    _logger.info("Audio Debug Info:");
+    _logger.info("Sample Rate: $sampleRate Hz");
+    _logger.info("Duration: $duration seconds");
+    _logger.info("Expected samples: $expectedSamples");
+    _logger.info("Expected bytes: $expectedBytes");
+    _logger.info("Actual bytes received: ${audioData.length}");
+    _logger.info("Actual samples (bytes/2): ${audioData.length ~/ 2}");
+    _logger.info("Calculated duration: ${audioData.length / (2 * sampleRate)} seconds");
   }
 
   Future<void> saveRecording(
@@ -339,13 +334,13 @@ Future<void> deletePatient(String uid, String medicareNumber, String confirmatio
       
       List<int> processedAudioData = audioData;
       if (audioData.length != expectedBytes) {
-        print("Warning: Audio data length mismatch");
-        print("Expected: $expectedBytes bytes");
-        print("Actual: ${audioData.length} bytes");
+        _logger.warning("Warning: Audio data length mismatch");
+        _logger.warning("Expected: $expectedBytes bytes");
+        _logger.warning("Actual: ${audioData.length} bytes");
         
         if (audioData.length > expectedBytes) {
           processedAudioData = audioData.sublist(0, expectedBytes);
-          print("Trimmed audio data to expected length");
+          _logger.info("Trimmed audio data to expected length");
         }
       }
 
@@ -399,9 +394,9 @@ Future<void> deletePatient(String uid, String medicareNumber, String confirmatio
             'peakAmplitude': metadata['peakAmplitude'],
           });
 
-      print("Recording saved successfully with correct duration");
+      _logger.info("Recording saved successfully with correct duration");
     } catch (e) {
-      print('Error saving recording: $e');
+      _logger.severe('Error saving recording: $e');
       rethrow;
     }
   }
@@ -467,7 +462,7 @@ Future<void> deletePatient(String uid, String medicareNumber, String confirmatio
           recording.downloadUrl = downloadUrl;
           recordings.add(recording);
         } catch (e) {
-          print('Error getting download URL for recording ${recording.filename}: $e');
+          _logger.warning('Error getting download URL for recording ${recording.filename}: $e');
           continue;
         }
       }
@@ -475,188 +470,189 @@ Future<void> deletePatient(String uid, String medicareNumber, String confirmatio
       recordings.sort((a, b) => b.timestamp.compareTo(a.timestamp));
       return recordings;
     } catch (e) {
-      print('Error fetching recordings: $e');
+      _logger.severe('Error fetching recordings: $e');
       rethrow;
     }
   }
-   Future<void> savePulseOxSession(
-  String uid,
-  String medicalCardNumber,
-  List<Map<String, dynamic>> sessionReadings,
-  Map<String, double> averages,
-) async {
-  try {
-    String sanitizedMedicalCard = medicalCardNumber.replaceAll('/', '_');
-    
-    // Ensure readings are in the correct format
-    List<Map<String, dynamic>> formattedReadings = sessionReadings.map((reading) {
-      return {
-        'heartRate': reading['heartRate'],
-        'spO2': reading['spO2'],
-        'temperature': reading['temperature'],
-        'timestamp': reading['timestamp'],
-      };
-    }).toList();
-    
-    // Save session data
-    await _database
-        .child('users')
-        .child(uid)
-        .child('patients')
-        .child(sanitizedMedicalCard)
-        .child('pulseOxSessions')
-        .push()
-        .set({
-          'timestamp': DateTime.now().toIso8601String(),
-          'averages': {
-            'heartRate': averages['heartRate'] ?? 0.0,
-            'spO2': averages['spO2'] ?? 0.0,
-            'temperature': averages['temperature'] ?? 0.0,
-          },
-          'readings': formattedReadings,
-          'readingCount': formattedReadings.length,
-        });
 
-    print('PulseOx session saved successfully');
-  } catch (e) {
-    print('Error saving PulseOx session: $e');
-    rethrow;
-  }
-}
+  Future<void> savePulseOxSession(
+    String uid,
+    String medicalCardNumber,
+    List<Map<String, dynamic>> sessionReadings,
+    Map<String, double> averages,
+  ) async {
+    try {
+      String sanitizedMedicalCard = medicalCardNumber.replaceAll('/', '_');
+      
+      // Ensure readings are in the correct format
+      List<Map<String, dynamic>> formattedReadings = sessionReadings.map((reading) {
+        return {
+          'heartRate': reading['heartRate'],
+          'spO2': reading['spO2'],
+          'temperature': reading['temperature'],
+          'timestamp': reading['timestamp'],
+        };
+      }).toList();
+      
+      // Save session data
+      await _database
+          .child('users')
+          .child(uid)
+          .child('patients')
+          .child(sanitizedMedicalCard)
+          .child('pulseOxSessions')
+          .push()
+          .set({
+            'timestamp': DateTime.now().toIso8601String(),
+            'averages': {
+              'heartRate': averages['heartRate'] ?? 0.0,
+              'spO2': averages['spO2'] ?? 0.0,
+              'temperature': averages['temperature'] ?? 0.0,
+            },
+            'readings': formattedReadings,
+            'readingCount': formattedReadings.length,
+          });
 
-Future<List<PulseOxSession>> getPulseOxSessions(
-  String uid,
-  String medicalCardNumber,
-) async {
-  try {
-    String sanitizedMedicalCard = medicalCardNumber.replaceAll('/', '_');
-    
-    DataSnapshot snapshot = await _database
-        .child('users')
-        .child(uid)
-        .child('patients')
-        .child(sanitizedMedicalCard)
-        .child('pulseOxSessions')
-        .get();
-
-    if (!snapshot.exists || snapshot.value == null) {
-      return [];
+      _logger.info('PulseOx session saved successfully');
+    } catch (e) {
+      _logger.severe('Error saving PulseOx session: $e');
+      rethrow;
     }
+  }
 
-    Map<dynamic, dynamic> sessionsMap = snapshot.value as Map<dynamic, dynamic>;
-    List<PulseOxSession> sessions = [];
+  Future<List<PulseOxSession>> getPulseOxSessions(
+    String uid,
+    String medicalCardNumber,
+  ) async {
+    try {
+      String sanitizedMedicalCard = medicalCardNumber.replaceAll('/', '_');
+      
+      DataSnapshot snapshot = await _database
+          .child('users')
+          .child(uid)
+          .child('patients')
+          .child(sanitizedMedicalCard)
+          .child('pulseOxSessions')
+          .get();
 
-    sessionsMap.forEach((key, value) {
-      if (value is Map) {
-        // Ensure readings is treated as a List
-        if (value['readings'] is Map) {
-          value['readings'] = (value['readings'] as Map).values.toList();
+      if (!snapshot.exists || snapshot.value == null) {
+        return [];
+      }
+
+      Map<dynamic, dynamic> sessionsMap = snapshot.value as Map<dynamic, dynamic>;
+      List<PulseOxSession> sessions = [];
+
+      for (var entry in sessionsMap.entries) {
+        final value = entry.value;
+        if (value is Map) {
+          // Ensure readings is treated as a List
+          if (value['readings'] is Map) {
+            value['readings'] = (value['readings'] as Map).values.toList();
+          }
+          sessions.add(PulseOxSession.fromMap(value));
         }
-        sessions.add(PulseOxSession.fromMap(value as Map<dynamic, dynamic>));
       }
-    });
 
-    // Sort by timestamp, newest first
-    sessions.sort((a, b) => b.timestamp.compareTo(a.timestamp));
+      // Sort by timestamp, newest first
+      sessions.sort((a, b) => b.timestamp.compareTo(a.timestamp));
 
-    return sessions;
-  } catch (e) {
-    print('Error fetching PulseOx sessions: $e');
-    rethrow;
-  }
-}
-
- Future<void> saveECGReading(
-  String uid,
-  String medicalCardNumber,
-  List<int> ecgData,
-  Map<String, dynamic> metadata,
-) async {
-  try {
-    String sanitizedMedicalCard = medicalCardNumber.replaceAll('/', '_');
-    
-    // Ensure ECG data is in the correct range (e.g., 0–4095)
-    List<int> processedECGData = ecgData.map((value) {
-      return value.clamp(0, 4095);
-    }).toList();
-
-    // Convert the processed ECG data to 16-bit little-endian bytes
-    ByteData byteData = ByteData(processedECGData.length * 2);
-    for (int i = 0; i < processedECGData.length; i++) {
-      byteData.setInt16(i * 2, processedECGData[i], Endian.little);
+      return sessions;
+    } catch (e) {
+      _logger.severe('Error fetching PulseOx sessions: $e');
+      rethrow;
     }
-    Uint8List ecgBytes = byteData.buffer.asUint8List();
-
-    // Generate filename and timestamp
-    DateTime timestamp = DateTime.now();
-    String filename = 'users/$uid/patients/$sanitizedMedicalCard/ecg/${timestamp.millisecondsSinceEpoch}.ecg';
-
-    // Upload to Firebase Storage
-    await _storage.ref(filename).putData(
-      ecgBytes,
-      SettableMetadata(
-        contentType: 'application/octet-stream',
-        customMetadata: {
-          'sampleRate': (metadata['sampleRate'] ?? 4000).toString(),
-          'duration': metadata['duration'].toString(),
-          'timestamp': timestamp.toIso8601String(),
-        },
-      ),
-    );
-
-    // Get download URL
-    String downloadUrl = await _storage.ref(filename).getDownloadURL();
-
-    // Save metadata to Realtime Database
-    await _database
-        .child('users')
-        .child(uid)
-        .child('patients')
-        .child(sanitizedMedicalCard)
-        .child('ecgData')
-        .push()
-        .set({
-          'timestamp': timestamp.toIso8601String(),
-          'filename': filename,
-          'downloadUrl': downloadUrl,
-          'duration': metadata['duration'],
-          'sampleRate': metadata['sampleRate'] ?? 4000,
-        });
-
-    print('ECG reading saved successfully');
-  } catch (e) {
-    print('Error saving ECG reading: $e');
-    rethrow;
   }
-}
 
-
- Future<List<int>> downloadECGData(String downloadUrl) async {
-  try {
-    final response = await FirebaseStorage.instance
-        .refFromURL(downloadUrl)
-        .getData();
-    
-    if (response != null) {
-      // Convert bytes to ECG values
-      ByteData byteData = ByteData.sublistView(Uint8List.fromList(response));
-      List<int> ecgData = [];
+  Future<void> saveECGReading(
+    String uid,
+    String medicalCardNumber,
+    List<int> ecgData,
+    Map<String, dynamic> metadata,
+  ) async {
+    try {
+      String sanitizedMedicalCard = medicalCardNumber.replaceAll('/', '_');
       
-      for (int i = 0; i < response.length; i += 2) {
-        // Read 16-bit integer (little-endian)
-        int value = byteData.getInt16(i, Endian.little);
-        // Ensure value is within the expected range (e.g., 0–4095)
-        ecgData.add(value.clamp(0, 4095));
+      // Ensure ECG data is in the correct range (e.g., 0–4095)
+      List<int> processedECGData = ecgData.map((value) {
+        return value.clamp(0, 4095);
+      }).toList();
+
+      // Convert the processed ECG data to 16-bit little-endian bytes
+      ByteData byteData = ByteData(processedECGData.length * 2);
+      for (int i = 0; i < processedECGData.length; i++) {
+        byteData.setInt16(i * 2, processedECGData[i], Endian.little);
       }
-      
-      return ecgData;
+      Uint8List ecgBytes = byteData.buffer.asUint8List();
+
+      // Generate filename and timestamp
+      DateTime timestamp = DateTime.now();
+      String filename = 'users/$uid/patients/$sanitizedMedicalCard/ecg/${timestamp.millisecondsSinceEpoch}.ecg';
+
+      // Upload to Firebase Storage
+      await _storage.ref(filename).putData(
+        ecgBytes,
+        SettableMetadata(
+          contentType: 'application/octet-stream',
+          customMetadata: {
+            'sampleRate': (metadata['sampleRate'] ?? 4000).toString(),
+            'duration': metadata['duration'].toString(),
+            'timestamp': timestamp.toIso8601String(),
+          },
+        ),
+      );
+
+      // Get download URL
+      String downloadUrl = await _storage.ref(filename).getDownloadURL();
+
+      // Save metadata to Realtime Database
+      await _database
+          .child('users')
+          .child(uid)
+          .child('patients')
+          .child(sanitizedMedicalCard)
+          .child('ecgData')
+          .push()
+          .set({
+            'timestamp': timestamp.toIso8601String(),
+            'filename': filename,
+            'downloadUrl': downloadUrl,
+            'duration': metadata['duration'],
+            'sampleRate': metadata['sampleRate'] ?? 4000,
+          });
+
+      _logger.info('ECG reading saved successfully');
+    } catch (e) {
+      _logger.severe('Error saving ECG reading: $e');
+      rethrow;
     }
-    return [];
-  } catch (e) {
-    print('Error downloading ECG data: $e');
-    rethrow;
   }
-}
+
+  Future<List<int>> downloadECGData(String downloadUrl) async {
+    try {
+      final response = await FirebaseStorage.instance
+          .refFromURL(downloadUrl)
+          .getData();
+      
+      if (response != null) {
+        // Convert bytes to ECG values
+        ByteData byteData = ByteData.sublistView(Uint8List.fromList(response));
+        List<int> ecgData = [];
+        
+        for (int i = 0; i < response.length; i += 2) {
+          // Read 16-bit integer (little-endian)
+          int value = byteData.getInt16(i, Endian.little);
+          // Ensure value is within the expected range (e.g., 0–4095)
+          ecgData.add(value.clamp(0, 4095));
+        }
+        
+        return ecgData;
+      }
+      return [];
+    } catch (e) {
+      _logger.severe('Error downloading ECG data: $e');
+      rethrow;
+    }
+  }
 
   Future<List<Map<String, dynamic>>> getPulseOxReadings(
     String uid,
@@ -680,9 +676,9 @@ Future<List<PulseOxSession>> getPulseOxSessions(
       Map<dynamic, dynamic> readingsMap = snapshot.value as Map<dynamic, dynamic>;
       List<Map<String, dynamic>> readings = [];
 
-      readingsMap.forEach((key, value) {
-        readings.add(Map<String, dynamic>.from(value as Map));
-      });
+      for (var entry in readingsMap.entries) {
+        readings.add(Map<String, dynamic>.from(entry.value as Map));
+      }
 
       readings.sort((a, b) => 
         DateTime.parse(b['timestamp']).compareTo(DateTime.parse(a['timestamp']))
@@ -690,7 +686,7 @@ Future<List<PulseOxSession>> getPulseOxSessions(
 
       return readings;
     } catch (e) {
-      print('Error fetching PulseOx readings: $e');
+      _logger.severe('Error fetching PulseOx readings: $e');
       rethrow;
     }
   }
@@ -729,7 +725,7 @@ Future<List<PulseOxSession>> getPulseOxSessions(
           }
           readings.add(reading);
         } catch (e) {
-          print('Error getting download URL for ECG ${reading['filename']}: $e');
+          _logger.warning('Error getting download URL for ECG ${reading['filename']}: $e');
           continue;
         }
       }
@@ -740,7 +736,7 @@ Future<List<PulseOxSession>> getPulseOxSessions(
 
       return readings;
     } catch (e) {
-      print('Error fetching ECG readings: $e');
+      _logger.severe('Error fetching ECG readings: $e');
       rethrow;
     }
   }

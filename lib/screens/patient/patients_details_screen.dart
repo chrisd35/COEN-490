@@ -7,7 +7,8 @@ import '../../widgets/back_button.dart';
 class PatientDetails extends StatelessWidget {
   final Patient patient;
 
-  const PatientDetails({Key? key, required this.patient}) : super(key: key);
+  // Use super parameter syntax for key
+  const PatientDetails({super.key, required this.patient});
 
   @override
   Widget build(BuildContext context) {

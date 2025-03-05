@@ -6,19 +6,25 @@ import '../registration/firebase_service.dart';
 import '../monitoring/ecg_monitoring_screen.dart';
 import '../../utils/navigation_service.dart';
 import '../../widgets/back_button.dart';
+// Add a logging package import
+import 'package:logging/logging.dart' as logging;
+
+// Create a logger instance
+final _logger = logging.Logger('ECGViewer');
 
 class ECGViewer extends StatefulWidget {
   final ECGReading reading;
   final String patientName;
 
+  // Use super parameter syntax for key
   const ECGViewer({
-    Key? key,
+    super.key,
     required this.reading,
     required this.patientName,
-  }) : super(key: key);
+  });
 
   @override
-  _ECGViewerState createState() => _ECGViewerState();
+  State<ECGViewer> createState() => _ECGViewerState();
 }
 
 class _ECGViewerState extends State<ECGViewer> {
@@ -41,6 +47,9 @@ class _ECGViewerState extends State<ECGViewer> {
         // Convert to points
         final response = await firebaseService.downloadECGData(widget.reading.downloadUrl!);
         
+        // Check if widget is still mounted before using setState
+        if (!mounted) return;
+        
         setState(() {
           _points = response.asMap().entries
               .map((entry) => Point<double>(entry.key.toDouble(), entry.value.toDouble()))
@@ -49,7 +58,11 @@ class _ECGViewerState extends State<ECGViewer> {
         });
       }
     } catch (e) {
-      print('Error loading ECG data: $e');
+      _logger.severe('Error loading ECG data: $e');
+      
+      // Check if widget is still mounted before using setState
+      if (!mounted) return;
+      
       setState(() {
         isLoading = false;
       });
@@ -70,22 +83,22 @@ class _ECGViewerState extends State<ECGViewer> {
         appBar: AppBar(
           title: Text('ECG Data - ${widget.patientName}'),
           leading: IconButton(
-            icon: Icon(Icons.arrow_back),
+            icon: const Icon(Icons.arrow_back),
             onPressed: () => NavigationService.goBack(),
           ),
           actions: [
             IconButton(
-              icon: Icon(Icons.zoom_in),
+              icon: const Icon(Icons.zoom_in),
               onPressed: () => _adjustZoom(0.1),
             ),
             IconButton(
-              icon: Icon(Icons.zoom_out),
+              icon: const Icon(Icons.zoom_out),
               onPressed: () => _adjustZoom(-0.1),
             ),
           ],
         ),
         body: isLoading
-            ? Center(child: CircularProgressIndicator())
+            ? const Center(child: CircularProgressIndicator())
             : Column(
                 children: [
                   Padding(
@@ -96,14 +109,14 @@ class _ECGViewerState extends State<ECGViewer> {
                         child: Column(
                           crossAxisAlignment: CrossAxisAlignment.start,
                           children: [
-                            Text(
+                            const Text(
                               'Recording Information',
                               style: TextStyle(
                                 fontSize: 18,
                                 fontWeight: FontWeight.bold,
                               ),
                             ),
-                            SizedBox(height: 8),
+                            const SizedBox(height: 8),
                             Text('Duration: ${widget.reading.duration} seconds'),
                             Text('Sample Rate: ${widget.reading.sampleRate} Hz'),
                             Text('Date: ${DateFormat('MMM dd, yyyy - HH:mm:ss').format(widget.reading.timestamp)}'),
@@ -125,7 +138,7 @@ class _ECGViewerState extends State<ECGViewer> {
                         child: SingleChildScrollView(
                           controller: scrollController,
                           scrollDirection: Axis.horizontal,
-                          child: Container(
+                          child: SizedBox( // Changed from Container to SizedBox
                             width: _points.length * 2.0 * zoomLevel,
                             height: 300, // Match the height of the parent container
                             child: CustomPaint(

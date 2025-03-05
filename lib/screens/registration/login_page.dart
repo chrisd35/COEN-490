@@ -1,14 +1,21 @@
 import 'package:coen_490/screens/registration/email_verification_screen.dart';
-import 'package:firebase_auth/firebase_auth.dart';
 import 'package:firebase_auth/firebase_auth.dart' as firebase_auth;
 import 'package:flutter/material.dart';
 import '/utils/validation_utils.dart'; // Import the new validation utilities
 import '../dashboard/dashboard_screen.dart';
 import 'auth_service.dart';
+// Add a logging package import
+import 'package:logging/logging.dart' as logging;
+
+// Create a logger instance
+final _logger = logging.Logger('LoginPage');
 
 class LoginPage extends StatefulWidget {
+  // Use super parameter syntax for key
+  const LoginPage({super.key});
+
   @override
-  _LoginPageState createState() => _LoginPageState();
+  State<LoginPage> createState() => _LoginPageState();
 }
 
 class _LoginPageState extends State<LoginPage> {
@@ -85,7 +92,7 @@ class _LoginPageState extends State<LoginPage> {
                       ),
                       errorBorder: OutlineInputBorder(
                         borderRadius: BorderRadius.circular(12),
-                        borderSide: BorderSide(color: Colors.red),
+                        borderSide: const BorderSide(color: Colors.red),
                       ),
                       filled: true,
                       fillColor: Colors.white,
@@ -133,7 +140,7 @@ class _LoginPageState extends State<LoginPage> {
                       ),
                       errorBorder: OutlineInputBorder(
                         borderRadius: BorderRadius.circular(12),
-                        borderSide: BorderSide(color: Colors.red),
+                        borderSide: const BorderSide(color: Colors.red),
                       ),
                       filled: true,
                       fillColor: Colors.white,
@@ -171,7 +178,7 @@ class _LoginPageState extends State<LoginPage> {
                               height: 24,
                               child: CircularProgressIndicator(
                                 strokeWidth: 2,
-                                valueColor: AlwaysStoppedAnimation<Color>(Colors.white),
+                                valueColor: const AlwaysStoppedAnimation<Color>(Colors.white),
                               ),
                             )
                           : const Text(
@@ -193,119 +200,125 @@ class _LoginPageState extends State<LoginPage> {
   }
 
   void _login() async {
-  // First validate the form
-  if (!_formKey.currentState!.validate()) {
-    return;
-  }
+    // First validate the form
+    if (!_formKey.currentState!.validate()) {
+      return;
+    }
 
-  setState(() => _isLoading = true);
-  
-  final email = _emailController.text.trim();
-  final password = _passwordController.text.trim();
+    setState(() => _isLoading = true);
+    
+    final email = _emailController.text.trim();
+    final password = _passwordController.text.trim();
 
-  try {
-    final userCredential = await _authService.signInWithEmailAndPassword(
-      email: email,
-      password: password,
-    );
+    try {
+      _logger.info("Attempting to sign in with email");
+      final userCredential = await _authService.signInWithEmailAndPassword(
+        email: email,
+        password: password,
+      );
 
-    if (userCredential?.user != null) {
-      // Check if email is verified
-      if (!userCredential!.user!.emailVerified) {
-        // Email is not verified, send them to verification screen
-        setState(() => _isLoading = false);
+      // Check if widget is still mounted before using setState or context
+      if (!mounted) return;
+
+      if (userCredential?.user != null) {
+        // Check if email is verified
+        if (!userCredential!.user!.emailVerified) {
+          // Email is not verified, send them to verification screen
+          _logger.info("Email not verified, redirecting to verification screen");
+          setState(() => _isLoading = false);
+          
+          Navigator.push(
+            context,
+            MaterialPageRoute(
+              builder: (context) => EmailVerificationScreen(email: email),
+            ),
+          );
+          return;
+        }
         
-        Navigator.push(
-          context,
-          MaterialPageRoute(
-            builder: (context) => EmailVerificationScreen(email: email),
-          ),
-        );
-        return;
-      }
-      
-      // Email is verified, proceed with normal flow
-      final args = ModalRoute.of(context)?.settings.arguments as Map<String, dynamic>?;
+        // Email is verified, proceed with normal flow
+        _logger.info("Login successful, email verified");
+        final args = ModalRoute.of(context)?.settings.arguments as Map<String, dynamic>?;
 
-      if (args != null) {
-        if (args['returnRoute'] == 'murmur_record' && args['pendingAction'] == 'save_recording') {
-          Navigator.pop(context, true);
-          return; // exit _login
-        } else if (args['returnRoute'] == 'recording_playback' && args['pendingAction'] == 'view_recordings') {
+        if (args != null) {
+          if (args['returnRoute'] == 'murmur_record' && args['pendingAction'] == 'save_recording') {
+            Navigator.pop(context, true);
+            return; // exit _login
+          } else if (args['returnRoute'] == 'recording_playback' && args['pendingAction'] == 'view_recordings') {
+            Navigator.pushReplacement(
+              context,
+              MaterialPageRoute(builder: (context) => const DashboardScreen()),
+            );
+            return; // exit _login
+          }
+        } else {
+          // Normal login flow: Replace login with dashboard.
           Navigator.pushReplacement(
             context,
-            MaterialPageRoute(builder: (context) => DashboardScreen()),
+            MaterialPageRoute(builder: (context) => const DashboardScreen()),
           );
           return; // exit _login
         }
       } else {
-        // Normal login flow: Replace login with dashboard.
-        Navigator.pushReplacement(
-          context,
-          MaterialPageRoute(builder: (context) => DashboardScreen()),
-        );
-        return; // exit _login
+        setState(() {
+          _emailError = "Login failed";
+        });
       }
-    } else {
+    } on firebase_auth.FirebaseAuthException catch (e) {
+      _logger.warning("Firebase auth exception: ${e.code}");
+      String errorMessage;
+      bool isEmailError = false;
+      
+      switch (e.code) {
+        case 'invalid-credential':
+        case 'user-not-found':
+        case 'wrong-password':
+          errorMessage = 'The email or password is incorrect';
+          isEmailError = true;
+          break;
+        case 'invalid-email':
+          errorMessage = 'Please enter a valid email address';
+          isEmailError = true;
+          break;
+        case 'user-disabled':
+          errorMessage = 'This account has been disabled';
+          isEmailError = true;
+          break;
+        case 'too-many-requests':
+          errorMessage = 'Too many attempts. Please try again later';
+          break;
+        case 'network-request-failed':
+          errorMessage = 'Network error. Please check your connection';
+          break;
+        default:
+          errorMessage = 'Login failed. Please try again';
+      }
+      
+      // Check if widget is still mounted before using setState
+      if (!mounted) return;
+      
       setState(() {
-        _emailError = "Login failed";
+        if (isEmailError) {
+          _emailError = errorMessage;
+        } else {
+          _passwordError = errorMessage;
+        }
+      });
+    } catch (e) {
+      _logger.severe("Unexpected error during login: $e");
+      
+      // Check if widget is still mounted before using setState
+      if (!mounted) return;
+      
+      setState(() {
+        _passwordError = 'An unexpected error occurred. Please try again.';
       });
     }
-  } on firebase_auth.FirebaseAuthException catch (e) {
-    String errorMessage;
-    bool isEmailError = false;
-    
-    switch (e.code) {
-      case 'invalid-credential':
-      case 'user-not-found':
-      case 'wrong-password':
-        errorMessage = 'The email or password is incorrect';
-        isEmailError = true;
-        break;
-      case 'invalid-email':
-        errorMessage = 'Please enter a valid email address';
-        isEmailError = true;
-        break;
-      case 'user-disabled':
-        errorMessage = 'This account has been disabled';
-        isEmailError = true;
-        break;
-      case 'too-many-requests':
-        errorMessage = 'Too many attempts. Please try again later';
-        break;
-      case 'network-request-failed':
-        errorMessage = 'Network error. Please check your connection';
-        break;
-      default:
-        errorMessage = 'Login failed. Please try again';
+
+    // If no navigation occurred, stop loading.
+    // Check if widget is still mounted before using setState
+    if (mounted) {
+      setState(() => _isLoading = false);
     }
-    
-    setState(() {
-      if (isEmailError) {
-        _emailError = errorMessage;
-      } else {
-        _passwordError = errorMessage;
-      }
-    });
-  } catch (e) {
-    setState(() {
-      _passwordError = 'An unexpected error occurred. Please try again.';
-    });
-  }
-
-  // If no navigation occurred, stop loading.
-  setState(() => _isLoading = false);
-}
-
-  void _showErrorSnackBar(String message) {
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(
-        content: Text(message),
-        backgroundColor: Colors.red[400],
-        behavior: SnackBarBehavior.floating,
-        margin: EdgeInsets.all(16),
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
-      ),
-    );
   }
 }

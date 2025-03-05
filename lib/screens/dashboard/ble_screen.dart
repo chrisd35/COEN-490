@@ -3,12 +3,15 @@ import 'package:flutter_blue_plus/flutter_blue_plus.dart';
 import 'package:provider/provider.dart';
 import 'package:permission_handler/permission_handler.dart';
 import '/utils/ble_manager.dart';
-import 'dart:typed_data';
+import 'package:logging/logging.dart' as logging;
 
+final _logger = logging.Logger('BLEScreen');
 
 class BLEScreen extends StatefulWidget {
+  const BLEScreen({super.key});
+
   @override
-  _BLEScreenState createState() => _BLEScreenState();
+  State<BLEScreen> createState() => _BLEScreenState();
 }
 
 class _BLEScreenState extends State<BLEScreen> with SingleTickerProviderStateMixin {
@@ -29,7 +32,7 @@ class _BLEScreenState extends State<BLEScreen> with SingleTickerProviderStateMix
   void _setupAnimations() {
     _pulseController = AnimationController(
       vsync: this,
-      duration: Duration(seconds: 2),
+      duration: const Duration(seconds: 2),
     )..repeat();
     
     _pulseAnimation = Tween<double>(begin: 1.0, end: 1.3).animate(
@@ -56,10 +59,12 @@ class _BLEScreenState extends State<BLEScreen> with SingleTickerProviderStateMix
         await Permission.bluetooth.isGranted &&
         await Permission.bluetoothScan.isGranted &&
         await Permission.bluetoothConnect.isGranted) {
-      print("All permissions granted");
+      _logger.info("All permissions granted");
     } else {
-      print("Permissions not granted");
-      _showPermissionDeniedDialog();
+      _logger.warning("Permissions not granted");
+      if (mounted) {
+        _showPermissionDeniedDialog();
+      }
     }
   }
 
@@ -70,18 +75,18 @@ class _BLEScreenState extends State<BLEScreen> with SingleTickerProviderStateMix
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
         title: Row(
           children: [
-            Icon(Icons.warning_amber_rounded, color: Colors.amber),
-            SizedBox(width: 8),
-            Text('Permissions Required'),
+            const Icon(Icons.warning_amber_rounded, color: Colors.amber),
+            const SizedBox(width: 8),
+            const Text('Permissions Required'),
           ],
         ),
-        content: Text(
+        content: const Text(
           'Please enable Bluetooth and Location permissions to scan for devices.',
         ),
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(context),
-            child: Text('Cancel'),
+            child: const Text('Cancel'),
           ),
           ElevatedButton(
             onPressed: () {
@@ -93,7 +98,7 @@ class _BLEScreenState extends State<BLEScreen> with SingleTickerProviderStateMix
                 borderRadius: BorderRadius.circular(8),
               ),
             ),
-            child: Text('Open Settings'),
+            child: const Text('Open Settings'),
           ),
         ],
       ),
@@ -101,68 +106,83 @@ class _BLEScreenState extends State<BLEScreen> with SingleTickerProviderStateMix
   }
 
   void _startScan() {
-  setState(() {
-    _isScanning = true;
-  });
-  final bleManager = Provider.of<BLEManager>(context, listen: false);
-  bleManager.scanDevices(timeout: Duration(seconds: 10)).listen(
-    (results) {
-      setState(() {
-        final targetService = "19B10000-E8F2-537E-4F6C-D104768A1214";
-        final targetName = "ESP32_Combined";
-        scanResults = results.where((result) {
-          // Check if any advertised service UUID matches the target (ignoring case)
-          final hasTargetUuid = result.advertisementData.serviceUuids.any(
-            (uuid) => uuid.toUpperCase() == targetService.toUpperCase(),
-          );
-          // Also check if the device name matches the target name (ignoring case)
-          final isTargetName = result.device.name.toUpperCase() == targetName.toUpperCase();
-          return hasTargetUuid || isTargetName;
-        }).toList();
-        _isScanning = false;
-      });
-    },
-    onError: (error) {
-      print("BLE scan error: $error");
-      setState(() {
-        _isScanning = false;
-      });
-      _showErrorSnackBar("Scanning failed. Please try again.");
-    },
-  );
-}
-
+    setState(() {
+      _isScanning = true;
+    });
+    
+    final currentContext = context;
+    
+    final bleManager = Provider.of<BLEManager>(currentContext, listen: false);
+    bleManager.scanDevices(timeout: const Duration(seconds: 10)).listen(
+      (results) {
+        if (!mounted) return;
+        
+        setState(() {
+          const targetService = "19B10000-E8F2-537E-4F6C-D104768A1214";
+          const targetName = "ESP32_Combined";
+          scanResults = results.where((result) {
+            final hasTargetUuid = result.advertisementData.serviceUuids.any(
+              (uuid) => uuid.toString().toUpperCase() == targetService.toUpperCase(),
+            );
+            final deviceName = result.device.platformName;
+            final isTargetName = deviceName.toUpperCase() == targetName.toUpperCase();
+            return hasTargetUuid || isTargetName;
+          }).toList();
+          _isScanning = false;
+        });
+      },
+      onError: (error) {
+        _logger.severe("BLE scan error: $error");
+        
+        if (!mounted) return;
+        
+        setState(() {
+          _isScanning = false;
+        });
+        _showErrorSnackBar("Scanning failed. Please try again.");
+      },
+    );
+  }
 
   void _connectToDevice(BluetoothDevice device) async {
-  setState(() {
-    _isScanning = true;
-  });
-  
-  try {
-    final bleManager = Provider.of<BLEManager>(context, listen: false);
-    print("Attempting to connect to device: ${device.name}");
-    
-    await bleManager.connectToDevice(device);
-    print("Connection attempt completed");
-    
     setState(() {
-      connectedDevice = device;
-      _isScanning = false;
+      _isScanning = true;
     });
+    
+    try {
+      final currentContext = context;
+      final bleManager = Provider.of<BLEManager>(currentContext, listen: false);
+      
+      _logger.info("Attempting to connect to device: ${device.platformName}");
+      
+      await bleManager.connectToDevice(device);
+      _logger.info("Connection attempt completed");
+      
+      if (!mounted) return;
+      
+      setState(() {
+        connectedDevice = device;
+        _isScanning = false;
+      });
 
-    _showSuccessSnackBar("Connected to ${device.name.isEmpty ? "Unknown Device" : device.name}");
-    
-    Future.delayed(Duration(seconds: 1), () {
-      Navigator.pop(context);
-    });
-  } catch (e) {
-    print("Connection error: $e");
-    setState(() {
-      _isScanning = false;
-    });
-    _showErrorSnackBar("Connection failed. Please try again.");
+      final deviceName = device.platformName.isEmpty ? "Unknown Device" : device.platformName;
+      _showSuccessSnackBar("Connected to $deviceName");
+      
+      Future.delayed(const Duration(seconds: 1), () {
+        if (!mounted) return;
+        Navigator.pop(context);
+      });
+    } catch (e) {
+      _logger.severe("Connection error: $e");
+      
+      if (!mounted) return;
+      
+      setState(() {
+        _isScanning = false;
+      });
+      _showErrorSnackBar("Connection failed. Please try again.");
+    }
   }
-}
  
   void _showSuccessSnackBar(String message) {
     ScaffoldMessenger.of(context).showSnackBar(
@@ -170,7 +190,7 @@ class _BLEScreenState extends State<BLEScreen> with SingleTickerProviderStateMix
         content: Text(message),
         backgroundColor: Colors.green,
         behavior: SnackBarBehavior.floating,
-        margin: EdgeInsets.all(16),
+        margin: const EdgeInsets.all(16),
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
       ),
     );
@@ -182,7 +202,7 @@ class _BLEScreenState extends State<BLEScreen> with SingleTickerProviderStateMix
         content: Text(message),
         backgroundColor: Colors.red[400],
         behavior: SnackBarBehavior.floating,
-        margin: EdgeInsets.all(16),
+        margin: const EdgeInsets.all(16),
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
       ),
     );
@@ -195,26 +215,25 @@ class _BLEScreenState extends State<BLEScreen> with SingleTickerProviderStateMix
       body: SafeArea(
         child: Column(
           children: [
-            // Custom App Bar
             Container(
-              padding: EdgeInsets.symmetric(horizontal: 8.0),
+              padding: const EdgeInsets.symmetric(horizontal: 8.0),
               decoration: BoxDecoration(
                 color: Colors.white,
                 boxShadow: [
                   BoxShadow(
-                    color: Colors.black.withOpacity(0.05),
+                    color: Colors.black.withAlpha(13),
                     blurRadius: 10,
-                    offset: Offset(0, 2),
+                    offset: const Offset(0, 2),
                   ),
                 ],
               ),
               child: Row(
                 children: [
                   IconButton(
-                    icon: Icon(Icons.arrow_back_ios_new, size: 20),
+                    icon: const Icon(Icons.arrow_back_ios_new, size: 20),
                     onPressed: () => Navigator.pop(context),
                   ),
-                  Expanded(
+                  const Expanded(
                     child: Text(
                       'Connect Device',
                       style: TextStyle(
@@ -225,17 +244,16 @@ class _BLEScreenState extends State<BLEScreen> with SingleTickerProviderStateMix
                     ),
                   ),
                   IconButton(
-                    icon: Icon(Icons.refresh_rounded),
+                    icon: const Icon(Icons.refresh_rounded),
                     onPressed: _isScanning ? null : _startScan,
                   ),
                 ],
               ),
             ),
 
-            // Scanning Animation and Status
             if (_isScanning)
               Container(
-                padding: EdgeInsets.symmetric(vertical: 24),
+                padding: const EdgeInsets.symmetric(vertical: 24),
                 child: Column(
                   children: [
                     AnimatedBuilder(
@@ -247,7 +265,7 @@ class _BLEScreenState extends State<BLEScreen> with SingleTickerProviderStateMix
                             width: 80,
                             height: 80,
                             decoration: BoxDecoration(
-                              color: Theme.of(context).primaryColor.withOpacity(0.2),
+                              color: Theme.of(context).primaryColor.withAlpha(51),
                               shape: BoxShape.circle,
                             ),
                             child: Icon(
@@ -259,7 +277,7 @@ class _BLEScreenState extends State<BLEScreen> with SingleTickerProviderStateMix
                         );
                       },
                     ),
-                    SizedBox(height: 16),
+                    const SizedBox(height: 16),
                     Text(
                       'Scanning for devices...',
                       style: TextStyle(
@@ -271,7 +289,6 @@ class _BLEScreenState extends State<BLEScreen> with SingleTickerProviderStateMix
                 ),
               ),
 
-            // Device List
             Expanded(
               child: scanResults.isEmpty
                   ? Center(
@@ -289,7 +306,7 @@ class _BLEScreenState extends State<BLEScreen> with SingleTickerProviderStateMix
                   : RefreshIndicator(
                       onRefresh: () async => _startScan(),
                       child: ListView.builder(
-                        padding: EdgeInsets.all(16),
+                        padding: const EdgeInsets.all(16),
                         itemCount: scanResults.length,
                         itemBuilder: (context, index) {
                           final device = scanResults[index].device;
@@ -305,13 +322,13 @@ class _BLEScreenState extends State<BLEScreen> with SingleTickerProviderStateMix
                               borderRadius: BorderRadius.circular(12),
                               onTap: () => _connectToDevice(device),
                               child: Padding(
-                                padding: EdgeInsets.all(16),
+                                padding: const EdgeInsets.all(16),
                                 child: Row(
                                   children: [
                                     Container(
-                                      padding: EdgeInsets.all(12),
+                                      padding: const EdgeInsets.all(12),
                                       decoration: BoxDecoration(
-                                        color: Theme.of(context).primaryColor.withOpacity(0.1),
+                                        color: Theme.of(context).primaryColor.withAlpha(26),
                                         shape: BoxShape.circle,
                                       ),
                                       child: Icon(
@@ -319,21 +336,21 @@ class _BLEScreenState extends State<BLEScreen> with SingleTickerProviderStateMix
                                         color: Theme.of(context).primaryColor,
                                       ),
                                     ),
-                                    SizedBox(width: 16),
+                                    const SizedBox(width: 16),
                                     Expanded(
                                       child: Column(
                                         crossAxisAlignment: CrossAxisAlignment.start,
                                         children: [
                                           Text(
-                                            device.name.isEmpty ? "Unknown Device" : device.name,
-                                            style: TextStyle(
+                                            device.platformName.isEmpty ? "Unknown Device" : device.platformName,
+                                            style: const TextStyle(
                                               fontSize: 16,
                                               fontWeight: FontWeight.w600,
                                             ),
                                           ),
-                                          SizedBox(height: 4),
+                                          const SizedBox(height: 4),
                                           Text(
-                                            device.id.toString(),
+                                            device.remoteId.toString(),
                                             style: TextStyle(
                                               fontSize: 14,
                                               color: Colors.grey[600],
@@ -343,12 +360,12 @@ class _BLEScreenState extends State<BLEScreen> with SingleTickerProviderStateMix
                                       ),
                                     ),
                                     Container(
-                                      padding: EdgeInsets.symmetric(
+                                      padding: const EdgeInsets.symmetric(
                                         horizontal: 8,
                                         vertical: 4,
                                       ),
                                       decoration: BoxDecoration(
-                                        color: _getRssiColor(rssi).withOpacity(0.1),
+                                        color: _getRssiColor(rssi).withAlpha(26),
                                         borderRadius: BorderRadius.circular(12),
                                       ),
                                       child: Text(
@@ -368,9 +385,6 @@ class _BLEScreenState extends State<BLEScreen> with SingleTickerProviderStateMix
                       ),
                     ),
             ),
-
-            // We've removed the permanent connection status container since we're
-            // showing the snackbar and navigating away immediately after connection
           ],
         ),
       ),
@@ -382,8 +396,4 @@ class _BLEScreenState extends State<BLEScreen> with SingleTickerProviderStateMix
     if (rssi >= -80) return Colors.orange;
     return Colors.red;
   }
-}
-
-extension on Guid {
-  toUpperCase() {}
 }
