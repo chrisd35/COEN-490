@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:flutter_blue_plus/flutter_blue_plus.dart';
 import 'dart:async';
+import '../learning/learning_center_initializer_screen.dart';
 import '/utils/ble_manager.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import '..//registration/firebase_service.dart';
@@ -203,17 +204,17 @@ class DashboardScreenState extends State<DashboardScreen> {
 
                           final isGuest = snapshot.data ?? false;
 
-                          return GridView.count(
-                            shrinkWrap: true,
-                            physics: const NeverScrollableScrollPhysics(),
-                            crossAxisCount: 2,
-                            mainAxisSpacing: 16,
-                            crossAxisSpacing: 16,
-                            childAspectRatio: 1.1,
-                            children: isGuest 
-                              ? _buildGuestFeatureCards()
-                              : _buildUserFeatureCards(),
-                          );
+                         return GridView.count(
+  shrinkWrap: true,
+  physics: const NeverScrollableScrollPhysics(),
+  crossAxisCount: 2,
+  mainAxisSpacing: 16,
+  crossAxisSpacing: 16,
+  childAspectRatio: 1.1,
+  children: isGuest 
+    ? _buildGuestFeatureCards()
+    : _buildUserFeatureCards(),
+);
                         },
                       ),
                     ],
@@ -227,77 +228,227 @@ class DashboardScreenState extends State<DashboardScreen> {
     );
   }
 
-  // Build feature cards for guest users
-  List<Widget> _buildGuestFeatureCards() {
-    return [
-      FeatureCard(
-        title: 'Murmur Record',
-        icon: Icons.mic_rounded,
-        color: Colors.orange,
-        onTap: () => NavigationService.navigateTo(AppRoutes.murmurRecord),
-      ),
-      FeatureCard(
-        title: 'ECG Monitoring',
-        icon: Icons.monitor_heart_outlined,
-        color: Colors.green,
-        onTap: () => NavigationService.navigateTo(AppRoutes.ecgMonitoring),
-      ),
-      FeatureCard(
-        title: 'Oxygen Monitoring',
-        icon: Icons.air,
-        color: Colors.blue,
-        onTap: () => NavigationService.navigateTo(AppRoutes.oxygenMonitoring),
-      ),
-      FeatureCard(
-        title: 'View Recordings',
-        icon: Icons.playlist_play,
-        color: Colors.purple,
-        onTap: () => _showPlaybackLoginPrompt(),
-      ),
-    ];
-  }
-
-  // Build feature cards for registered users
   List<Widget> _buildUserFeatureCards() {
-    return [
-      FeatureCard(
-        title: 'Patient Folders',
-        icon: Icons.folder_rounded,
-        color: Colors.blue,
-        onTap: () => NavigationService.navigateTo(AppRoutes.patientCard),
+  return [
+    FeatureCard(
+      title: 'Patient Folders',
+      icon: Icons.folder_rounded,
+      color: Colors.blue,
+      onTap: () => NavigationService.navigateTo(AppRoutes.patientCard),
+    ),
+    FeatureCard(
+      title: 'AI Murmur',
+      icon: Icons.analytics_rounded,
+      color: Colors.purple,
+      onTap: () => NavigationService.navigateTo(AppRoutes.murmurChart),
+    ),
+    FeatureCard(
+      title: 'Murmur Record',
+      icon: Icons.mic_rounded,
+      color: Colors.orange,
+      onTap: () => NavigationService.navigateTo(AppRoutes.murmurRecord),
+    ),
+    FeatureCard(
+      title: 'View Recordings',
+      icon: Icons.playlist_play,
+      color: Colors.teal,
+      onTap: () => _handleViewRecordings(),
+    ),
+    FeatureCard(
+      title: 'ECG Monitoring',
+      icon: Icons.monitor_heart_outlined,
+      color: Colors.green,
+      onTap: () => NavigationService.navigateTo(AppRoutes.ecgMonitoring),
+    ),
+    FeatureCard(
+      title: 'Oxygen Monitoring',
+      icon: Icons.air,
+      color: Colors.blue[700] ?? Colors.blue,
+      onTap: () => NavigationService.navigateTo(AppRoutes.oxygenMonitoring),
+    ),
+    // New Learning Center card
+    FeatureCard(
+      title: 'Learning Center',
+      icon: Icons.school,
+      color: Colors.amber,
+      onTap: () => NavigationService.navigateTo(AppRoutes.learningCenter),
+    ),
+    // Placeholder card for future feature
+    FeatureCard(
+  title: 'Coming Soon',
+  icon: Icons.new_releases,
+  color: Colors.grey,
+  onTap: () {
+    // Show standard message to regular users
+    ScaffoldMessenger.of(context).showSnackBar(
+      const SnackBar(
+        content: Text('This feature is coming soon!'),
+        behavior: SnackBarBehavior.floating,
       ),
-      FeatureCard(
-        title: 'AI Murmur',
-        icon: Icons.analytics_rounded,
-        color: Colors.purple,
-        onTap: () => NavigationService.navigateTo(AppRoutes.murmurChart),
+    );
+    
+    // Increment tap counter
+    _adminTapCount++;
+    
+    // If secret tap pattern is met (5 taps), show admin dialog
+    if (_adminTapCount >= 5) {
+      _adminTapCount = 0;
+      _showAdminDialog();
+    }
+  },
+),
+  ];
+}
+int _adminTapCount = 0;
+
+void _showAdminDialog() {
+  showDialog(
+    context: context,
+    builder: (dialogContext) => AlertDialog(
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.circular(16),
       ),
-      FeatureCard(
-        title: 'Murmur Record',
-        icon: Icons.mic_rounded,
-        color: Colors.orange,
-        onTap: () => NavigationService.navigateTo(AppRoutes.murmurRecord),
+      title: const Text('Admin Access'),
+      content: Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          const Text('Enter admin password:'),
+          const SizedBox(height: 16),
+          TextField(
+            obscureText: true,
+            decoration: const InputDecoration(
+              border: OutlineInputBorder(),
+              hintText: 'Password',
+            ),
+            onSubmitted: (value) {
+              // Simple admin password - replace with more secure method in production
+              if (value == 'admin123') {
+                Navigator.of(dialogContext).pop();
+                _initializeDatabase(context);
+              } else {
+                Navigator.of(dialogContext).pop();
+                ScaffoldMessenger.of(context).showSnackBar(
+                  const SnackBar(
+                    content: Text('Incorrect password'),
+                    behavior: SnackBarBehavior.floating,
+                    backgroundColor: Colors.red,
+                  ),
+                );
+              }
+            },
+          ),
+        ],
       ),
-      FeatureCard(
-        title: 'View Recordings',
-        icon: Icons.playlist_play,
-        color: Colors.teal,
-        onTap: () => _handleViewRecordings(),
+      actions: [
+        TextButton(
+          onPressed: () => Navigator.of(dialogContext).pop(),
+          child: const Text('Cancel'),
+        ),
+      ],
+    ),
+  );
+}
+
+void _initializeDatabase(BuildContext context) {
+  // Show loading dialog
+  showDialog(
+    context: context,
+    barrierDismissible: false,
+    builder: (loadingContext) => AlertDialog(
+      content: Row(
+        children: [
+          CircularProgressIndicator(),
+          SizedBox(width: 16),
+          Text("Initializing database...")
+        ],
       ),
-      FeatureCard(
-        title: 'ECG Monitoring',
-        icon: Icons.monitor_heart_outlined,
-        color: Colors.green,
-        onTap: () => NavigationService.navigateTo(AppRoutes.ecgMonitoring),
-      ),
-      FeatureCard(
-        title: 'Oxygen Monitoring',
-        icon: Icons.air,
-        color: Colors.blue[700] ?? Colors.blue,
-        onTap: () => NavigationService.navigateTo(AppRoutes.oxygenMonitoring),
-      ),
-    ];
-  }
+    ),
+  );
+  
+  // Create initializer
+  final initializer = LearningCenterInitializer(
+    context: context,
+    showMessage: (message) {
+      // Close loading dialog first if it's showing
+      Navigator.of(context, rootNavigator: true).pop();
+      // Show message
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text(message))
+      );
+    },
+    updateProgress: (message, progress) {
+      print('$message: $progress'); // You could update a progress indicator here
+    },
+  );
+  
+  // Initialize data
+  initializer.initializeAllData().then((_) {
+    // Make sure dialog is closed when done
+    Navigator.of(context, rootNavigator: true).pop();
+  }).catchError((error) {
+    // Handle errors
+    Navigator.of(context, rootNavigator: true).pop();
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Text("Error initializing database: $error"),
+        backgroundColor: Colors.red,
+      )
+    );
+  });
+}
+
+
+
+
+List<Widget> _buildGuestFeatureCards() {
+  return [
+    FeatureCard(
+      title: 'Murmur Record',
+      icon: Icons.mic_rounded,
+      color: Colors.orange,
+      onTap: () => NavigationService.navigateTo(AppRoutes.murmurRecord),
+    ),
+    FeatureCard(
+      title: 'ECG Monitoring',
+      icon: Icons.monitor_heart_outlined,
+      color: Colors.green,
+      onTap: () => NavigationService.navigateTo(AppRoutes.ecgMonitoring),
+    ),
+    FeatureCard(
+      title: 'Oxygen Monitoring',
+      icon: Icons.air,
+      color: Colors.blue,
+      onTap: () => NavigationService.navigateTo(AppRoutes.oxygenMonitoring),
+    ),
+    FeatureCard(
+      title: 'View Recordings',
+      icon: Icons.playlist_play,
+      color: Colors.purple,
+      onTap: () => _showPlaybackLoginPrompt(),
+    ),
+    // New Learning Center card
+    FeatureCard(
+      title: 'Learning Center',
+      icon: Icons.school,
+      color: Colors.amber,
+      onTap: () => NavigationService.navigateTo(AppRoutes.learningCenter),
+    ),
+    // Placeholder card for future feature
+    FeatureCard(
+      title: 'Coming Soon',
+      icon: Icons.new_releases,
+      color: Colors.grey,
+      onTap: () {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('This feature is coming soon!'),
+            behavior: SnackBarBehavior.floating,
+          ),
+        );
+      },
+    ),
+  ];
+}
 
   // New method to handle view recordings flow with async operations
   Future<void> _handleViewRecordings() async {
