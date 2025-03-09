@@ -49,6 +49,8 @@ dependencies:
   fl_chart: ^0.70.2 
   shared_preferences: ^2.5.2
   logging: ^1.2.0
+  flutter_markdown: ^0.7.6+2 
+  file_picker: ^9.0.2
   
 
 dev_dependencies:

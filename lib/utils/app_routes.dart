@@ -17,6 +17,15 @@ import 'package:coen_490/screens/monitoring/pusleox_history.dart';
 import 'package:coen_490/screens/patient/add_patient_screen.dart';
 import 'package:coen_490/screens/patient/patients_details_screen.dart';
 import 'package:coen_490/utils/ble_manager.dart';
+// Import learning center screens
+import 'package:coen_490/screens/learning/learning_center_screen.dart';
+import 'package:coen_490/screens/learning/learning_topic_screen.dart';
+import 'package:coen_490/screens/learning/heart_murmur_library_screen.dart';
+import 'package:coen_490/screens/learning/heart_murmur_detail_screen.dart';
+import 'package:coen_490/screens/learning/quiz_list_screen.dart';
+import 'package:coen_490/screens/learning/quiz_screen.dart';
+import 'package:coen_490/screens/learning/quiz_result_screen.dart';
+import 'package:coen_490/screens/learning/user_progress_screen.dart';
 
 /// Class that defines all routes in the application
 class AppRoutes {
@@ -40,6 +49,17 @@ class AppRoutes {
   static const String addPatient = '/add-patient';
   static const String patientDetails = '/patient-details';
   
+  // Learning center routes
+  static const String learningCenter = '/learning-center';
+  static const String learningTopic = '/learning-topic';
+  static const String heartMurmurLibrary = '/heart-murmur-library';
+  static const String heartMurmurDetail = '/heart-murmur-detail';
+  static const String quizList = '/quiz-list';
+  static const String quiz = '/quiz';
+  static const String quizResult = '/quiz-result';
+  static const String userProgress = '/user-progress';
+
+  
   // Route map
   static Map<String, WidgetBuilder> routes = {
     auth: (context) => AuthPage(),
@@ -50,6 +70,12 @@ class AppRoutes {
     murmurChart: (context) => MurmurChart(),
     bleScreen: (context) => BLEScreen(),
     addPatient: (context) => AddPatientScreen(),
+    // Learning center routes
+    learningCenter: (context) => LearningCenterScreen(),
+    heartMurmurLibrary: (context) => HeartMurmurLibraryScreen(),
+    quizList: (context) => QuizListScreen(),
+    userProgress: (context) => UserProgressScreen(),
+    
   };
   
   // Route generator for routes with parameters
@@ -136,6 +162,48 @@ class AppRoutes {
         return MaterialPageRoute(
           builder: (context) => PulseOxHistory(
             preselectedPatientId: args?['preselectedPatientId'],
+          ),
+        );
+        
+      // Learning center routes with parameters
+      case learningTopic:
+        final args = settings.arguments as Map<String, dynamic>?;
+        if (args?['topic'] == null) return null;
+        return MaterialPageRoute(
+          builder: (context) => LearningTopicScreen(
+            topic: args!['topic'],
+          ),
+        );
+        
+      case heartMurmurDetail:
+        final args = settings.arguments as Map<String, dynamic>?;
+        if (args?['murmur'] == null) return null;
+        return MaterialPageRoute(
+          builder: (context) => HeartMurmurDetailScreen(
+            murmur: args!['murmur'],
+          ),
+        );
+        
+      case quiz:
+        final args = settings.arguments as Map<String, dynamic>?;
+        if (args?['quiz'] == null) return null;
+        return MaterialPageRoute(
+          builder: (context) => QuizScreen(
+            quiz: args!['quiz'],
+          ),
+        );
+        
+      case quizResult:
+        final args = settings.arguments as Map<String, dynamic>?;
+        if (args?['result'] == null || args?['quiz'] == null || 
+            args?['questions'] == null || args?['userAnswers'] == null) return null;
+        return MaterialPageRoute(
+          builder: (context) => QuizResultScreen(
+            quiz: args!['quiz'],
+            result: args['result'],
+            questions: args['questions'],
+            userAnswers: args['userAnswers'],
+            isTimeUp: args['isTimeUp'] ?? false,
           ),
         );
         
