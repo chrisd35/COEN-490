@@ -1,9 +1,10 @@
-
-
 import 'package:flutter/material.dart';
 import 'package:audioplayers/audioplayers.dart';
 import '../../utils/learning_center_models.dart';
 import '../../utils/learning_center_service.dart';
+import 'package:logging/logging.dart' as logging;
+
+final _logger = logging.Logger('HeartMurmurDetailScreen');
 
 class HeartMurmurDetailScreen extends StatefulWidget {
   final HeartMurmur murmur;
@@ -22,7 +23,9 @@ class _HeartMurmurDetailScreenState extends State<HeartMurmurDetailScreen> {
   final AudioPlayer _audioPlayer = AudioPlayer();
   bool _isPlaying = false;
   bool _isAudioLoading = false;
+  bool _isImageLoading = false;
   String? _audioUrl;
+  String? _imageUrl;
   Duration _duration = Duration.zero;
   Duration _position = Duration.zero;
 
@@ -30,6 +33,7 @@ class _HeartMurmurDetailScreenState extends State<HeartMurmurDetailScreen> {
   void initState() {
     super.initState();
     _loadAudioUrl();
+    _loadImageUrl();
     _setupAudioPlayer();
   }
 
@@ -39,45 +43,99 @@ class _HeartMurmurDetailScreenState extends State<HeartMurmurDetailScreen> {
     });
     
     try {
-      // For the purpose of this example, we're using the path directly
-      // In a real app, you would fetch the URL from Firebase Storage
+      _logger.info('Loading audio URL from: ${widget.murmur.audioUrl}');
       _audioUrl = await _learningService.getAudioUrl(widget.murmur.audioUrl);
-      setState(() {
-        _isAudioLoading = false;
-      });
-    } catch (e) {
-      setState(() {
-        _isAudioLoading = false;
-      });
+      _logger.info('Audio URL loaded successfully: $_audioUrl');
       
-      // Show error
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text('Error loading audio: $e'),
-          backgroundColor: Colors.red,
-          behavior: SnackBarBehavior.floating,
-        ),
-      );
+      if (mounted) {
+        setState(() {
+          _isAudioLoading = false;
+        });
+      }
+    } catch (e) {
+      _logger.severe('Error loading audio URL: $e');
+      
+      if (mounted) {
+        setState(() {
+          _isAudioLoading = false;
+        });
+        
+        // Show error
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Error loading audio: $e'),
+            backgroundColor: Colors.red,
+            behavior: SnackBarBehavior.floating,
+          ),
+        );
+      }
+    }
+  }
+
+  Future<void> _loadImageUrl() async {
+    // Only attempt to load if imageUrl is not null
+    if (widget.murmur.imageUrl == null) {
+      _logger.info('No image URL provided for this murmur');
+      return;
+    }
+    
+    setState(() {
+      _isImageLoading = true;
+    });
+    
+    try {
+      _logger.info('Loading image URL from: ${widget.murmur.imageUrl}');
+      _imageUrl = await _learningService.getAudioUrl(widget.murmur.imageUrl!);
+      _logger.info('Image URL loaded successfully: $_imageUrl');
+      
+      if (mounted) {
+        setState(() {
+          _isImageLoading = false;
+        });
+      }
+    } catch (e) {
+      _logger.severe('Error loading image URL: $e');
+      
+      if (mounted) {
+        setState(() {
+          _isImageLoading = false;
+        });
+        
+        // Optional: show error for image loading
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Error loading image: $e'),
+            backgroundColor: Colors.orange,
+            behavior: SnackBarBehavior.floating,
+          ),
+        );
+      }
     }
   }
 
   void _setupAudioPlayer() {
     _audioPlayer.onPlayerStateChanged.listen((state) {
-      setState(() {
-        _isPlaying = state == PlayerState.playing;
-      });
+      if (mounted) {
+        setState(() {
+          _isPlaying = state == PlayerState.playing;
+        });
+      }
     });
 
     _audioPlayer.onDurationChanged.listen((newDuration) {
-      setState(() {
-        _duration = newDuration;
-      });
+      if (mounted) {
+        setState(() {
+          _duration = newDuration;
+        });
+      }
     });
 
     _audioPlayer.onPositionChanged.listen((newPosition) {
-      setState(() {
-        _position = newPosition;
-      });
+      if (mounted) {
+        setState(() {
+          _position = newPosition;
+        });
+      }
     });
   }
 
@@ -119,7 +177,7 @@ class _HeartMurmurDetailScreenState extends State<HeartMurmurDetailScreen> {
       appBar: AppBar(
         title: Text(
           widget.murmur.name,
-          style: TextStyle(fontWeight: FontWeight.w600),
+          style: const TextStyle(fontWeight: FontWeight.w600),
         ),
         elevation: 2,
       ),
@@ -132,7 +190,7 @@ class _HeartMurmurDetailScreenState extends State<HeartMurmurDetailScreen> {
               padding: const EdgeInsets.all(16),
               decoration: BoxDecoration(
                 color: cardColor.withAlpha(15),
-                borderRadius: BorderRadius.only(
+                borderRadius: const BorderRadius.only(
                   bottomLeft: Radius.circular(24),
                   bottomRight: Radius.circular(24),
                 ),
@@ -168,7 +226,7 @@ class _HeartMurmurDetailScreenState extends State<HeartMurmurDetailScreen> {
                   // Description
                   Text(
                     widget.murmur.description,
-                    style: TextStyle(
+                    style: const TextStyle(
                       fontSize: 16,
                       height: 1.5,
                     ),
@@ -320,7 +378,7 @@ class _HeartMurmurDetailScreenState extends State<HeartMurmurDetailScreen> {
                               Expanded(
                                 child: Text(
                                   implication,
-                                  style: TextStyle(fontSize: 16),
+                                  style: const TextStyle(fontSize: 16),
                                 ),
                               ),
                             ],
@@ -356,19 +414,57 @@ class _HeartMurmurDetailScreenState extends State<HeartMurmurDetailScreen> {
                         ),
                         const SizedBox(height: 16),
                         
-                        Image.network(
-                          widget.murmur.imageUrl!,
-                          fit: BoxFit.contain,
-                          errorBuilder: (context, error, stackTrace) {
-                            return Container(
-                              height: 200,
-                              color: Colors.grey[200],
-                              child: const Center(
-                                child: Text('Image not available'),
+                        _isImageLoading 
+                          ? const Center(
+                              child: CircularProgressIndicator(),
+                            )
+                          : _imageUrl != null
+                            ? Image.network(
+                                _imageUrl!,
+                                fit: BoxFit.contain,
+                                loadingBuilder: (context, child, loadingProgress) {
+                                  if (loadingProgress == null) return child;
+                                  return Center(
+                                    child: CircularProgressIndicator(
+                                      value: loadingProgress.expectedTotalBytes != null
+                                          ? loadingProgress.cumulativeBytesLoaded / 
+                                              loadingProgress.expectedTotalBytes!
+                                          : null,
+                                    ),
+                                  );
+                                },
+                                errorBuilder: (context, error, stackTrace) {
+                                  _logger.severe('Error loading image: $error');
+                                  return Container(
+                                    height: 200,
+                                    color: Colors.grey[200],
+                                    child: const Center(
+                                      child: Column(
+                                        mainAxisSize: MainAxisSize.min,
+                                        children: [
+                                          Icon(Icons.error_outline, size: 48, color: Colors.grey),
+                                          SizedBox(height: 8),
+                                          Text('Image not available'),
+                                        ],
+                                      ),
+                                    ),
+                                  );
+                                },
+                              )
+                            : Container(
+                                height: 200,
+                                color: Colors.grey[200],
+                                child: const Center(
+                                  child: Column(
+                                    mainAxisSize: MainAxisSize.min,
+                                    children: [
+                                      Icon(Icons.image_not_supported, size: 48, color: Colors.grey),
+                                      SizedBox(height: 8),
+                                      Text('Image not available'),
+                                    ],
+                                  ),
+                                ),
                               ),
-                            );
-                          },
-                        ),
                       ],
                     ),
                   ),

@@ -135,6 +135,20 @@ class LearningCenterService {
     }
   }
 
+  Future<String> getImageUrl(String? path) async {
+  if (path == null || path.isEmpty) {
+    throw Exception('Image path is null or empty');
+  }
+  
+  try {
+    _logger.info('Fetching image URL from path: $path');
+    return await _storage.ref(path).getDownloadURL();
+  } catch (e) {
+    _logger.severe('Error getting image URL: $e');
+    throw Exception('Failed to load image: $e');
+  }
+}
+
   // Quiz methods
   Future<List<Quiz>> getQuizzes() async {
     try {

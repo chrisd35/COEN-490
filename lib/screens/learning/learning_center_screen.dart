@@ -1,5 +1,3 @@
-// lib/screens/learning/learning_center_screen.dart
-
 import 'package:flutter/material.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import '../../utils/learning_center_service.dart';
@@ -8,6 +6,9 @@ import 'learning_topic_screen.dart';
 import 'heart_murmur_library_screen.dart';
 import 'quiz_list_screen.dart';
 import 'user_progress_screen.dart';
+import 'package:logging/logging.dart' as logging;
+
+final _logger = logging.Logger('LearningCenterScreen');
 
 class LearningCenterScreen extends StatefulWidget {
   const LearningCenterScreen({Key? key}) : super(key: key);
@@ -24,6 +25,10 @@ class _LearningCenterScreenState extends State<LearningCenterScreen> {
   @override
   void initState() {
     super.initState();
+    _refreshData();
+  }
+  
+  Future<void> _refreshData() async {
     _topicsFuture = _learningService.getLearningTopics();
     _userProgressFuture = _learningService.getUserProgress(
       FirebaseAuth.instance.currentUser?.uid ?? 'anonymous',
@@ -33,57 +38,49 @@ class _LearningCenterScreenState extends State<LearningCenterScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
+      backgroundColor: Colors.grey[50],
       appBar: AppBar(
         title: const Text(
           'Learning Center',
           style: TextStyle(fontWeight: FontWeight.w600),
         ),
-        elevation: 2,
+        elevation: 0,
         actions: [
-          IconButton(
-            icon: const Icon(Icons.person),
-            onPressed: () => _navigateToUserProgress(),
+          Padding(
+            padding: const EdgeInsets.only(right: 8.0),
+            child: IconButton(
+              icon: const Icon(Icons.person),
+              tooltip: 'My Progress',
+              onPressed: () => _navigateToUserProgress(),
+            ),
           ),
         ],
       ),
       body: RefreshIndicator(
         onRefresh: () async {
-          setState(() {
-            _topicsFuture = _learningService.getLearningTopics();
-            _userProgressFuture = _learningService.getUserProgress(
-              FirebaseAuth.instance.currentUser?.uid ?? 'anonymous',
-            );
-          });
+          await _refreshData();
+          setState(() {});
         },
         child: SingleChildScrollView(
           physics: const AlwaysScrollableScrollPhysics(),
-          child: Padding(
-            padding: const EdgeInsets.all(16.0),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                _buildWelcomeCard(),
-                const SizedBox(height: 24),
-                
-                // Topics Section
-                _buildSectionHeader('Learning Resources', Icons.menu_book),
-                const SizedBox(height: 16),
-                _buildTopicsList(),
-                const SizedBox(height: 24),
-                
-                // Murmur Library
-                _buildSectionHeader('Heart Murmur Library', Icons.hearing),
-                const SizedBox(height: 16),
-                _buildMurmurLibraryCard(),
-                const SizedBox(height: 24),
-                
-                // Quiz Section
-                _buildSectionHeader('Knowledge Assessment', Icons.quiz),
-                const SizedBox(height: 16),
-                _buildQuizCard(),
-                const SizedBox(height: 16),
-              ],
-            ),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              _buildWelcomeCard(),
+              
+              const SizedBox(height: 16),
+              
+              // Quick Access Buttons
+              _buildQuickAccessSection(),
+              
+              // Topics Section
+              Padding(
+                padding: const EdgeInsets.symmetric(horizontal: 16.0),
+                child: _buildSectionHeader('Learning Resources', Icons.menu_book),
+              ),
+              const SizedBox(height: 12),
+              _buildTopicsList(),
+            ],
           ),
         ),
       ),
@@ -98,111 +95,263 @@ class _LearningCenterScreenState extends State<LearningCenterScreen> {
         gradient: LinearGradient(
           colors: [
             Theme.of(context).primaryColor,
-            Theme.of(context).primaryColor.withAlpha(180),
+            Theme.of(context).primaryColor.withAlpha(200),
           ],
           begin: Alignment.topLeft,
           end: Alignment.bottomRight,
         ),
-        borderRadius: BorderRadius.circular(16),
         boxShadow: [
           BoxShadow(
-            color: Colors.black.withAlpha(50),
-            blurRadius: 10,
-            offset: const Offset(0, 5),
+            color: Colors.black.withAlpha(30),
+            blurRadius: 6,
+            offset: const Offset(0, 3),
           ),
         ],
       ),
+      child: SafeArea(
+        bottom: false,
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            const Text(
+              'Welcome to the Learning Center',
+              style: TextStyle(
+                fontSize: 20,
+                fontWeight: FontWeight.bold,
+                color: Colors.white,
+              ),
+            ),
+            const SizedBox(height: 12),
+            FutureBuilder<UserProgress>(
+              future: _userProgressFuture,
+              builder: (context, snapshot) {
+                if (snapshot.connectionState == ConnectionState.waiting) {
+                  return const Padding(
+                    padding: EdgeInsets.symmetric(vertical: 8.0),
+                    child: Text(
+                      'Loading your progress...',
+                      style: TextStyle(color: Colors.white),
+                    ),
+                  );
+                }
+                
+                if (snapshot.hasError || !snapshot.hasData) {
+                  return const Text(
+                    'Explore educational resources, heart murmur sounds, and test your knowledge.',
+                    style: TextStyle(color: Colors.white),
+                  );
+                }
+                
+                final progress = snapshot.data!;
+                final completedTopics = progress.completedTopics.length;
+                final quizResults = progress.quizResults.length;
+                
+                return Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    const Text(
+                      'Your Learning Progress:',
+                      style: TextStyle(
+                        fontSize: 16,
+                        fontWeight: FontWeight.w500,
+                        color: Colors.white,
+                      ),
+                    ),
+                    const SizedBox(height: 8),
+                    Row(
+                      children: [
+                        _buildProgressStat(
+                          'Topics',
+                          '$completedTopics',
+                          Icons.book,
+                        ),
+                        const SizedBox(width: 16),
+                        _buildProgressStat(
+                          'Quizzes',
+                          '$quizResults',
+                          Icons.quiz,
+                        ),
+                      ],
+                    ),
+                  ],
+                );
+              },
+            ),
+            const SizedBox(height: 16),
+            Center(
+              child: ElevatedButton.icon(
+                onPressed: () => _navigateToUserProgress(),
+                icon: const Icon(Icons.analytics, size: 18),
+                label: const Text('View My Progress'),
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: Colors.white,
+                  foregroundColor: Theme.of(context).primaryColor,
+                  elevation: 0,
+                  padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(8),
+                  ),
+                ),
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+  
+  Widget _buildProgressStat(String label, String value, IconData icon) {
+    return Expanded(
+      child: Container(
+        padding: const EdgeInsets.symmetric(vertical: 12, horizontal: 16),
+        decoration: BoxDecoration(
+          color: Colors.white.withOpacity(0.2),
+          borderRadius: BorderRadius.circular(8),
+        ),
+        child: Row(
+          children: [
+            Icon(
+              icon,
+              color: Colors.white,
+              size: 20,
+            ),
+            const SizedBox(width: 8),
+            Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  value,
+                  style: const TextStyle(
+                    color: Colors.white,
+                    fontWeight: FontWeight.bold,
+                    fontSize: 18,
+                  ),
+                ),
+                Text(
+                  label,
+                  style: const TextStyle(
+                    color: Colors.white,
+                    fontSize: 12,
+                  ),
+                ),
+              ],
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildQuickAccessSection() {
+    return Padding(
+      padding: const EdgeInsets.symmetric(horizontal: 16.0, vertical: 8.0),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Text(
-            'Welcome to the Learning Center',
-            style: TextStyle(
-              fontSize: 20,
-              fontWeight: FontWeight.bold,
-              color: Colors.white,
-            ),
-          ),
-          const SizedBox(height: 10),
-          FutureBuilder<UserProgress>(
-            future: _userProgressFuture,
-            builder: (context, snapshot) {
-              if (snapshot.connectionState == ConnectionState.waiting) {
-                return const Text(
-                  'Loading your learning progress...',
-                  style: TextStyle(color: Colors.white),
-                );
-              }
-              
-              if (snapshot.hasError || !snapshot.hasData) {
-                return const Text(
-                  'Explore educational resources, heart murmur sounds, and test your knowledge.',
-                  style: TextStyle(color: Colors.white),
-                );
-              }
-              
-              final progress = snapshot.data!;
-              final completedTopics = progress.completedTopics.length;
-              final quizResults = progress.quizResults.length;
-              
-              return Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(
-                    'Your Learning Progress:',
-                    style: TextStyle(
-                      fontSize: 16,
-                      fontWeight: FontWeight.w500,
-                      color: Colors.white,
-                    ),
-                  ),
-                  const SizedBox(height: 5),
-                  Text(
-                    'Topics completed: $completedTopics',
-                    style: TextStyle(color: Colors.white),
-                  ),
-                  Text(
-                    'Quizzes taken: $quizResults',
-                    style: TextStyle(color: Colors.white),
-                  ),
-                ],
-              );
-            },
-          ),
-          const SizedBox(height: 15),
-          ElevatedButton(
-            onPressed: () => _navigateToUserProgress(),
-            style: ElevatedButton.styleFrom(
-              backgroundColor: Colors.white,
-              foregroundColor: Theme.of(context).primaryColor,
-              shape: RoundedRectangleBorder(
-                borderRadius: BorderRadius.circular(8),
+          Padding(
+            padding: const EdgeInsets.only(left: 4.0, top: 8.0, bottom: 12.0),
+            child: Text(
+              'Quick Access',
+              style: TextStyle(
+                fontSize: 16,
+                fontWeight: FontWeight.w600,
+                color: Colors.grey[800],
               ),
             ),
-            child: const Text('View My Progress'),
+          ),
+          Row(
+            children: [
+              Expanded(
+                child: _buildQuickAccessButton(
+                  'Heart Murmurs',
+                  Icons.hearing,
+                  Colors.redAccent,
+                  _navigateToMurmurLibrary,
+                ),
+              ),
+              const SizedBox(width: 16),
+              Expanded(
+                child: _buildQuickAccessButton(
+                  'Quizzes',
+                  Icons.quiz,
+                  Colors.blueAccent,
+                  _navigateToQuizzes,
+                ),
+              ),
+            ],
           ),
         ],
       ),
     );
   }
 
-  Widget _buildSectionHeader(String title, IconData icon) {
-    return Row(
-      children: [
-        Icon(
-          icon,
-          color: Theme.of(context).primaryColor,
-          size: 24,
-        ),
-        const SizedBox(width: 8),
-        Text(
-          title,
-          style: const TextStyle(
-            fontSize: 18,
-            fontWeight: FontWeight.bold,
+  Widget _buildQuickAccessButton(
+    String title,
+    IconData icon,
+    Color color,
+    VoidCallback onTap,
+  ) {
+    return Material(
+      color: Colors.white,
+      borderRadius: BorderRadius.circular(12),
+      elevation: 1,
+      shadowColor: Colors.black.withOpacity(0.1),
+      child: InkWell(
+        onTap: onTap,
+        borderRadius: BorderRadius.circular(12),
+        child: Padding(
+          padding: const EdgeInsets.symmetric(vertical: 16.0),
+          child: Column(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              Container(
+                padding: const EdgeInsets.all(12),
+                decoration: BoxDecoration(
+                  color: color.withOpacity(0.1),
+                  shape: BoxShape.circle,
+                ),
+                child: Icon(
+                  icon,
+                  color: color,
+                  size: 28,
+                ),
+              ),
+              const SizedBox(height: 12),
+              Text(
+                title,
+                style: const TextStyle(
+                  fontWeight: FontWeight.w600,
+                  fontSize: 15,
+                ),
+                textAlign: TextAlign.center,
+              ),
+            ],
           ),
         ),
-      ],
+      ),
+    );
+  }
+
+  Widget _buildSectionHeader(String title, IconData icon) {
+    return Padding(
+      padding: const EdgeInsets.only(top: 16.0, bottom: 4.0),
+      child: Row(
+        children: [
+          Icon(
+            icon,
+            color: Theme.of(context).primaryColor,
+            size: 22,
+          ),
+          const SizedBox(width: 8),
+          Text(
+            title,
+            style: const TextStyle(
+              fontSize: 18,
+              fontWeight: FontWeight.bold,
+            ),
+          ),
+        ],
+      ),
     );
   }
 
@@ -212,22 +361,64 @@ class _LearningCenterScreenState extends State<LearningCenterScreen> {
       builder: (context, snapshot) {
         if (snapshot.connectionState == ConnectionState.waiting) {
           return const Center(
-            child: CircularProgressIndicator(),
+            child: Padding(
+              padding: EdgeInsets.all(32.0),
+              child: CircularProgressIndicator(),
+            ),
           );
         }
         
         if (snapshot.hasError) {
           return Center(
-            child: Text(
-              'Error loading topics: ${snapshot.error}',
-              style: TextStyle(color: Colors.red),
+            child: Padding(
+              padding: const EdgeInsets.all(32.0),
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Icon(
+                    Icons.error_outline,
+                    size: 48,
+                    color: Colors.red[300],
+                  ),
+                  const SizedBox(height: 16),
+                  const Text(
+                    'Error loading topics',
+                    style: TextStyle(
+                      fontWeight: FontWeight.bold,
+                      fontSize: 16,
+                    ),
+                  ),
+                  const SizedBox(height: 8),
+                  Text(
+                    snapshot.error.toString(),
+                    style: TextStyle(
+                      color: Colors.red[700],
+                      fontSize: 14,
+                    ),
+                    textAlign: TextAlign.center,
+                  ),
+                  const SizedBox(height: 24),
+                  ElevatedButton.icon(
+                    onPressed: () {
+                      setState(() {
+                        _refreshData();
+                      });
+                    },
+                    icon: const Icon(Icons.refresh),
+                    label: const Text('Retry'),
+                  ),
+                ],
+              ),
             ),
           );
         }
         
         if (!snapshot.hasData || snapshot.data!.isEmpty) {
           return const Center(
-            child: Text('No topics available'),
+            child: Padding(
+              padding: EdgeInsets.all(32.0),
+              child: Text('No topics available'),
+            ),
           );
         }
         
@@ -236,90 +427,119 @@ class _LearningCenterScreenState extends State<LearningCenterScreen> {
         return ListView.builder(
           shrinkWrap: true,
           physics: const NeverScrollableScrollPhysics(),
+          padding: const EdgeInsets.symmetric(horizontal: 16.0),
           itemCount: topics.length,
           itemBuilder: (context, index) {
             final topic = topics[index];
-            return Card(
-              margin: const EdgeInsets.only(bottom: 12),
-              shape: RoundedRectangleBorder(
-                borderRadius: BorderRadius.circular(12),
-              ),
-              elevation: 2,
-              child: ListTile(
-                contentPadding: const EdgeInsets.symmetric(
-                  horizontal: 16,
-                  vertical: 8,
-                ),
-                title: Text(
-                  topic.title,
-                  style: const TextStyle(
-                    fontWeight: FontWeight.w600,
-                    fontSize: 16,
-                  ),
-                ),
-                subtitle: Text(
-                  topic.description,
-                  maxLines: 2,
-                  overflow: TextOverflow.ellipsis,
-                ),
-                trailing: const Icon(Icons.arrow_forward_ios, size: 16),
-                onTap: () => _navigateToTopic(topic),
-              ),
-            );
+            return _buildTopicCard(topic);
           },
         );
       },
     );
   }
 
-  Widget _buildMurmurLibraryCard() {
+  Widget _buildTopicCard(LearningTopic topic) {
     return Card(
+      margin: const EdgeInsets.only(bottom: 12),
       shape: RoundedRectangleBorder(
         borderRadius: BorderRadius.circular(12),
+        side: BorderSide(color: Colors.grey.withAlpha(30), width: 0.5),
       ),
-      elevation: 2,
+      elevation: 0.5,
       child: InkWell(
         borderRadius: BorderRadius.circular(12),
-        onTap: _navigateToMurmurLibrary,
+        onTap: () => _navigateToTopic(topic),
         child: Padding(
           padding: const EdgeInsets.all(16.0),
-          child: Row(
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              Container(
-                width: 60,
-                height: 60,
-                decoration: BoxDecoration(
-                  color: Colors.redAccent.withAlpha(40),
-                  shape: BoxShape.circle,
-                ),
-                child: const Icon(
-                  Icons.hearing,
-                  color: Colors.redAccent,
-                  size: 30,
-                ),
+              Row(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  // Topic icon in a circle
+                  Container(
+                    width: 44,
+                    height: 44,
+                    decoration: BoxDecoration(
+                      color: Theme.of(context).primaryColor.withOpacity(0.1),
+                      shape: BoxShape.circle,
+                    ),
+                    child: Icon(
+                      _getTopicIcon(topic.title),
+                      color: Theme.of(context).primaryColor,
+                      size: 24,
+                    ),
+                  ),
+                  const SizedBox(width: 12),
+                  
+                  // Topic title and description
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          topic.title,
+                          style: const TextStyle(
+                            fontWeight: FontWeight.w600,
+                            fontSize: 16,
+                          ),
+                        ),
+                        const SizedBox(height: 4),
+                        Text(
+                          topic.description,
+                          style: TextStyle(
+                            fontSize: 14,
+                            color: Colors.grey[700],
+                            height: 1.3,
+                          ),
+                          maxLines: 2,
+                          overflow: TextOverflow.ellipsis,
+                        ),
+                      ],
+                    ),
+                  ),
+                ],
               ),
-              const SizedBox(width: 16),
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: const [
+              
+              // Resources count and button
+              Padding(
+                padding: const EdgeInsets.only(top: 12.0, left: 56.0),
+                child: Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  children: [
+                    // Resources count
                     Text(
-                      'Heart Murmur Sound Library',
+                      '${topic.resources.length} resource${topic.resources.length != 1 ? 's' : ''}',
                       style: TextStyle(
-                        fontWeight: FontWeight.w600,
-                        fontSize: 16,
+                        fontSize: 13,
+                        color: Colors.grey[600],
                       ),
                     ),
-                    SizedBox(height: 4),
-                    Text(
-                      'Listen to different heart murmurs and learn their clinical significance',
-                      maxLines: 2,
-                      overflow: TextOverflow.ellipsis,
+                    
+                    // View button
+                    Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        Text(
+                          'View',
+                          style: TextStyle(
+                            fontSize: 14,
+                            color: Theme.of(context).primaryColor,
+                            fontWeight: FontWeight.w500,
+                          ),
+                        ),
+                        const SizedBox(width: 4),
+                        Icon(
+                          Icons.arrow_forward_ios,
+                          size: 14,
+                          color: Theme.of(context).primaryColor,
+                        ),
+                      ],
                     ),
                   ],
                 ),
               ),
-              const Icon(Icons.arrow_forward_ios, size: 16),
             ],
           ),
         ),
@@ -327,62 +547,20 @@ class _LearningCenterScreenState extends State<LearningCenterScreen> {
     );
   }
 
-  Widget _buildQuizCard() {
-    return Card(
-      shape: RoundedRectangleBorder(
-        borderRadius: BorderRadius.circular(12),
-      ),
-      elevation: 2,
-      child: InkWell(
-        borderRadius: BorderRadius.circular(12),
-        onTap: _navigateToQuizzes,
-        child: Padding(
-          padding: const EdgeInsets.all(16.0),
-          child: Row(
-            children: [
-              Container(
-                width: 60,
-                height: 60,
-                decoration: BoxDecoration(
-                  color: Colors.blueAccent.withAlpha(40),
-                  shape: BoxShape.circle,
-                ),
-                child: const Icon(
-                  Icons.quiz,
-                  color: Colors.blueAccent,
-                  size: 30,
-                ),
-              ),
-              const SizedBox(width: 16),
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: const [
-                    Text(
-                      'Interactive Quizzes',
-                      style: TextStyle(
-                        fontWeight: FontWeight.w600,
-                        fontSize: 16,
-                      ),
-                    ),
-                    SizedBox(height: 4),
-                    Text(
-                      'Test your knowledge with quizzes on ECG, PulseOx, and heart murmurs',
-                      maxLines: 2,
-                      overflow: TextOverflow.ellipsis,
-                    ),
-                  ],
-                ),
-              ),
-              const Icon(Icons.arrow_forward_ios, size: 16),
-            ],
-          ),
-        ),
-      ),
-    );
+  IconData _getTopicIcon(String topicTitle) {
+    final title = topicTitle.toLowerCase();
+    
+    if (title.contains('ecg')) return Icons.monitor_heart;
+    if (title.contains('heart') || title.contains('murmur')) return Icons.favorite;
+    if (title.contains('pulse') || title.contains('ox')) return Icons.bloodtype;
+    if (title.contains('breath') || title.contains('lung')) return Icons.air;
+    
+    // Default icon
+    return Icons.school;
   }
 
   void _navigateToTopic(LearningTopic topic) {
+    _logger.info('Navigating to topic: ${topic.title}');
     Navigator.push(
       context,
       MaterialPageRoute(
@@ -392,29 +570,37 @@ class _LearningCenterScreenState extends State<LearningCenterScreen> {
   }
 
   void _navigateToMurmurLibrary() {
+    _logger.info('Navigating to heart murmur library');
     Navigator.push(
       context,
       MaterialPageRoute(
-        builder: (context) => HeartMurmurLibraryScreen(),
+        builder: (context) => const HeartMurmurLibraryScreen(),
       ),
     );
   }
 
   void _navigateToQuizzes() {
+    _logger.info('Navigating to quizzes');
     Navigator.push(
       context,
       MaterialPageRoute(
-        builder: (context) => QuizListScreen(),
+        builder: (context) => const QuizListScreen(),
       ),
     );
   }
 
   void _navigateToUserProgress() {
+    _logger.info('Navigating to user progress');
     Navigator.push(
       context,
       MaterialPageRoute(
-        builder: (context) => UserProgressScreen(),
+        builder: (context) => const UserProgressScreen(),
       ),
-    );
+    ).then((_) {
+      // Refresh data when returning from progress screen
+      setState(() {
+        _refreshData();
+      });
+    });
   }
 }
