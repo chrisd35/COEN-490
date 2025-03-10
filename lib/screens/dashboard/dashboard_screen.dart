@@ -426,14 +426,7 @@ List<Widget> _buildGuestFeatureCards() {
       color: Colors.purple,
       onTap: () => _showPlaybackLoginPrompt(),
     ),
-    // New Learning Center card
-    FeatureCard(
-      title: 'Learning Center',
-      icon: Icons.school,
-      color: Colors.amber,
-      onTap: () => NavigationService.navigateTo(AppRoutes.learningCenter),
-    ),
-    // Placeholder card for future feature
+    // Removed the Learning Center card - only available for logged-in users
     FeatureCard(
       title: 'Coming Soon',
       icon: Icons.new_releases,

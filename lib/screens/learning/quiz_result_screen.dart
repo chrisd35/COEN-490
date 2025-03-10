@@ -1,8 +1,9 @@
-// lib/screens/learning/quiz_result_screen.dart
-
 import 'package:flutter/material.dart';
 import '../../utils/learning_center_models.dart';
 import 'package:fl_chart/fl_chart.dart';
+import 'package:logging/logging.dart' as logging;
+
+final _logger = logging.Logger('QuizResultScreen');
 
 class QuizResultScreen extends StatelessWidget {
   final Quiz quiz;
@@ -29,21 +30,34 @@ class QuizResultScreen extends StatelessWidget {
         return false;
       },
       child: Scaffold(
+        backgroundColor: Colors.grey[50],
         appBar: AppBar(
           title: const Text(
             'Quiz Results',
             style: TextStyle(fontWeight: FontWeight.w600),
           ),
-          elevation: 2,
+          elevation: 0,
           automaticallyImplyLeading: false,
+          actions: [
+            Padding(
+              padding: const EdgeInsets.only(right: 8.0),
+              child: IconButton(
+                icon: const Icon(Icons.home),
+                tooltip: 'Return to Quiz List',
+                onPressed: () {
+                  Navigator.of(context).popUntil((route) => route.isFirst || route.settings.name == '/quiz-list');
+                },
+              ),
+            ),
+          ],
         ),
         body: SingleChildScrollView(
           child: Column(
             children: [
               _buildResultHeader(context),
-              _buildScoreCard(context),
-              _buildStatisticsCard(context),
+              _buildScoreCards(context),
               _buildFeedbackMessage(context),
+              _buildStatisticsSection(context),
               _buildAnswersList(context),
               _buildActionButtons(context),
             ],
@@ -54,42 +68,63 @@ class QuizResultScreen extends StatelessWidget {
   }
 
   Widget _buildResultHeader(BuildContext context) {
+    final scoreColor = _getScoreColor(result.score);
+    
     return Container(
       width: double.infinity,
-      padding: const EdgeInsets.all(24),
+      padding: const EdgeInsets.only(top: 20, bottom: 32, left: 24, right: 24),
       decoration: BoxDecoration(
-        color: _getScoreColor(result.score).withAlpha(20),
-        borderRadius: const BorderRadius.only(
-          bottomLeft: Radius.circular(24),
-          bottomRight: Radius.circular(24),
+        gradient: LinearGradient(
+          colors: [
+            scoreColor.withOpacity(0.7),
+            scoreColor.withOpacity(0.5),
+          ],
+          begin: Alignment.topCenter,
+          end: Alignment.bottomCenter,
         ),
+        borderRadius: const BorderRadius.only(
+          bottomLeft: Radius.circular(32),
+          bottomRight: Radius.circular(32),
+        ),
+        boxShadow: [
+          BoxShadow(
+            color: scoreColor.withOpacity(0.3),
+            blurRadius: 10,
+            offset: const Offset(0, 4),
+          ),
+        ],
       ),
       child: Column(
         children: [
           // Show time's up message if applicable
           if (isTimeUp)
             Container(
+              margin: const EdgeInsets.only(bottom: 16),
               padding: const EdgeInsets.symmetric(
                 horizontal: 16,
                 vertical: 8,
               ),
               decoration: BoxDecoration(
-                color: Colors.red.withAlpha(30),
+                color: Colors.white.withOpacity(0.3),
                 borderRadius: BorderRadius.circular(16),
+                border: Border.all(
+                  color: Colors.white.withOpacity(0.5),
+                  width: 1,
+                ),
               ),
               child: Row(
                 mainAxisSize: MainAxisSize.min,
                 children: const [
                   Icon(
                     Icons.timer_off,
-                    color: Colors.red,
+                    color: Colors.white,
                     size: 20,
                   ),
                   SizedBox(width: 8),
                   Text(
                     'Time\'s Up!',
                     style: TextStyle(
-                      color: Colors.red,
+                      color: Colors.white,
                       fontWeight: FontWeight.bold,
                     ),
                   ),
@@ -97,54 +132,75 @@ class QuizResultScreen extends StatelessWidget {
               ),
             ),
           
-          const SizedBox(height: 16),
-          
-          // Quiz title
-          Text(
-            quiz.title,
-            style: const TextStyle(
-              fontSize: 20,
-              fontWeight: FontWeight.bold,
-            ),
-            textAlign: TextAlign.center,
-          ),
-          
-          const SizedBox(height: 8),
-          
-          // Quiz completion status
-          Text(
-            'Quiz Completed on ${_formatDate(result.timestamp)}',
-            style: TextStyle(
-              fontSize: 14,
-              color: Colors.grey[600],
-            ),
+          // Score display with circle
+          Stack(
+            alignment: Alignment.center,
+            children: [
+              Container(
+                width: 140,
+                height: 140,
+                decoration: BoxDecoration(
+                  shape: BoxShape.circle,
+                  color: Colors.white.withOpacity(0.2),
+                  border: Border.all(
+                    color: Colors.white.withOpacity(0.8),
+                    width: 2,
+                  ),
+                ),
+              ),
+              Column(
+                children: [
+                  Text(
+                    '${result.score.toStringAsFixed(1)}%',
+                    style: const TextStyle(
+                      fontSize: 42,
+                      fontWeight: FontWeight.bold,
+                      color: Colors.white,
+                    ),
+                  ),
+                  const SizedBox(height: 4),
+                  Text(
+                    _getResultMessage(result.score),
+                    style: const TextStyle(
+                      fontSize: 18,
+                      fontWeight: FontWeight.w500,
+                      color: Colors.white,
+                    ),
+                  ),
+                ],
+              ),
+            ],
           ),
           
           const SizedBox(height: 24),
           
-          // Score display
-          CircleAvatar(
-            radius: 60,
-            backgroundColor: _getScoreColor(result.score).withAlpha(50),
-            child: Text(
-              '${result.score.toStringAsFixed(1)}%',
-              style: TextStyle(
-                fontSize: 32,
-                fontWeight: FontWeight.bold,
-                color: _getScoreColor(result.score),
-              ),
+          // Quiz title and completion info
+          Container(
+            padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 12),
+            decoration: BoxDecoration(
+              color: Colors.white.withOpacity(0.2),
+              borderRadius: BorderRadius.circular(12),
             ),
-          ),
-          
-          const SizedBox(height: 16),
-          
-          // Pass/Fail status
-          Text(
-            _getResultMessage(result.score),
-            style: TextStyle(
-              fontSize: 18,
-              fontWeight: FontWeight.bold,
-              color: _getScoreColor(result.score),
+            child: Column(
+              children: [
+                Text(
+                  quiz.title,
+                  style: const TextStyle(
+                    fontSize: 18,
+                    fontWeight: FontWeight.bold,
+                    color: Colors.white,
+                  ),
+                  textAlign: TextAlign.center,
+                ),
+                const SizedBox(height: 4),
+                Text(
+                  'Completed on ${_formatDate(result.timestamp)}',
+                  style: const TextStyle(
+                    fontSize: 14,
+                    color: Colors.white,
+                  ),
+                ),
+              ],
             ),
           ),
         ],
@@ -152,155 +208,89 @@ class QuizResultScreen extends StatelessWidget {
     );
   }
 
-  Widget _buildScoreCard(BuildContext context) {
-    return Card(
-      margin: const EdgeInsets.all(16),
-      shape: RoundedRectangleBorder(
-        borderRadius: BorderRadius.circular(16),
-      ),
-      elevation: 2,
-      child: Padding(
-        padding: const EdgeInsets.all(16.0),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            const Text(
-              'Score Breakdown',
-              style: TextStyle(
-                fontSize: 18,
-                fontWeight: FontWeight.bold,
-              ),
-            ),
-            
-            const SizedBox(height: 16),
-            
-            Row(
-              children: [
-                _buildScoreItem(
-                  'Correct',
-                  result.correctAnswers.toString(),
-                  Icons.check_circle,
-                  Colors.green,
-                ),
-                _buildScoreItem(
-                  'Incorrect',
-                  (result.totalQuestions - result.correctAnswers).toString(),
-                  Icons.cancel,
-                  Colors.red,
-                ),
-                _buildScoreItem(
-                  'Total',
-                  result.totalQuestions.toString(),
-                  Icons.quiz,
-                  Colors.blue,
-                ),
-              ],
-            ),
-            
-            const SizedBox(height: 16),
-            
-            // Time taken
-            Row(
-              children: [
-                Icon(
-                  Icons.timer,
-                  size: 20,
-                  color: Colors.orange,
-                ),
-                const SizedBox(width: 8),
-                const Text(
-                  'Time taken: ',
-                  style: TextStyle(
-                    fontSize: 16,
-                  ),
-                ),
-                Text(
-                  _formatDuration(result.timeTaken),
-                  style: const TextStyle(
-                    fontSize: 16,
-                    fontWeight: FontWeight.bold,
-                  ),
-                ),
-              ],
-            ),
-          ],
-        ),
+  Widget _buildScoreCards(BuildContext context) {
+    // Calculate statistics
+    int correct = result.correctAnswers;
+    int incorrect = result.totalQuestions - result.correctAnswers;
+    int skipped = questions.length - userAnswers.length;
+    
+    return Padding(
+      padding: const EdgeInsets.symmetric(horizontal: 16.0, vertical: 8.0),
+      child: Row(
+        children: [
+          _buildMetricCard(
+            'Correct',
+            correct.toString(),
+            Icons.check_circle_outline,
+            Colors.green,
+            context,
+          ),
+          const SizedBox(width: 8),
+          _buildMetricCard(
+            'Incorrect',
+            incorrect.toString(),
+            Icons.cancel_outlined,
+            Colors.red,
+            context,
+          ),
+          const SizedBox(width: 8),
+          _buildMetricCard(
+            'Total',
+            result.totalQuestions.toString(),
+            Icons.quiz_outlined,
+            Colors.blue,
+            context,
+          ),
+        ],
       ),
     );
   }
 
-  Widget _buildStatisticsCard(BuildContext context) {
-    // Calculate statistics
-    int correct = result.correctAnswers;
-    int incorrect = result.totalQuestions - result.correctAnswers;
-    
-    return Card(
-      margin: const EdgeInsets.symmetric(horizontal: 16),
-      shape: RoundedRectangleBorder(
-        borderRadius: BorderRadius.circular(16),
-      ),
-      elevation: 2,
-      child: Padding(
-        padding: const EdgeInsets.all(16.0),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            const Text(
-              'Performance',
-              style: TextStyle(
-                fontSize: 18,
-                fontWeight: FontWeight.bold,
+  Widget _buildMetricCard(
+    String label,
+    String value,
+    IconData icon,
+    Color color,
+    BuildContext context,
+  ) {
+    return Expanded(
+      child: Card(
+        elevation: 0,
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(12),
+          side: BorderSide(
+            color: Colors.grey.withOpacity(0.1),
+            width: 1,
+          ),
+        ),
+        child: Padding(
+          padding: const EdgeInsets.symmetric(vertical: 16.0),
+          child: Column(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              Icon(
+                icon,
+                color: color,
+                size: 28,
               ),
-            ),
-            
-            const SizedBox(height: 16),
-            
-            SizedBox(
-              height: 200,
-              child: PieChart(
-                PieChartData(
-                  sectionsSpace: 0,
-                  centerSpaceRadius: 40,
-                  sections: [
-                    if (correct > 0)
-                      PieChartSectionData(
-                        color: Colors.green,
-                        value: correct.toDouble(),
-                        title: '${(correct / result.totalQuestions * 100).toStringAsFixed(0)}%',
-                        radius: 100,
-                        titleStyle: const TextStyle(
-                          fontSize: 16,
-                          fontWeight: FontWeight.bold,
-                          color: Colors.white,
-                        ),
-                      ),
-                    if (incorrect > 0)
-                      PieChartSectionData(
-                        color: Colors.red,
-                        value: incorrect.toDouble(),
-                        title: '${(incorrect / result.totalQuestions * 100).toStringAsFixed(0)}%',
-                        radius: 100,
-                        titleStyle: const TextStyle(
-                          fontSize: 16,
-                          fontWeight: FontWeight.bold,
-                          color: Colors.white,
-                        ),
-                      ),
-                  ],
+              const SizedBox(height: 8),
+              Text(
+                value,
+                style: TextStyle(
+                  fontSize: 22,
+                  fontWeight: FontWeight.bold,
+                  color: color,
                 ),
               ),
-            ),
-            
-            // Legend
-            Row(
-              mainAxisAlignment: MainAxisAlignment.center,
-              children: [
-                _buildLegendItem('Correct', Colors.green),
-                const SizedBox(width: 24),
-                _buildLegendItem('Incorrect', Colors.red),
-              ],
-            ),
-          ],
+              Text(
+                label,
+                style: TextStyle(
+                  fontSize: 13,
+                  color: Colors.grey[600],
+                ),
+              ),
+            ],
+          ),
         ),
       ),
     );
@@ -313,7 +303,7 @@ class QuizResultScreen extends StatelessWidget {
     
     if (result.score >= 90) {
       message = 'Excellent! You have a strong understanding of this topic.';
-      icon = Icons.star;
+      icon = Icons.emoji_events;
       color = Colors.amber;
     } else if (result.score >= 70) {
       message = 'Good job! You have a good grasp of the material.';
@@ -334,24 +324,46 @@ class QuizResultScreen extends StatelessWidget {
       shape: RoundedRectangleBorder(
         borderRadius: BorderRadius.circular(16),
       ),
-      elevation: 2,
+      elevation: 0,
       child: Padding(
         padding: const EdgeInsets.all(16.0),
         child: Row(
           children: [
-            Icon(
-              icon,
-              size: 36,
-              color: color,
+            Container(
+              padding: const EdgeInsets.all(12),
+              decoration: BoxDecoration(
+                color: color.withOpacity(0.1),
+                shape: BoxShape.circle,
+              ),
+              child: Icon(
+                icon,
+                size: 28,
+                color: color,
+              ),
             ),
             const SizedBox(width: 16),
             Expanded(
-              child: Text(
-                message,
-                style: const TextStyle(
-                  fontSize: 16,
-                  fontWeight: FontWeight.w500,
-                ),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    'Feedback',
+                    style: TextStyle(
+                      fontWeight: FontWeight.bold,
+                      color: Colors.grey[800],
+                      fontSize: 16,
+                    ),
+                  ),
+                  const SizedBox(height: 4),
+                  Text(
+                    message,
+                    style: TextStyle(
+                      fontSize: 14,
+                      color: Colors.grey[700],
+                      height: 1.3,
+                    ),
+                  ),
+                ],
               ),
             ),
           ],
@@ -360,83 +372,111 @@ class QuizResultScreen extends StatelessWidget {
     );
   }
 
-  Widget _buildAnswersList(BuildContext context) {
-    return Card(
-      margin: const EdgeInsets.all(16),
-      shape: RoundedRectangleBorder(
-        borderRadius: BorderRadius.circular(16),
-      ),
-      elevation: 2,
-      child: Padding(
-        padding: const EdgeInsets.all(16.0),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            const Text(
-              'Your Answers',
-              style: TextStyle(
-                fontSize: 18,
-                fontWeight: FontWeight.bold,
-              ),
-            ),
-            
-            const SizedBox(height: 16),
-            
-            ...List.generate(questions.length, (index) {
-              final question = questions[index];
-              final userAnswer = userAnswers[question.id];
-              final isCorrect = userAnswer == question.correctAnswerIndex;
-              
-              return _buildAnswerItem(
-                questionNumber: index + 1,
-                question: question.question,
-                isCorrect: isCorrect,
-                userAnswer: userAnswer != null
-                    ? question.options[userAnswer]
-                    : 'Not answered',
-                correctAnswer: question.options[question.correctAnswerIndex],
-              );
-            }),
-          ],
-        ),
-      ),
-    );
-  }
-
-  Widget _buildActionButtons(BuildContext context) {
+  Widget _buildStatisticsSection(BuildContext context) {
+    // Calculate statistics
+    int correct = result.correctAnswers;
+    int incorrect = result.totalQuestions - result.correctAnswers;
+    
     return Padding(
-      padding: const EdgeInsets.all(16.0),
-      child: Row(
-        mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+      padding: const EdgeInsets.symmetric(horizontal: 16.0, vertical: 8.0),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          ElevatedButton.icon(
-            onPressed: () {
-              // Navigate back to quiz list
-              Navigator.of(context).popUntil((route) => route.isFirst || route.settings.name == '/quiz-list');
-            },
-            icon: const Icon(Icons.list),
-            label: const Text('Quiz List'),
-            style: ElevatedButton.styleFrom(
-              padding: const EdgeInsets.symmetric(
-                horizontal: 24,
-                vertical: 12,
+          _buildSectionHeader(context, 'Performance Statistics'),
+          const SizedBox(height: 8),
+          Card(
+            elevation: 0,
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(16),
+              side: BorderSide(
+                color: Colors.grey.withOpacity(0.1),
+                width: 1,
               ),
             ),
-          ),
-          ElevatedButton.icon(
-            onPressed: () {
-              // Pop twice to go back to quiz screen and try again
-              Navigator.of(context).pop();
-              Navigator.of(context).pop();
-            },
-            icon: const Icon(Icons.replay),
-            label: const Text('Try Again'),
-            style: ElevatedButton.styleFrom(
-              padding: const EdgeInsets.symmetric(
-                horizontal: 24,
-                vertical: 12,
+            child: Padding(
+              padding: const EdgeInsets.all(16.0),
+              child: Column(
+                children: [
+                  // Time taken
+                  _buildInfoRow(
+                    title: 'Time Taken:',
+                    value: _formatDuration(result.timeTaken),
+                    icon: Icons.access_time,
+                    iconColor: Colors.orange,
+                  ),
+                  const SizedBox(height: 8),
+                  
+                  // Difficulty 
+                  _buildInfoRow(
+                    title: 'Difficulty:',
+                    value: quiz.difficulty,
+                    icon: Icons.speed,
+                    iconColor: _getDifficultyColor(quiz.difficulty),
+                  ),
+                  const SizedBox(height: 8),
+                  
+                  // Category
+                  _buildInfoRow(
+                    title: 'Category:',
+                    value: quiz.category,
+                    icon: Icons.category,
+                    iconColor: Colors.purple,
+                  ),
+                  
+                  const SizedBox(height: 16),
+                  
+                  // Chart
+                  Container(
+                    height: 200,
+                    padding: const EdgeInsets.all(8),
+                    child: PieChart(
+                      PieChartData(
+                        sectionsSpace: 2,
+                        centerSpaceRadius: 40,
+                        sections: [
+                          if (correct > 0)
+                            PieChartSectionData(
+                              color: Colors.green,
+                              value: correct.toDouble(),
+                              title: '${(correct / result.totalQuestions * 100).toStringAsFixed(0)}%',
+                              radius: 100,
+                              titleStyle: const TextStyle(
+                                fontSize: 16,
+                                fontWeight: FontWeight.bold,
+                                color: Colors.white,
+                              ),
+                            ),
+                          if (incorrect > 0)
+                            PieChartSectionData(
+                              color: Colors.red,
+                              value: incorrect.toDouble(),
+                              title: '${(incorrect / result.totalQuestions * 100).toStringAsFixed(0)}%',
+                              radius: 100,
+                              titleStyle: const TextStyle(
+                                fontSize: 16,
+                                fontWeight: FontWeight.bold,
+                                color: Colors.white,
+                              ),
+                            ),
+                        ],
+                      ),
+                    ),
+                  ),
+                  
+                  // Legend
+                  Padding(
+                    padding: const EdgeInsets.symmetric(horizontal: 16.0),
+                    child: Row(
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      children: [
+                        _buildLegendItem('Correct Answers', Colors.green),
+                        const SizedBox(width: 24),
+                        _buildLegendItem('Incorrect Answers', Colors.red),
+                      ],
+                    ),
+                  ),
+                ],
               ),
-              backgroundColor: Theme.of(context).primaryColor,
             ),
           ),
         ],
@@ -444,34 +484,59 @@ class QuizResultScreen extends StatelessWidget {
     );
   }
 
-  Widget _buildScoreItem(
-    String label,
-    String value,
-    IconData icon,
-    Color color,
-  ) {
-    return Expanded(
-      child: Column(
-        children: [
-          Icon(
-            icon,
-            color: color,
-            size: 28,
+  Widget _buildInfoRow({
+    required String title,
+    required String value,
+    required IconData icon,
+    required Color iconColor,
+  }) {
+    return Row(
+      children: [
+        Icon(
+          icon,
+          size: 18,
+          color: iconColor,
+        ),
+        const SizedBox(width: 8),
+        Text(
+          title,
+          style: const TextStyle(
+            fontSize: 14,
+            fontWeight: FontWeight.w500,
           ),
-          const SizedBox(height: 8),
-          Text(
+        ),
+        const SizedBox(width: 4),
+        Expanded(
+          child: Text(
             value,
-            style: TextStyle(
-              fontSize: 24,
-              fontWeight: FontWeight.bold,
-              color: color,
+            style: const TextStyle(
+              fontSize: 14,
             ),
           ),
+        ),
+      ],
+    );
+  }
+
+  Widget _buildSectionHeader(BuildContext context, String title) {
+    return Padding(
+      padding: const EdgeInsets.symmetric(vertical: 8.0, horizontal: 4.0),
+      child: Row(
+        children: [
+          Container(
+            width: 4,
+            height: 16,
+            decoration: BoxDecoration(
+              color: Theme.of(context).primaryColor,
+              borderRadius: BorderRadius.circular(2),
+            ),
+          ),
+          const SizedBox(width: 8),
           Text(
-            label,
-            style: TextStyle(
-              fontSize: 14,
-              color: Colors.grey[600],
+            title,
+            style: const TextStyle(
+              fontSize: 16,
+              fontWeight: FontWeight.bold,
             ),
           ),
         ],
@@ -483,131 +548,298 @@ class QuizResultScreen extends StatelessWidget {
     return Row(
       children: [
         Container(
-          width: 16,
-          height: 16,
+          width: 12,
+          height: 12,
           decoration: BoxDecoration(
             color: color,
             shape: BoxShape.circle,
           ),
         ),
-        const SizedBox(width: 8),
-        Text(label),
+        const SizedBox(width: 4),
+        Text(
+          label,
+          style: TextStyle(
+            fontSize: 12,
+            color: Colors.grey[700],
+          ),
+        ),
       ],
     );
   }
 
-  Widget _buildAnswerItem({
-    required int questionNumber,
-    required String question,
-    required bool isCorrect,
-    required String userAnswer,
-    required String correctAnswer,
-  }) {
-    return Container(
-      margin: const EdgeInsets.only(bottom: 16),
-      padding: const EdgeInsets.all(16),
-      decoration: BoxDecoration(
-        borderRadius: BorderRadius.circular(12),
-        color: isCorrect ? Colors.green.withAlpha(30) : Colors.red.withAlpha(30),
-      ),
+  Widget _buildAnswersList(BuildContext context) {
+    return Padding(
+      padding: const EdgeInsets.symmetric(horizontal: 16.0, vertical: 8.0),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          // Question number and status
-          Row(
-            children: [
-              Container(
-                width: 32,
-                height: 32,
-                decoration: BoxDecoration(
-                  color: isCorrect ? Colors.green : Colors.red,
-                  shape: BoxShape.circle,
-                ),
-                child: Center(
-                  child: Text(
-                    questionNumber.toString(),
-                    style: const TextStyle(
-                      color: Colors.white,
-                      fontWeight: FontWeight.bold,
-                    ),
-                  ),
-                ),
-              ),
-              const SizedBox(width: 12),
-              Text(
-                isCorrect ? 'Correct' : 'Incorrect',
-                style: TextStyle(
-                  fontWeight: FontWeight.bold,
-                  color: isCorrect ? Colors.green : Colors.red,
-                ),
-              ),
-            ],
-          ),
-          
-          const SizedBox(height: 12),
-          
-          // Question text
-          Text(
-            question,
-            style: const TextStyle(
-              fontWeight: FontWeight.w500,
-              fontSize: 16,
-            ),
-          ),
-          
+          _buildSectionHeader(context, 'Question Summary'),
           const SizedBox(height: 8),
-          
-          // User answer
-          Row(
-            children: [
-              const Text(
-                'Your answer: ',
-                style: TextStyle(
-                  color: Colors.grey,
-                ),
-              ),
-              Expanded(
-                child: Text(
-                  userAnswer,
-                  style: TextStyle(
-                    fontWeight: FontWeight.w500,
-                    color: isCorrect ? Colors.green : Colors.red,
-                  ),
-                ),
-              ),
-            ],
-          ),
-          
-          // Show correct answer if wrong
-          if (!isCorrect) ...[
-            const SizedBox(height: 4),
+          ...List.generate(questions.length, (index) {
+            final question = questions[index];
+            final userAnswer = userAnswers[question.id];
+            final isCorrect = userAnswer == question.correctAnswerIndex;
+            final isSkipped = userAnswer == null;
+            
+            return _buildAnswerItem(
+              context: context,
+              questionNumber: index + 1,
+              question: question.question,
+              isCorrect: isCorrect,
+              isSkipped: isSkipped,
+              userAnswer: isSkipped
+                  ? 'Not answered'
+                  : question.options[userAnswer!],
+              correctAnswer: question.options[question.correctAnswerIndex],
+            );
+          }),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildAnswerItem({
+    required BuildContext context,
+    required int questionNumber,
+    required String question,
+    required bool isCorrect,
+    required bool isSkipped,
+    required String userAnswer,
+    required String correctAnswer,
+  }) {
+    final Color statusColor = isSkipped
+        ? Colors.amber
+        : isCorrect
+            ? Colors.green
+            : Colors.red;
+    
+    final String statusText = isSkipped
+        ? 'Skipped'
+        : isCorrect
+            ? 'Correct'
+            : 'Incorrect';
+    
+    final IconData statusIcon = isSkipped
+        ? Icons.help_outline
+        : isCorrect
+            ? Icons.check_circle_outline
+            : Icons.cancel_outlined;
+    
+    return Card(
+      margin: const EdgeInsets.only(bottom: 10),
+      elevation: 0,
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.circular(12),
+        side: BorderSide(
+          color: statusColor.withOpacity(0.5),
+          width: 1,
+        ),
+      ),
+      color: statusColor.withOpacity(0.05),
+      child: Padding(
+        padding: const EdgeInsets.all(16),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            // Question number and status
             Row(
+              crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                const Text(
-                  'Correct answer: ',
-                  style: TextStyle(
-                    color: Colors.grey,
+                // Question number
+                Container(
+                  width: 32,
+                  height: 32,
+                  decoration: BoxDecoration(
+                    color: statusColor.withOpacity(0.1),
+                    shape: BoxShape.circle,
+                    border: Border.all(
+                      color: statusColor,
+                      width: 1.5,
+                    ),
+                  ),
+                  child: Center(
+                    child: Text(
+                      questionNumber.toString(),
+                      style: TextStyle(
+                        color: statusColor,
+                        fontWeight: FontWeight.bold,
+                      ),
+                    ),
                   ),
                 ),
+                const SizedBox(width: 12),
+                // Status and question
                 Expanded(
-                  child: Text(
-                    correctAnswer,
-                    style: const TextStyle(
-                      fontWeight: FontWeight.w500,
-                      color: Colors.green,
-                    ),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Row(
+                        children: [
+                          Icon(
+                            statusIcon,
+                            size: 16,
+                            color: statusColor,
+                          ),
+                          const SizedBox(width: 4),
+                          Text(
+                            statusText,
+                            style: TextStyle(
+                              fontSize: 14,
+                              fontWeight: FontWeight.w500,
+                              color: statusColor,
+                            ),
+                          ),
+                        ],
+                      ),
+                      const SizedBox(height: 4),
+                      Text(
+                        question,
+                        style: const TextStyle(
+                          fontWeight: FontWeight.w500,
+                          fontSize: 15,
+                        ),
+                      ),
+                    ],
                   ),
                 ),
               ],
             ),
+            
+            // Divider
+            Padding(
+              padding: const EdgeInsets.symmetric(vertical: 12.0),
+              child: Divider(
+                color: statusColor.withOpacity(0.2),
+                height: 1,
+              ),
+            ),
+            
+            // User answer
+            if (!isSkipped) ...[
+              Row(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  const Text(
+                    'Your answer: ',
+                    style: TextStyle(
+                      color: Colors.grey,
+                      fontSize: 13,
+                    ),
+                  ),
+                  const SizedBox(width: 4),
+                  Expanded(
+                    child: Text(
+                      userAnswer,
+                      style: TextStyle(
+                        fontSize: 14,
+                        fontWeight: FontWeight.w500,
+                        color: isCorrect ? Colors.green : Colors.red,
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+            ] else ...[
+              const Text(
+                'You did not answer this question',
+                style: TextStyle(
+                  fontSize: 14,
+                  color: Colors.amber,
+                  fontStyle: FontStyle.italic,
+                ),
+              ),
+            ],
+            
+            // Show correct answer if wrong or skipped
+            if (!isCorrect) ...[
+              const SizedBox(height: 8),
+              Row(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  const Text(
+                    'Correct answer: ',
+                    style: TextStyle(
+                      color: Colors.grey,
+                      fontSize: 13,
+                    ),
+                  ),
+                  const SizedBox(width: 4),
+                  Expanded(
+                    child: Text(
+                      correctAnswer,
+                      style: const TextStyle(
+                        fontSize: 14,
+                        fontWeight: FontWeight.w500,
+                        color: Colors.green,
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+            ],
           ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildActionButtons(BuildContext context) {
+    return Padding(
+      padding: const EdgeInsets.symmetric(vertical: 24.0, horizontal: 16.0),
+      child: Row(
+        children: [
+          Expanded(
+            child: OutlinedButton.icon(
+              onPressed: () {
+                // Navigate back to quiz list
+                Navigator.of(context).popUntil((route) => route.isFirst || route.settings.name == '/quiz-list');
+              },
+              icon: const Icon(Icons.list),
+              label: const Text('Back to Quiz List'),
+              style: OutlinedButton.styleFrom(
+                padding: const EdgeInsets.symmetric(
+                  vertical: 12,
+                ),
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(8),
+                ),
+              ),
+            ),
+          ),
+          const SizedBox(width: 12),
+          Expanded(
+            child: ElevatedButton.icon(
+              onPressed: () {
+                // Pop twice to go back to quiz screen and try again
+                Navigator.of(context).pop();
+                Navigator.of(context).pop();
+              },
+              icon: const Icon(Icons.replay),
+              label: const Text('Try Again'),
+              style: ElevatedButton.styleFrom(
+                padding: const EdgeInsets.symmetric(
+                  vertical: 12,
+                ),
+                elevation: 0,
+                backgroundColor: Theme.of(context).primaryColor,
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(8),
+                ),
+              ),
+            ),
+          ),
         ],
       ),
     );
   }
 
   String _formatDate(DateTime date) {
-    return '${date.month}/${date.day}/${date.year}';
+    final months = [
+      'January', 'February', 'March', 'April', 'May', 'June',
+      'July', 'August', 'September', 'October', 'November', 'December'
+    ];
+    
+    return '${months[date.month - 1]} ${date.day}, ${date.year}';
   }
 
   String _formatDuration(Duration duration) {
@@ -618,9 +850,11 @@ class QuizResultScreen extends StatelessWidget {
 
   String _getResultMessage(double score) {
     if (score >= 90) return 'Excellent!';
-    if (score >= 70) return 'Good Job!';
-    if (score >= 50) return 'Not Bad';
-    return 'Keep Practicing';
+    if (score >= 80) return 'Great Job!';
+    if (score >= 70) return 'Good Work!';
+    if (score >= 60) return 'Not Bad';
+    if (score >= 50) return 'Keep Learning';
+    return 'Try Again';
   }
 
   Color _getScoreColor(double score) {
@@ -628,5 +862,18 @@ class QuizResultScreen extends StatelessWidget {
     if (score >= 70) return Colors.blue;
     if (score >= 50) return Colors.orange;
     return Colors.red;
+  }
+  
+  Color _getDifficultyColor(String difficulty) {
+    switch (difficulty.toLowerCase()) {
+      case 'easy':
+        return Colors.green;
+      case 'medium':
+        return Colors.orange;
+      case 'hard':
+        return Colors.red;
+      default:
+        return Colors.blue;
+    }
   }
 }
