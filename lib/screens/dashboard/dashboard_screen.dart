@@ -3,7 +3,7 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:flutter_blue_plus/flutter_blue_plus.dart';
 import 'dart:async';
-import '../learning/learning_center_initializer_screen.dart';
+//import '../learning/learning_center_initializer_screen.dart'; only use once to initialize remove eventually!
 import '/utils/ble_manager.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import '..//registration/firebase_service.dart';
@@ -286,7 +286,11 @@ class DashboardScreenState extends State<DashboardScreen> {
         behavior: SnackBarBehavior.floating,
       ),
     );
-    
+     },
+),
+  ];
+}
+    /*
     // Increment tap counter
     _adminTapCount++;
     
@@ -295,13 +299,11 @@ class DashboardScreenState extends State<DashboardScreen> {
       _adminTapCount = 0;
       _showAdminDialog();
     }
-  },
-),
-  ];
-}
-int _adminTapCount = 0;
+ 
+int _adminTapCount = 0; 
+*/
 
-void _showAdminDialog() {
+/*void _showAdminDialog() {
   showDialog(
     context: context,
     builder: (dialogContext) => AlertDialog(
@@ -347,9 +349,9 @@ void _showAdminDialog() {
       ],
     ),
   );
-}
+}*/
 
-void _initializeDatabase(BuildContext context) {
+/*void _initializeDatabase(BuildContext context) {
   // Show loading dialog
   showDialog(
     context: context,
@@ -395,7 +397,7 @@ void _initializeDatabase(BuildContext context) {
       )
     );
   });
-}
+}*/
 
 
 
