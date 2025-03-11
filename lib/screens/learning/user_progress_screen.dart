@@ -4,10 +4,9 @@ import 'package:flutter/material.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import '../../utils/learning_center_models.dart';
 import '../../utils/learning_center_service.dart';
-import 'package:fl_chart/fl_chart.dart';
 
 class UserProgressScreen extends StatefulWidget {
-  const UserProgressScreen({Key? key}) : super(key: key);
+  const UserProgressScreen({super.key});
 
   @override
   State<UserProgressScreen> createState() => _UserProgressScreenState();
@@ -37,6 +36,108 @@ class _UserProgressScreenState extends State<UserProgressScreen> with SingleTick
     super.dispose();
   }
 
+  void _showResetConfirmationDialog() {
+    showDialog(
+      context: context,
+      builder: (BuildContext context) {
+        return AlertDialog(
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(16),
+          ),
+          title: Row(
+            children: const [
+              Icon(Icons.warning_amber_rounded, color: Colors.orange),
+              SizedBox(width: 8),
+              Text('Reset Progress'),
+            ],
+          ),
+          content: const Text(
+            'This will delete all your learning progress and quiz results. '
+            'This action cannot be undone. Are you sure you want to continue?'
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.of(context).pop(),
+              child: const Text('Cancel'),
+            ),
+            ElevatedButton(
+              onPressed: () {
+                _resetProgress();
+                Navigator.of(context).pop();
+              },
+              style: ElevatedButton.styleFrom(
+                backgroundColor: Colors.red,
+                foregroundColor: Colors.white,
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(8),
+                ),
+              ),
+              child: const Text('Reset'),
+            ),
+          ],
+        );
+      },
+    );
+  }
+
+  Future<void> _resetProgress() async {
+    try {
+      // Show loading indicator
+      showDialog(
+        context: context,
+        barrierDismissible: false,
+        builder: (BuildContext context) {
+          return const Center(
+            child: CircularProgressIndicator(),
+          );
+        },
+      );
+      
+      await _learningService.resetUserProgress(_userId);
+      
+      // Close the loading dialog
+      if (mounted) {
+        Navigator.of(context).pop();
+      }
+      
+      // Refresh the data
+      if (mounted) {
+        setState(() {
+          _userProgressFuture = _learningService.getUserProgress(_userId);
+          _topicsFuture = _learningService.getLearningTopics();
+          _quizzesFuture = _learningService.getQuizzes();
+        });
+      }
+      
+      // Show success message
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('Your progress has been reset successfully'),
+            backgroundColor: Colors.green,
+            behavior: SnackBarBehavior.floating,
+          ),
+        );
+      }
+    } catch (e) {
+      // Close the loading dialog
+      if (mounted) {
+        Navigator.of(context).pop();
+      }
+      
+      // Show error message
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Error resetting progress: $e'),
+            backgroundColor: Colors.red,
+            behavior: SnackBarBehavior.floating,
+          ),
+        );
+      }
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -46,6 +147,13 @@ class _UserProgressScreenState extends State<UserProgressScreen> with SingleTick
           style: TextStyle(fontWeight: FontWeight.w600),
         ),
         elevation: 2,
+        actions: [
+          IconButton(
+            icon: const Icon(Icons.refresh),
+            tooltip: 'Reset Progress',
+            onPressed: _showResetConfirmationDialog,
+          ),
+        ],
         bottom: TabBar(
           controller: _tabController,
           tabs: const [
@@ -120,12 +228,6 @@ class _UserProgressScreenState extends State<UserProgressScreen> with SingleTick
         final topicCompletionPercentage = totalTopics > 0
             ? (completedTopics / totalTopics * 100).toStringAsFixed(1)
             : '0';
-            
-        final quizzesTaken = userProgress.quizResults.length;
-        final totalQuizzes = quizzes.length;
-        final quizCompletionPercentage = totalQuizzes > 0
-            ? (quizzesTaken / totalQuizzes * 100).toStringAsFixed(1)
-            : '0';
         
         // Calculate average score
         double averageScore = 0;
@@ -133,6 +235,15 @@ class _UserProgressScreenState extends State<UserProgressScreen> with SingleTick
           final totalScore = userProgress.quizResults.fold<double>(
             0, (sum, result) => sum + result.score);
           averageScore = totalScore / userProgress.quizResults.length;
+        }
+        
+        // Get highest score per quiz
+        Map<String, QuizResult> bestQuizResults = {};
+        for (var result in userProgress.quizResults) {
+          if (!bestQuizResults.containsKey(result.quizId) || 
+              bestQuizResults[result.quizId]!.score < result.score) {
+            bestQuizResults[result.quizId] = result;
+          }
         }
         
         // Get last accessed topics
@@ -157,7 +268,6 @@ class _UserProgressScreenState extends State<UserProgressScreen> with SingleTick
                 children: [
                   _buildProgressSummaryCard(
                     topicCompletionPercentage,
-                    quizCompletionPercentage,
                     averageScore,
                   ),
                   
@@ -189,16 +299,16 @@ class _UserProgressScreenState extends State<UserProgressScreen> with SingleTick
                   
                   const SizedBox(height: 24),
                   
-                  // Quiz performance by category
+                  // Quiz progress
                   const Text(
-                    'Quiz Performance by Category',
+                    'Quiz Progress',
                     style: TextStyle(
                       fontSize: 18,
                       fontWeight: FontWeight.bold,
                     ),
                   ),
                   const SizedBox(height: 16),
-                  _buildQuizPerformanceCard(userProgress, quizzes),
+                  _buildQuizProgressCard(quizzes, bestQuizResults),
                   
                   const SizedBox(height: 16),
                 ],
@@ -317,7 +427,6 @@ class _UserProgressScreenState extends State<UserProgressScreen> with SingleTick
 
   Widget _buildProgressSummaryCard(
     String topicCompletionPercentage,
-    String quizCompletionPercentage,
     double averageScore,
   ) {
     return Card(
@@ -343,17 +452,12 @@ class _UserProgressScreenState extends State<UserProgressScreen> with SingleTick
             Row(
               children: [
                 _buildSummaryItem(
-                  'Topics',
+                  'Topics Completed',
                   '$topicCompletionPercentage%',
                   Colors.blue,
                 ),
                 _buildSummaryItem(
-                  'Quizzes',
-                  '$quizCompletionPercentage%',
-                  Colors.orange,
-                ),
-                _buildSummaryItem(
-                  'Avg. Score',
+                  'Avg. Quiz Score',
                   '${averageScore.toStringAsFixed(1)}%',
                   _getScoreColor(averageScore),
                 ),
@@ -364,7 +468,7 @@ class _UserProgressScreenState extends State<UserProgressScreen> with SingleTick
       ),
     );
   }
-
+  
   Widget _buildTopicProgressCard(
     List<LearningTopic> topics,
     UserProgress userProgress,
@@ -438,7 +542,7 @@ class _UserProgressScreenState extends State<UserProgressScreen> with SingleTick
                   ],
                 ),
               );
-            }).toList(),
+            }),
           ],
         ),
       ),
@@ -553,11 +657,11 @@ class _UserProgressScreenState extends State<UserProgressScreen> with SingleTick
     );
   }
 
-  Widget _buildQuizPerformanceCard(
-    UserProgress userProgress,
+  Widget _buildQuizProgressCard(
     List<Quiz> quizzes,
+    Map<String, QuizResult> bestQuizResults,
   ) {
-    if (userProgress.quizResults.isEmpty) {
+    if (bestQuizResults.isEmpty) {
       return Card(
         elevation: 2,
         shape: RoundedRectangleBorder(
@@ -569,19 +673,19 @@ class _UserProgressScreenState extends State<UserProgressScreen> with SingleTick
             child: Column(
               children: const [
                 Icon(
-                  Icons.bar_chart,
+                  Icons.quiz,
                   size: 32,
                   color: Colors.grey,
                 ),
                 SizedBox(height: 8),
                 Text(
-                  'No quiz data available yet',
+                  'No quizzes completed yet',
                   style: TextStyle(color: Colors.grey),
                   textAlign: TextAlign.center,
                 ),
                 SizedBox(height: 4),
                 Text(
-                  'Complete quizzes to see your performance',
+                  'Complete quizzes to see your progress',
                   style: TextStyle(color: Colors.grey, fontSize: 12),
                   textAlign: TextAlign.center,
                 ),
@@ -592,38 +696,9 @@ class _UserProgressScreenState extends State<UserProgressScreen> with SingleTick
       );
     }
     
-    // Group results by category
-    Map<String, List<QuizResult>> resultsByCategory = {};
-    
-    for (var result in userProgress.quizResults) {
-      // Find quiz to get its category
-      final quiz = quizzes.firstWhere(
-        (q) => q.id == result.quizId,
-        orElse: () => Quiz(
-          id: 'unknown',
-          title: 'Unknown Quiz',
-          description: '',
-          category: 'Unknown',
-          difficulty: 'Medium',
-          questions: [],
-        ),
-      );
-      
-      final category = quiz.category;
-      
-      if (!resultsByCategory.containsKey(category)) {
-        resultsByCategory[category] = [];
-      }
-      
-      resultsByCategory[category]!.add(result);
-    }
-    
-    // Calculate average score by category
-    Map<String, double> avgScoreByCategory = {};
-    resultsByCategory.forEach((category, results) {
-      double totalScore = results.fold(0.0, (sum, result) => sum + result.score);
-      avgScoreByCategory[category] = totalScore / results.length;
-    });
+    // Count completed quizzes
+    final completedQuizzes = bestQuizResults.length;
+    final totalQuizzes = quizzes.length;
     
     return Card(
       elevation: 2,
@@ -635,120 +710,81 @@ class _UserProgressScreenState extends State<UserProgressScreen> with SingleTick
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            // Bar chart
-            SizedBox(
-              height: 200,
-              child: BarChart(
-                BarChartData(
-                  alignment: BarChartAlignment.spaceAround,
-                  maxY: 100,
-                  // Disable touch handling for simplicity and compatibility
-                  barTouchData: BarTouchData(
-                    enabled: false,
-                  ),
-                  titlesData: FlTitlesData(
-                    show: true,
-                    // Simplify titles for better compatibility across versions
-                    bottomTitles: AxisTitles(
-                      sideTitles: SideTitles(
-                        showTitles: true,
-                        getTitlesWidget: (value, meta) {
-                          if (value.toInt() >= 0 && value.toInt() < avgScoreByCategory.length) {
-                            String category = avgScoreByCategory.keys.elementAt(value.toInt());
-                            String abbr = category.substring(0, min(3, category.length));
-                            return Text(
-                              abbr,
-                              style: const TextStyle(fontSize: 12),
-                            );
-                          }
-                          return const Text('');
-                        },
-                      ),
-                    ),
-                    leftTitles: AxisTitles(
-                      sideTitles: SideTitles(
-                        showTitles: true,
-                        interval: 20,
-                        reservedSize: 30,
-                        getTitlesWidget: (value, meta) {
-                          return Text(
-                            value.toInt().toString(),
-                            style: const TextStyle(fontSize: 10),
-                          );
-                        },
-                      ),
-                    ),
-                    topTitles: AxisTitles(sideTitles: SideTitles(showTitles: false)),
-                    rightTitles: AxisTitles(sideTitles: SideTitles(showTitles: false)),
-                  ),
-                  gridData: FlGridData(
-                    show: true,
-                    getDrawingHorizontalLine: (value) {
-                      return FlLine(
-                        color: Colors.grey[300],
-                        strokeWidth: 1,
-                      );
-                    },
-                    drawVerticalLine: false,
-                  ),
-                  borderData: FlBorderData(show: false),
-                  barGroups: List.generate(
-                    avgScoreByCategory.length,
-                    (index) {
-                      final category = avgScoreByCategory.keys.elementAt(index);
-                      final score = avgScoreByCategory[category]!;
-                      
-                      return BarChartGroupData(
-                        x: index,
-                        barRods: [
-                          BarChartRodData(
-                            toY: score,
-                            color: _getScoreColor(score),
-                            width: 20,
-                            borderRadius: const BorderRadius.only(
-                              topLeft: Radius.circular(6),
-                              topRight: Radius.circular(6),
-                            ),
-                          ),
-                        ],
-                      );
-                    },
+            Row(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              children: [
+                Text(
+                  'Completed: $completedQuizzes/$totalQuizzes',
+                  style: TextStyle(
+                    fontWeight: FontWeight.w500,
                   ),
                 ),
+                Text(
+                  '${(completedQuizzes / totalQuizzes * 100).toStringAsFixed(1)}%',
+                  style: TextStyle(
+                    fontWeight: FontWeight.bold,
+                    color: Theme.of(context).primaryColor,
+                  ),
+                ),
+              ],
+            ),
+            
+            const SizedBox(height: 8),
+            
+            // Progress bar
+            LinearProgressIndicator(
+              value: totalQuizzes > 0 ? completedQuizzes / totalQuizzes : 0,
+              backgroundColor: Colors.grey[200],
+              valueColor: AlwaysStoppedAnimation<Color>(
+                Theme.of(context).primaryColor,
               ),
             ),
             
             const SizedBox(height: 16),
             
-            // Legend
-            SingleChildScrollView(
-              scrollDirection: Axis.horizontal,
-              child: Row(
-                children: avgScoreByCategory.entries.map((entry) {
-                  return Padding(
-                    padding: const EdgeInsets.only(right: 16.0),
-                    child: Row(
-                      children: [
-                        Container(
-                          width: 12,
-                          height: 12,
-                          decoration: BoxDecoration(
-                            color: _getScoreColor(entry.value),
-                            shape: BoxShape.rectangle,
-                            borderRadius: BorderRadius.circular(3),
+            // Quiz list with highest scores
+            ...quizzes.map((quiz) {
+              final hasResult = bestQuizResults.containsKey(quiz.id);
+              final bestScore = hasResult ? bestQuizResults[quiz.id]!.score : 0.0;
+              
+              return Padding(
+                padding: const EdgeInsets.only(bottom: 8.0),
+                child: Row(
+                  children: [
+                    Icon(
+                      hasResult ? Icons.check_circle : Icons.radio_button_unchecked,
+                      color: hasResult ? Colors.green : Colors.grey,
+                      size: 20,
+                    ),
+                    const SizedBox(width: 8),
+                    Expanded(
+                      child: Text(
+                        quiz.title,
+                        style: TextStyle(
+                          fontWeight: hasResult ? FontWeight.w500 : FontWeight.normal,
+                        ),
+                      ),
+                    ),
+                    if (hasResult)
+                      Container(
+                        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+                        decoration: BoxDecoration(
+                          color: _getScoreColor(bestScore).withAlpha(40),
+                          borderRadius: BorderRadius.circular(12),
+                        ),
+                        child: Text(
+                          '${bestScore.toStringAsFixed(1)}%',
+                          style: TextStyle(
+                            fontSize: 12,
+                            fontWeight: FontWeight.w500,
+                            color: _getScoreColor(bestScore),
                           ),
                         ),
-                        const SizedBox(width: 4),
-                        Text(
-                          '${entry.key}: ${entry.value.toStringAsFixed(1)}%',
-                          style: const TextStyle(fontSize: 12),
-                        ),
-                      ],
-                    ),
-                  );
-                }).toList(),
-              ),
-            ),
+                      ),
+                  ],
+                ),
+              );
+            }),
           ],
         ),
       ),
@@ -834,40 +870,22 @@ class _UserProgressScreenState extends State<UserProgressScreen> with SingleTick
             
             const Divider(height: 24),
             
-            // Score and details
-            Row(
-              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            // Score details - removed the "View Details" button
+            Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(
-                      'Score: ${result.score.toStringAsFixed(1)}%',
-                      style: TextStyle(
-                        fontSize: 16,
-                        fontWeight: FontWeight.bold,
-                        color: _getScoreColor(result.score),
-                      ),
-                    ),
-                    const SizedBox(height: 4),
-                    Text(
-                      'Correct: ${result.correctAnswers}/${result.totalQuestions}',
-                      style: const TextStyle(fontSize: 14),
-                    ),
-                  ],
+                Text(
+                  'Score: ${result.score.toStringAsFixed(1)}%',
+                  style: TextStyle(
+                    fontSize: 16,
+                    fontWeight: FontWeight.bold,
+                    color: _getScoreColor(result.score),
+                  ),
                 ),
-                OutlinedButton(
-                  onPressed: () {
-                    // For a real implementation, you would navigate to a detailed view
-                    // Here we'll just show a simple alert
-                    ScaffoldMessenger.of(context).showSnackBar(
-                      SnackBar(
-                        content: Text('Quiz result details not available in this demo'),
-                        behavior: SnackBarBehavior.floating,
-                      ),
-                    );
-                  },
-                  child: const Text('View Details'),
+                const SizedBox(height: 4),
+                Text(
+                  'Correct: ${result.correctAnswers}/${result.totalQuestions}',
+                  style: const TextStyle(fontSize: 14),
                 ),
               ],
             ),
@@ -924,9 +942,5 @@ class _UserProgressScreenState extends State<UserProgressScreen> with SingleTick
       default:
         return Colors.blue;
     }
-  }
-
-  int min(int a, int b) {
-    return a < b ? a : b;
   }
 }

@@ -258,6 +258,35 @@ class LearningCenterService {
     }
   }
 
+  
+Future<void> resetUserProgress(String userId) async {
+  try {
+    _logger.info('Resetting progress for user: $userId');
+    
+    // Create a fresh empty progress object
+    UserProgress emptyProgress = UserProgress(userId: userId);
+    
+    // Save the empty progress to Firebase
+    await _database
+        .child('learningCenter')
+        .child('userProgress')
+        .child(userId)
+        .set(emptyProgress.toMap());
+    
+    // Also remove individual quiz results
+    await _database
+        .child('learningCenter')
+        .child('quizResults')
+        .child(userId)
+        .remove();
+    
+    _logger.info('User progress reset successfully!');
+  } catch (e) {
+    _logger.severe('Error resetting user progress: $e');
+    rethrow;
+  }
+}
+
   Future<void> updateCompletedTopic(String userId, String topicId) async {
     try {
       UserProgress progress = await getUserProgress(userId);
@@ -284,36 +313,49 @@ class LearningCenterService {
     }
   }
 
-  Future<void> saveQuizResult(QuizResult result) async {
-    try {
-      UserProgress progress = await getUserProgress(result.userId);
-      
-      List<QuizResult> updatedResults = List.from(progress.quizResults);
+ Future<void> saveQuizResult(QuizResult result) async {
+  try {
+    UserProgress progress = await getUserProgress(result.userId);
+    
+    // Check if this quiz was already taken
+    List<QuizResult> updatedResults = List.from(progress.quizResults);
+    
+    // Find the index of the existing quiz result (if any)
+    int existingResultIndex = updatedResults.indexWhere((r) => r.quizId == result.quizId);
+    
+    if (existingResultIndex != -1) {
+      // Replace the existing result
+      updatedResults[existingResultIndex] = result;
+      _logger.info('Replaced existing quiz result for quiz: ${result.quizId}');
+    } else {
+      // Add new result
       updatedResults.add(result);
-      
-      UserProgress updatedProgress = UserProgress(
-        userId: result.userId,
-        completedTopics: progress.completedTopics,
-        quizResults: updatedResults,
-        lastAccessedTopics: progress.lastAccessedTopics,
-      );
-      
-      await saveUserProgress(updatedProgress);
-      
-      // Also save individual quiz result
-      await _database
-          .child('learningCenter')
-          .child('quizResults')
-          .child(result.userId)
-          .child(result.id)
-          .set(result.toMap());
-      
-      _logger.info('Quiz result saved successfully!');
-    } catch (e) {
-      _logger.severe('Error saving quiz result: $e');
-      rethrow;
+      _logger.info('Added new quiz result for quiz: ${result.quizId}');
     }
+    
+    UserProgress updatedProgress = UserProgress(
+      userId: result.userId,
+      completedTopics: progress.completedTopics,
+      quizResults: updatedResults,
+      lastAccessedTopics: progress.lastAccessedTopics,
+    );
+    
+    await saveUserProgress(updatedProgress);
+    
+    // Also save/update individual quiz result
+    await _database
+        .child('learningCenter')
+        .child('quizResults')
+        .child(result.userId)
+        .child(result.id)
+        .set(result.toMap());
+    
+    _logger.info('Quiz result saved successfully!');
+  } catch (e) {
+    _logger.severe('Error saving quiz result: $e');
+    rethrow;
   }
+}
   
   Future<String> getAudioUrl(String path) async {
     try {

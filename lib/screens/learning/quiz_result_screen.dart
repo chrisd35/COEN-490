@@ -1,9 +1,6 @@
 import 'package:flutter/material.dart';
 import '../../utils/learning_center_models.dart';
-import 'package:fl_chart/fl_chart.dart';
-import 'package:logging/logging.dart' as logging;
-
-final _logger = logging.Logger('QuizResultScreen');
+import '../../utils/app_routes.dart';
 
 class QuizResultScreen extends StatelessWidget {
   final Quiz quiz;
@@ -13,44 +10,52 @@ class QuizResultScreen extends StatelessWidget {
   final bool isTimeUp;
   
   const QuizResultScreen({
-    Key? key,
+    super.key,
     required this.quiz,
     required this.result,
     required this.questions,
     required this.userAnswers,
     this.isTimeUp = false,
-  }) : super(key: key);
+  });
 
-  @override
-  Widget build(BuildContext context) {
-    return WillPopScope(
-      onWillPop: () async {
-        // Go back to the quiz list screen
-        Navigator.of(context).popUntil((route) => route.isFirst || route.settings.name == '/quiz-list');
-        return false;
-      },
-      child: Scaffold(
-        backgroundColor: Colors.grey[50],
-        appBar: AppBar(
-          title: const Text(
-            'Quiz Results',
-            style: TextStyle(fontWeight: FontWeight.w600),
-          ),
-          elevation: 0,
-          automaticallyImplyLeading: false,
-          actions: [
-            Padding(
-              padding: const EdgeInsets.only(right: 8.0),
-              child: IconButton(
-                icon: const Icon(Icons.home),
-                tooltip: 'Return to Quiz List',
-                onPressed: () {
-                  Navigator.of(context).popUntil((route) => route.isFirst || route.settings.name == '/quiz-list');
-                },
-              ),
-            ),
-          ],
+@override
+Widget build(BuildContext context) {
+  return PopScope(
+    // Using PopScope with onPopInvokedWithResult instead of deprecated onPopInvoked
+    canPop: false,
+    onPopInvokedWithResult: (didPop, dynamic _) {
+      // If didPop is true, the pop already happened and we shouldn't navigate
+      if (!didPop) {
+        // Go back to the quiz screen (single pop)
+        Navigator.of(context).pop();
+      }
+      // Return false to prevent the default pop behavior
+    },
+    child: Scaffold(
+      backgroundColor: Colors.grey[50],
+      appBar: AppBar(
+        title: const Text(
+          'Quiz Results',
+          style: TextStyle(fontWeight: FontWeight.w600),
         ),
+        elevation: 0,
+        automaticallyImplyLeading: false,
+        actions: [
+          Padding(
+            padding: const EdgeInsets.only(right: 8.0),
+            child: IconButton(
+              icon: const Icon(Icons.home),
+              tooltip: 'Return to Learning Center',
+              onPressed: () {
+                // Navigate to the learning center screen
+                Navigator.of(context).popUntil(
+                  (route) => route.settings.name == AppRoutes.learningCenter
+                );
+              },
+            ),
+          ),
+        ],
+      ),
         body: SingleChildScrollView(
           child: Column(
             children: [
@@ -76,8 +81,8 @@ class QuizResultScreen extends StatelessWidget {
       decoration: BoxDecoration(
         gradient: LinearGradient(
           colors: [
-            scoreColor.withOpacity(0.7),
-            scoreColor.withOpacity(0.5),
+            scoreColor.withAlpha(179), // 0.7 * 255 ≈ 179
+            scoreColor.withAlpha(128), // 0.5 * 255 ≈ 128
           ],
           begin: Alignment.topCenter,
           end: Alignment.bottomCenter,
@@ -88,7 +93,7 @@ class QuizResultScreen extends StatelessWidget {
         ),
         boxShadow: [
           BoxShadow(
-            color: scoreColor.withOpacity(0.3),
+            color: scoreColor.withAlpha(77), // 0.3 * 255 ≈ 77
             blurRadius: 10,
             offset: const Offset(0, 4),
           ),
@@ -105,10 +110,10 @@ class QuizResultScreen extends StatelessWidget {
                 vertical: 8,
               ),
               decoration: BoxDecoration(
-                color: Colors.white.withOpacity(0.3),
+                color: Colors.white.withAlpha(77), // 0.3 * 255 ≈ 77
                 borderRadius: BorderRadius.circular(16),
                 border: Border.all(
-                  color: Colors.white.withOpacity(0.5),
+                  color: Colors.white.withAlpha(128), // 0.5 * 255 ≈ 128
                   width: 1,
                 ),
               ),
@@ -141,9 +146,9 @@ class QuizResultScreen extends StatelessWidget {
                 height: 140,
                 decoration: BoxDecoration(
                   shape: BoxShape.circle,
-                  color: Colors.white.withOpacity(0.2),
+                  color: Colors.white.withAlpha(51), // 0.2 * 255 ≈ 51
                   border: Border.all(
-                    color: Colors.white.withOpacity(0.8),
+                    color: Colors.white.withAlpha(204), // 0.8 * 255 ≈ 204
                     width: 2,
                   ),
                 ),
@@ -178,7 +183,7 @@ class QuizResultScreen extends StatelessWidget {
           Container(
             padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 12),
             decoration: BoxDecoration(
-              color: Colors.white.withOpacity(0.2),
+              color: Colors.white.withAlpha(51), // 0.2 * 255 ≈ 51
               borderRadius: BorderRadius.circular(12),
             ),
             child: Column(
@@ -212,7 +217,6 @@ class QuizResultScreen extends StatelessWidget {
     // Calculate statistics
     int correct = result.correctAnswers;
     int incorrect = result.totalQuestions - result.correctAnswers;
-    int skipped = questions.length - userAnswers.length;
     
     return Padding(
       padding: const EdgeInsets.symmetric(horizontal: 16.0, vertical: 8.0),
@@ -259,7 +263,7 @@ class QuizResultScreen extends StatelessWidget {
         shape: RoundedRectangleBorder(
           borderRadius: BorderRadius.circular(12),
           side: BorderSide(
-            color: Colors.grey.withOpacity(0.1),
+            color: Colors.grey.withAlpha(26), // 0.1 * 255 ≈ 26
             width: 1,
           ),
         ),
@@ -332,7 +336,7 @@ class QuizResultScreen extends StatelessWidget {
             Container(
               padding: const EdgeInsets.all(12),
               decoration: BoxDecoration(
-                color: color.withOpacity(0.1),
+                color: color.withAlpha(26), // 0.1 * 255 ≈ 26
                 shape: BoxShape.circle,
               ),
               child: Icon(
@@ -375,7 +379,6 @@ class QuizResultScreen extends StatelessWidget {
   Widget _buildStatisticsSection(BuildContext context) {
     // Calculate statistics
     int correct = result.correctAnswers;
-    int incorrect = result.totalQuestions - result.correctAnswers;
     
     return Padding(
       padding: const EdgeInsets.symmetric(horizontal: 16.0, vertical: 8.0),
@@ -389,7 +392,7 @@ class QuizResultScreen extends StatelessWidget {
             shape: RoundedRectangleBorder(
               borderRadius: BorderRadius.circular(16),
               side: BorderSide(
-                color: Colors.grey.withOpacity(0.1),
+                color: Colors.grey.withAlpha(26), // 0.1 * 255 ≈ 26
                 width: 1,
               ),
             ),
@@ -423,56 +426,17 @@ class QuizResultScreen extends StatelessWidget {
                     iconColor: Colors.purple,
                   ),
                   
-                  const SizedBox(height: 16),
-                  
-                  // Chart
-                  Container(
-                    height: 200,
-                    padding: const EdgeInsets.all(8),
-                    child: PieChart(
-                      PieChartData(
-                        sectionsSpace: 2,
-                        centerSpaceRadius: 40,
-                        sections: [
-                          if (correct > 0)
-                            PieChartSectionData(
-                              color: Colors.green,
-                              value: correct.toDouble(),
-                              title: '${(correct / result.totalQuestions * 100).toStringAsFixed(0)}%',
-                              radius: 100,
-                              titleStyle: const TextStyle(
-                                fontSize: 16,
-                                fontWeight: FontWeight.bold,
-                                color: Colors.white,
-                              ),
-                            ),
-                          if (incorrect > 0)
-                            PieChartSectionData(
-                              color: Colors.red,
-                              value: incorrect.toDouble(),
-                              title: '${(incorrect / result.totalQuestions * 100).toStringAsFixed(0)}%',
-                              radius: 100,
-                              titleStyle: const TextStyle(
-                                fontSize: 16,
-                                fontWeight: FontWeight.bold,
-                                color: Colors.white,
-                              ),
-                            ),
-                        ],
-                      ),
-                    ),
-                  ),
-                  
-                  // Legend
+                  // Summary text instead of chart
                   Padding(
-                    padding: const EdgeInsets.symmetric(horizontal: 16.0),
-                    child: Row(
-                      mainAxisAlignment: MainAxisAlignment.center,
-                      children: [
-                        _buildLegendItem('Correct Answers', Colors.green),
-                        const SizedBox(width: 24),
-                        _buildLegendItem('Incorrect Answers', Colors.red),
-                      ],
+                    padding: const EdgeInsets.symmetric(vertical: 16.0),
+                    child: Text(
+                      'You answered $correct out of ${result.totalQuestions} questions correctly.',
+                      style: TextStyle(
+                        fontSize: 16,
+                        fontWeight: FontWeight.w500,
+                        color: Colors.grey[800],
+                      ),
+                      textAlign: TextAlign.center,
                     ),
                   ),
                 ],
@@ -544,29 +508,6 @@ class QuizResultScreen extends StatelessWidget {
     );
   }
 
-  Widget _buildLegendItem(String label, Color color) {
-    return Row(
-      children: [
-        Container(
-          width: 12,
-          height: 12,
-          decoration: BoxDecoration(
-            color: color,
-            shape: BoxShape.circle,
-          ),
-        ),
-        const SizedBox(width: 4),
-        Text(
-          label,
-          style: TextStyle(
-            fontSize: 12,
-            color: Colors.grey[700],
-          ),
-        ),
-      ],
-    );
-  }
-
   Widget _buildAnswersList(BuildContext context) {
     return Padding(
       padding: const EdgeInsets.symmetric(horizontal: 16.0, vertical: 8.0),
@@ -589,7 +530,7 @@ class QuizResultScreen extends StatelessWidget {
               isSkipped: isSkipped,
               userAnswer: isSkipped
                   ? 'Not answered'
-                  : question.options[userAnswer!],
+                  : question.options[userAnswer],
               correctAnswer: question.options[question.correctAnswerIndex],
             );
           }),
@@ -631,11 +572,11 @@ class QuizResultScreen extends StatelessWidget {
       shape: RoundedRectangleBorder(
         borderRadius: BorderRadius.circular(12),
         side: BorderSide(
-          color: statusColor.withOpacity(0.5),
+          color: statusColor.withAlpha(128), // 0.5 * 255 ≈ 128
           width: 1,
         ),
       ),
-      color: statusColor.withOpacity(0.05),
+      color: statusColor.withAlpha(13), // 0.05 * 255 ≈ 13
       child: Padding(
         padding: const EdgeInsets.all(16),
         child: Column(
@@ -650,7 +591,7 @@ class QuizResultScreen extends StatelessWidget {
                   width: 32,
                   height: 32,
                   decoration: BoxDecoration(
-                    color: statusColor.withOpacity(0.1),
+                    color: statusColor.withAlpha(26), // 0.1 * 255 ≈ 26
                     shape: BoxShape.circle,
                     border: Border.all(
                       color: statusColor,
@@ -709,7 +650,7 @@ class QuizResultScreen extends StatelessWidget {
             Padding(
               padding: const EdgeInsets.symmetric(vertical: 12.0),
               child: Divider(
-                color: statusColor.withOpacity(0.2),
+                color: statusColor.withAlpha(51), // 0.2 * 255 ≈ 51
                 height: 1,
               ),
             ),
@@ -784,54 +725,64 @@ class QuizResultScreen extends StatelessWidget {
   }
 
   Widget _buildActionButtons(BuildContext context) {
-    return Padding(
-      padding: const EdgeInsets.symmetric(vertical: 24.0, horizontal: 16.0),
-      child: Row(
-        children: [
-          Expanded(
-            child: OutlinedButton.icon(
-              onPressed: () {
-                // Navigate back to quiz list
-                Navigator.of(context).popUntil((route) => route.isFirst || route.settings.name == '/quiz-list');
-              },
-              icon: const Icon(Icons.list),
-              label: const Text('Back to Quiz List'),
-              style: OutlinedButton.styleFrom(
-                padding: const EdgeInsets.symmetric(
-                  vertical: 12,
-                ),
-                shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(8),
-                ),
+  return Padding(
+    padding: const EdgeInsets.symmetric(vertical: 24.0, horizontal: 16.0),
+    child: Row(
+      children: [
+        Expanded(
+          child: OutlinedButton.icon(
+            onPressed: () {
+              // Navigate directly to the quiz list screen
+              Navigator.of(context).pushNamedAndRemoveUntil(
+                AppRoutes.quizList, 
+                (route) => route.settings.name == AppRoutes.learningCenter || route.isFirst
+              );
+            },
+            icon: const Icon(Icons.list),
+            label: const Text('Quiz List'),
+            style: OutlinedButton.styleFrom(
+              padding: const EdgeInsets.symmetric(
+                vertical: 12,
               ),
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(8),
+              ),
+              alignment: Alignment.center,
             ),
           ),
-          const SizedBox(width: 12),
-          Expanded(
-            child: ElevatedButton.icon(
-              onPressed: () {
-                // Pop twice to go back to quiz screen and try again
-                Navigator.of(context).pop();
-                Navigator.of(context).pop();
-              },
-              icon: const Icon(Icons.replay),
-              label: const Text('Try Again'),
-              style: ElevatedButton.styleFrom(
-                padding: const EdgeInsets.symmetric(
-                  vertical: 12,
-                ),
-                elevation: 0,
-                backgroundColor: Theme.of(context).primaryColor,
-                shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(8),
-                ),
+        ),
+        const SizedBox(width: 12),
+        Expanded(
+          child: ElevatedButton.icon(
+            onPressed: () {
+              // Pop back to the quiz screen
+              Navigator.of(context).pop();
+              
+              // Send the same quiz data to restart it
+              Navigator.of(context).pushReplacementNamed(
+                AppRoutes.quiz,
+                arguments: {'quiz': quiz}
+              );
+            },
+            icon: const Icon(Icons.replay),
+            label: const Text('Try Again'),
+            style: ElevatedButton.styleFrom(
+              padding: const EdgeInsets.symmetric(
+                vertical: 12,
               ),
+              elevation: 0,
+              backgroundColor: Theme.of(context).primaryColor,
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(8),
+              ),
+              alignment: Alignment.center,
             ),
           ),
-        ],
-      ),
-    );
-  }
+        ),
+      ],
+    ),
+  );
+}
 
   String _formatDate(DateTime date) {
     final months = [
@@ -845,7 +796,7 @@ class QuizResultScreen extends StatelessWidget {
   String _formatDuration(Duration duration) {
     final minutes = duration.inMinutes;
     final seconds = duration.inSeconds % 60;
-    return '$minutes min ${seconds} sec';
+    return '$minutes min $seconds sec';
   }
 
   String _getResultMessage(double score) {

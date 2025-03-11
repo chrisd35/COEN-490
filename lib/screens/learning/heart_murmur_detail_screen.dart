@@ -406,7 +406,7 @@ class _HeartMurmurDetailScreenState extends State<HeartMurmurDetailScreen> {
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
                         const Text(
-                          'Auscultation Location',
+                          'Illustration',
                           style: TextStyle(
                             fontWeight: FontWeight.bold,
                             fontSize: 18,
