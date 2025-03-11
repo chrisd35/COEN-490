@@ -13,9 +13,9 @@ class QuizScreen extends StatefulWidget {
   final Quiz quiz;
   
   const QuizScreen({
-    Key? key,
+    super.key,
     required this.quiz,
-  }) : super(key: key);
+  });
 
   @override
   State<QuizScreen> createState() => _QuizScreenState();
@@ -26,10 +26,16 @@ class _QuizScreenState extends State<QuizScreen> with SingleTickerProviderStateM
   late String _userId;
   late List<QuizQuestion> _questions;
   int _currentQuestionIndex = 0;
-  Map<String, int> _userAnswers = {};
-  bool _isAnswered = false;
+  final Map<String, int> _userAnswers = {};
   bool _isQuizCompleted = false;
   int? _selectedAnswerIndex;
+  
+  // States for showing correct/incorrect answers
+  bool _shouldShowAnswer = false;
+  bool _isTransitioning = false;
+  
+  // Track which questions have had their answers checked
+  final Set<String> _checkedQuestions = {};
   
   // Timer related
   late Timer? _timer;
@@ -90,7 +96,7 @@ class _QuizScreenState extends State<QuizScreen> with SingleTickerProviderStateM
   }
 
   void _answerQuestion(int answerIndex) {
-    if (_isAnswered) return;
+    if (_shouldShowAnswer || _isTransitioning) return;
     
     // Play selection animation
     _animationController.forward().then((_) {
@@ -98,31 +104,44 @@ class _QuizScreenState extends State<QuizScreen> with SingleTickerProviderStateM
     });
     
     setState(() {
-      _isAnswered = true;
       _selectedAnswerIndex = answerIndex;
       
       // Save user's answer
       _userAnswers[_questions[_currentQuestionIndex].id] = answerIndex;
     });
-    
-    // Auto-advance to next question after delay
-    Future.delayed(const Duration(seconds: 2), () {
-      if (mounted) {
-        _goToNextQuestion();
-      }
-    });
   }
 
-  void _goToNextQuestion() {
-    if (_currentQuestionIndex < _questions.length - 1) {
-      setState(() {
-        _currentQuestionIndex++;
-        _isAnswered = false;
-        _selectedAnswerIndex = null;
-      });
-    } else {
-      _finishQuiz();
+  void _showAnswer() {
+    // Only proceed if an answer is selected - this is the core safeguard
+    if (_selectedAnswerIndex == null) {
+      // Show a simple toast message when trying to check without selecting an answer
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Please select an answer first'),
+          duration: Duration(seconds: 1),
+          behavior: SnackBarBehavior.floating,
+        ),
+      );
+      return;
     }
+    
+    // Show the correct answer 
+    setState(() {
+      _shouldShowAnswer = true;
+      // Add this question to checked questions set
+      _checkedQuestions.add(_questions[_currentQuestionIndex].id);
+      // Create a transition lock that prevents immediate button presses
+      _isTransitioning = true;
+    });
+    
+    // Just unlock interactions after a short delay
+    Future.delayed(const Duration(milliseconds: 300), () {
+      if (mounted) {
+        setState(() {
+          _isTransitioning = false;
+        });
+      }
+    });
   }
 
   Future<void> _finishQuiz() async {
@@ -181,11 +200,15 @@ class _QuizScreenState extends State<QuizScreen> with SingleTickerProviderStateM
         questionResults: questionResults,
       );
       
+      // Store just the mounted state - no need to store context
+      final isMounted = mounted;
+      
       // Save result to Firebase
       await _learningService.saveQuizResult(result);
       
-      // Navigate to results screen
-      if (mounted) {
+      // Navigate to results screen - wrapped in mounted check
+      if (isMounted && mounted) {
+        // Using context directly after the mounted check - no async gap
         Navigator.pushReplacement(
           context,
           MaterialPageRoute(
@@ -201,7 +224,8 @@ class _QuizScreenState extends State<QuizScreen> with SingleTickerProviderStateM
       }
     } catch (error) {
       _logger.severe('Error saving quiz result: $error');
-      // Show error snackbar
+      
+      // Check if widget is still mounted before using context
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
@@ -223,36 +247,53 @@ class _QuizScreenState extends State<QuizScreen> with SingleTickerProviderStateM
 
   @override
   Widget build(BuildContext context) {
-    return WillPopScope(
-      onWillPop: () async {
+    return PopScope(
+      canPop: false,
+      onPopInvokedWithResult: (didPop, _) async {
         // Show confirmation dialog when user tries to exit
-        if (_userAnswers.isEmpty) {
-          return true; // Allow exit if no answers yet
-        }
-        
-        return await showDialog<bool>(
-          context: context,
-          builder: (context) => AlertDialog(
-            title: const Text('Quit Quiz?'),
-            content: const Text(
-              'Your progress will be lost if you quit now.',
-            ),
-            actions: [
-              TextButton(
-                onPressed: () => Navigator.of(context).pop(false),
-                child: const Text('Cancel'),
-              ),
-              ElevatedButton(
-                onPressed: () => Navigator.of(context).pop(true),
-                style: ElevatedButton.styleFrom(
-                  backgroundColor: Colors.red,
-                  foregroundColor: Colors.white,
+        if (!didPop) {
+          if (_userAnswers.isEmpty) {
+            // No answers yet, safe to pop immediately
+            if (!context.mounted) return;
+            Navigator.of(context).pop();
+            return;
+          }
+          
+          // Make a local function to handle the popup
+          Future<void> showQuitDialog() async {
+            // Put all code that uses BuildContext inside here
+            final shouldPop = await showDialog<bool>(
+              context: context,
+              builder: (context) => AlertDialog(
+                title: const Text('Quit Quiz?'),
+                content: const Text(
+                  'Your progress will be lost if you quit now.',
                 ),
-                child: const Text('Quit'),
+                actions: [
+                  TextButton(
+                    onPressed: () => Navigator.of(context).pop(false),
+                    child: const Text('Cancel'),
+                  ),
+                  ElevatedButton(
+                    onPressed: () => Navigator.of(context).pop(true),
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: Colors.red,
+                      foregroundColor: Colors.white,
+                    ),
+                    child: const Text('Quit'),
+                  ),
+                ],
               ),
-            ],
-          ),
-        ) ?? false;
+            ) ?? false;
+            
+            if (shouldPop && context.mounted) {
+              Navigator.of(context).pop();
+            }
+          }
+          
+          // Call the function
+          await showQuitDialog();
+        }
       },
       child: Scaffold(
         backgroundColor: Colors.grey[50],
@@ -268,52 +309,12 @@ class _QuizScreenState extends State<QuizScreen> with SingleTickerProviderStateM
   }
 
   PreferredSizeWidget _buildAppBar() {
-    final bool isTimeAlmostUp = widget.quiz.timeLimit > 0 && 
-        _remainingSeconds < min(30, widget.quiz.timeLimit * 0.1);
-    
     return AppBar(
       title: Text(
         widget.quiz.title,
         style: const TextStyle(fontWeight: FontWeight.w600),
       ),
       elevation: 0,
-      actions: [
-        if (widget.quiz.timeLimit > 0)
-          Container(
-            margin: const EdgeInsets.symmetric(horizontal: 16.0, vertical: 8.0),
-            padding: const EdgeInsets.symmetric(horizontal: 12.0, vertical: 4.0),
-            decoration: BoxDecoration(
-              color: isTimeAlmostUp
-                  ? Colors.red.withOpacity(0.1)
-                  : Colors.white.withOpacity(0.2),
-              borderRadius: BorderRadius.circular(16),
-              border: Border.all(
-                color: isTimeAlmostUp
-                    ? Colors.red.withOpacity(0.5)
-                    : Colors.white.withOpacity(0.3),
-                width: 1,
-              ),
-            ),
-            child: Row(
-              children: [
-                Icon(
-                  Icons.timer,
-                  size: 16,
-                  color: isTimeAlmostUp ? Colors.red : Colors.white,
-                ),
-                const SizedBox(width: 4),
-                Text(
-                  _formatTime(_remainingSeconds),
-                  style: TextStyle(
-                    fontSize: 14,
-                    fontWeight: FontWeight.bold,
-                    color: isTimeAlmostUp ? Colors.red : Colors.white,
-                  ),
-                ),
-              ],
-            ),
-          ),
-      ],
     );
   }
 
@@ -349,6 +350,8 @@ class _QuizScreenState extends State<QuizScreen> with SingleTickerProviderStateM
   Widget _buildQuizContent() {
     final question = _questions[_currentQuestionIndex];
     final double progressPercent = (_currentQuestionIndex + 1) / _questions.length;
+    final bool isTimeAlmostUp = widget.quiz.timeLimit > 0 && 
+        _remainingSeconds < min(30, widget.quiz.timeLimit * 0.1);
     
     return Column(
       children: [
@@ -356,16 +359,54 @@ class _QuizScreenState extends State<QuizScreen> with SingleTickerProviderStateM
         Container(
           padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
           decoration: BoxDecoration(
-            color: Theme.of(context).primaryColor.withOpacity(0.05),
+            color: Theme.of(context).primaryColor.withAlpha(13), // 0.05 opacity
             border: Border(
               bottom: BorderSide(
-                color: Colors.grey.withOpacity(0.2),
+                color: Colors.grey.withAlpha(51), // 0.2 opacity
                 width: 1,
               ),
             ),
           ),
           child: Column(
             children: [
+              // Timer display (more prominent)
+              if (widget.quiz.timeLimit > 0)
+                Container(
+                  margin: const EdgeInsets.only(bottom: 12),
+                  padding: const EdgeInsets.symmetric(vertical: 8, horizontal: 16),
+                  decoration: BoxDecoration(
+                    color: isTimeAlmostUp
+                        ? Colors.red.withAlpha(26) // 0.1 opacity
+                        : Theme.of(context).primaryColor.withAlpha(26), // 0.1 opacity
+                    borderRadius: BorderRadius.circular(8),
+                    border: Border.all(
+                      color: isTimeAlmostUp
+                          ? Colors.red.withAlpha(77) // 0.3 opacity
+                          : Theme.of(context).primaryColor.withAlpha(77), // 0.3 opacity
+                      width: 1,
+                    ),
+                  ),
+                  child: Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Icon(
+                        Icons.timer,
+                        color: isTimeAlmostUp ? Colors.red : Theme.of(context).primaryColor,
+                        size: 20,
+                      ),
+                      const SizedBox(width: 8),
+                      Text(
+                        'Time Remaining: ${_formatTime(_remainingSeconds)}',
+                        style: TextStyle(
+                          fontSize: 15,
+                          fontWeight: FontWeight.bold,
+                          color: isTimeAlmostUp ? Colors.red : Theme.of(context).primaryColor,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+                
               // Progress indicator
               Row(
                 children: [
@@ -438,7 +479,7 @@ class _QuizScreenState extends State<QuizScreen> with SingleTickerProviderStateM
                     borderRadius: BorderRadius.circular(12),
                     boxShadow: [
                       BoxShadow(
-                        color: Colors.black.withOpacity(0.05),
+                        color: Colors.black.withAlpha(13), // 0.05 opacity
                         blurRadius: 5,
                         offset: const Offset(0, 2),
                       ),
@@ -533,10 +574,10 @@ class _QuizScreenState extends State<QuizScreen> with SingleTickerProviderStateM
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
       decoration: BoxDecoration(
-        color: color.withOpacity(0.1),
+        color: color.withAlpha(26), // 0.1 opacity
         borderRadius: BorderRadius.circular(8),
         border: Border.all(
-          color: color.withOpacity(0.3),
+          color: color.withAlpha(77), // 0.3 opacity
           width: 1,
         ),
       ),
@@ -570,8 +611,8 @@ class _QuizScreenState extends State<QuizScreen> with SingleTickerProviderStateM
     int correctIndex,
   ) {
     bool isSelected = _selectedAnswerIndex == index;
-    bool showCorrect = _isAnswered && index == correctIndex;
-    bool showIncorrect = _isAnswered && isSelected && index != correctIndex;
+    bool showCorrect = _shouldShowAnswer && index == correctIndex;
+    bool showIncorrect = _shouldShowAnswer && isSelected && index != correctIndex;
     
     Color cardColor = Colors.white;
     if (showCorrect) {
@@ -579,7 +620,7 @@ class _QuizScreenState extends State<QuizScreen> with SingleTickerProviderStateM
     } else if (showIncorrect) {
       cardColor = Colors.red.shade50;
     } else if (isSelected) {
-      cardColor = Theme.of(context).primaryColor.withOpacity(0.05);
+      cardColor = Theme.of(context).primaryColor.withAlpha(13); // 0.05 opacity
     }
     
     final iconData = showCorrect 
@@ -614,7 +655,7 @@ class _QuizScreenState extends State<QuizScreen> with SingleTickerProviderStateM
           elevation: isSelected ? 1 : 0,
           child: InkWell(
             borderRadius: BorderRadius.circular(12),
-            onTap: _isAnswered ? null : () => _answerQuestion(index),
+            onTap: _shouldShowAnswer || _isTransitioning ? null : () => _answerQuestion(index),
             child: Container(
               padding: const EdgeInsets.symmetric(vertical: 16, horizontal: 12),
               decoration: BoxDecoration(
@@ -703,7 +744,7 @@ class _QuizScreenState extends State<QuizScreen> with SingleTickerProviderStateM
         color: Colors.white,
         boxShadow: [
           BoxShadow(
-            color: Colors.black.withOpacity(0.05),
+            color: Colors.black.withAlpha(13), // 0.05 opacity
             blurRadius: 5,
             offset: const Offset(0, -2),
           ),
@@ -715,19 +756,17 @@ class _QuizScreenState extends State<QuizScreen> with SingleTickerProviderStateM
           children: [
             // Previous button
             TextButton.icon(
-              onPressed: _currentQuestionIndex > 0
-                  ? () {
+              onPressed: (_isTransitioning || _currentQuestionIndex <= 0)
+                  ? null
+                  : () {
                       setState(() {
                         _currentQuestionIndex--;
-                        _isAnswered = _userAnswers.containsKey(
-                          _questions[_currentQuestionIndex].id,
-                        );
-                        _selectedAnswerIndex = _userAnswers[
-                          _questions[_currentQuestionIndex].id
-                        ];
+                        String questionId = _questions[_currentQuestionIndex].id;
+                        // Restore the "checked" state if we previously checked this question
+                        _shouldShowAnswer = _checkedQuestions.contains(questionId);
+                        _selectedAnswerIndex = _userAnswers[questionId];
                       });
-                    }
-                  : null,
+                    },
               icon: const Icon(Icons.arrow_back, size: 18),
               label: const Text('Previous'),
               style: TextButton.styleFrom(
@@ -738,63 +777,43 @@ class _QuizScreenState extends State<QuizScreen> with SingleTickerProviderStateM
             
             // Next/Submit button
             ElevatedButton.icon(
-              onPressed: _isAnswered
-                  ? _goToNextQuestion
-                  : isLastQuestion
-                      ? () {
-                          // Show confirmation for submitting with unanswered questions
-                          final unansweredCount = _questions.length - _userAnswers.length;
-                          
-                          showDialog(
-                            context: context,
-                            builder: (context) => AlertDialog(
-                              title: Text(
-                                unansweredCount > 0
-                                    ? 'Submit Quiz?'
-                                    : 'Finish Quiz',
-                              ),
-                              content: unansweredCount > 0
-                                  ? Text(
-                                      'You have left $unansweredCount of ${_questions.length} questions unanswered. Are you sure you want to submit?',
-                                    )
-                                  : const Text(
-                                      'You have answered all questions. Ready to see your results?',
-                                    ),
-                              actions: [
-                                TextButton(
-                                  onPressed: () => Navigator.of(context).pop(),
-                                  child: const Text('Cancel'),
-                                ),
-                                ElevatedButton(
-                                  onPressed: () {
-                                    Navigator.of(context).pop();
-                                    _finishQuiz();
-                                  },
-                                  style: ElevatedButton.styleFrom(
-                                    backgroundColor: unansweredCount > 0
-                                        ? Colors.orange
-                                        : Colors.green,
-                                  ),
-                                  child: Text(
-                                    unansweredCount > 0
-                                        ? 'Submit Anyway'
-                                        : 'View Results',
-                                  ),
-                                ),
-                              ],
-                            ),
-                          );
-                        }
-                      : null,
+              onPressed: _isTransitioning
+                  ? null
+                  : _shouldShowAnswer
+                      ? isLastQuestion
+                          ? _finishQuiz
+                          : () {
+                              // When moving to next question, add this question to checked set
+                              _checkedQuestions.add(_questions[_currentQuestionIndex].id);
+                              
+                              setState(() {
+                                _currentQuestionIndex++;
+                                String questionId = _questions[_currentQuestionIndex].id;
+                                // Check if we've already seen this question's answer before
+                                _shouldShowAnswer = _checkedQuestions.contains(questionId);
+                                _selectedAnswerIndex = _userAnswers[questionId];
+                              });
+                            }
+                      : _selectedAnswerIndex != null
+                          ? _showAnswer  // Check answer only when an answer is selected
+                          : null,  // Explicitly disable if no answer selected
               icon: Icon(
-                isLastQuestion ? Icons.check_circle : Icons.arrow_forward,
+                isLastQuestion 
+                    ? (_shouldShowAnswer ? Icons.check_circle : Icons.visibility) 
+                    : (_shouldShowAnswer ? Icons.arrow_forward : Icons.visibility),
                 size: 18,
               ),
               label: Text(
-                isLastQuestion ? 'Submit' : 'Next',
+                isLastQuestion 
+                    ? (_shouldShowAnswer ? 'Submit' : 'Check Answer') 
+                    : (_shouldShowAnswer ? 'Next' : 'Check Answer'),
               ),
               style: ElevatedButton.styleFrom(
-                backgroundColor: isLastQuestion ? Colors.green : Theme.of(context).primaryColor,
+                backgroundColor: isLastQuestion && _shouldShowAnswer
+                    ? Colors.green
+                    : _shouldShowAnswer
+                        ? Colors.blue
+                        : Theme.of(context).primaryColor,
                 padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
                 elevation: 0,
                 shape: RoundedRectangleBorder(
