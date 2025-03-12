@@ -17,13 +17,14 @@ def extract_features(file_path, valve="Unknown"):
         # Extract MFCCs (13 coefficients)
         mfccs = librosa.feature.mfcc(y=y, sr=sr, n_mfcc=13)
         mfccs_mean = np.mean(mfccs.T, axis=0)
+        mfccs_std = np.std(mfccs.T, axis=0)  # Add variance information
 
         # Spectral Contrast with Nyquist-safe parameters
         spectral_contrast = librosa.feature.spectral_contrast(
             y=y,
             sr=sr,
             fmin=200.0,       # Default is 200Hz
-            n_bands=3       # Default is 6 bands
+            n_bands=3         # Default is 6 bands
         )
         spectral_contrast_mean = np.mean(spectral_contrast, axis=1)
 
@@ -31,13 +32,29 @@ def extract_features(file_path, valve="Unknown"):
         zcr = librosa.feature.zero_crossing_rate(y)
         zcr_mean = np.mean(zcr)
 
+        # Frequency band energy ratios (important for murmurs)
+        bands = [(20, 50), (50, 100), (100, 150), (150, 200), (200, 400)]
+        band_energies = []
+        for low, high in bands:
+            spec = np.abs(librosa.stft(y))
+            freq_bins = librosa.fft_frequencies(sr=sr)
+            idx_low = np.searchsorted(freq_bins, low)
+            idx_high = np.searchsorted(freq_bins, high)
+            band_energy = np.sum(np.mean(spec[idx_low:idx_high], axis=1))
+            band_energies.append(band_energy)
+
         # Combine features
         features_dict = {}
         for i, value in enumerate(mfccs_mean.tolist()):
-            features_dict[f"{valve}_MFCC_{i+1}"] = float(value)
+            features_dict[f"{valve}_MFCC_mean_{i+1}"] = float(value)
+        for i, value in enumerate(mfccs_std.tolist()):
+            features_dict[f"{valve}_MFCC_std_{i+1}"] = float(value)
         for i, value in enumerate(spectral_contrast_mean.tolist()):
             features_dict[f"{valve}_SpectralContrast_{i+1}"] = float(value)
+        for i, value in enumerate(band_energies):
+            features_dict[f"{valve}_BandEnergy_{i+1}"] = float(value)
         features_dict[f"{valve}_ZeroCrossingRate"] = float(zcr_mean)
+        
         return features_dict
     
     except Exception as e:
