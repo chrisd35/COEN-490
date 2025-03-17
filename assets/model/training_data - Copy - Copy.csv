@@ -1,0 +1,4 @@
+Patient ID,Recording locations:,Age,Sex,Height,Weight,Pregnancy status,Murmur,Murmur locations,Most audible location,Systolic murmur timing,Systolic murmur shape,Systolic murmur grading,Systolic murmur pitch,Systolic murmur quality,Diastolic murmur timing,Diastolic murmur shape,Diastolic murmur grading,Diastolic murmur pitch,Diastolic murmur quality,Outcome,Campaign,Additional ID
+2530,AV+PV+TV+MV,Child,Female,98,15.9,FALSE,Absent,nan,nan,nan,nan,nan,nan,nan,nan,nan,nan,nan,nan,Abnormal,CC2015,nan
+9979,AV+PV+TV+MV,Child,Female,103,13.1,FALSE,Present,AV+MV+PV+TV,TV,Holosystolic,Diamond,III/VI,High,Harsh,nan,nan,nan,nan,nan,Abnormal,CC2015,nan
+9983,AV+PV+TV+MV,Child,Male,115,19.1,FALSE,Unknown,nan,nan,nan,nan,nan,nan,nan,nan,nan,nan,nan,nan,Abnormal,CC2015,nan
