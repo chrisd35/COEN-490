@@ -66,17 +66,48 @@ def preprocess_heart_sound(file_path):
             fmax=500  # Focus on heart sound frequency range
         )
         
-        # Find peaks with tuned parameters
-        peaks = librosa.util.peak_pick(
-            onset_env,
-            pre_max=max(1, int(0.05*sr/hop_length)),    # 50ms pre-max window
-            post_max=max(1, int(0.05*sr/hop_length)),   # 50ms post-max window
-            pre_avg=max(1, int(0.1*sr/hop_length)),    # 80ms pre-avg window
-            post_avg=max(1, int(0.1*sr/hop_length)),   # 80ms post-avg window
-            delta=0.07,                                 # Lower threshold for better sensitivity
-            wait=max(1, int(0.25*sr/hop_length))        # 200ms minimum spacing between peaks
-                                                        # (heart sounds usually not closer than this)
-        )
+        # Define adaptive peak detection function
+        def adaptive_peak_detection(onset_env, sr, hop_length):
+            # Estimate noise floor
+            noise_floor = float(np.percentile(onset_env, 15))
+            # Dynamic threshold based on signal statistics
+            threshold = float(noise_floor + 0.5 * (np.max(onset_env) - noise_floor))
+            
+            # Adapt wait time based on estimated heart rate
+            # Using librosa's beat tracking as a rough heart rate estimate
+            tempo, _ = librosa.beat.beat_track(onset_envelope=onset_env, sr=sr, hop_length=hop_length)
+            tempo = float(tempo)  # Convert to Python float
+            # Ensure reasonable heart rate bounds (40-220 BPM)
+            tempo = max(40, min(220, tempo)) if tempo > 0 else 80
+            # Calculate minimum wait time (allowing for slightly faster detection than the estimated tempo)
+            min_wait = float(60/(tempo*1.5) if tempo > 0 else 0.25)
+            wait_frames = max(1, int(min_wait*sr/hop_length))
+            
+            # Dynamic window sizes based on estimated heart rate
+            window_scale = float(80/tempo) if tempo > 0 else 1  # Scale windows for slower heart rates
+            pre_max_frames = max(1, int(0.05*window_scale*sr/hop_length))
+            post_max_frames = max(1, int(0.05*window_scale*sr/hop_length))
+            pre_avg_frames = max(1, int(0.1*window_scale*sr/hop_length))
+            post_avg_frames = max(1, int(0.1*window_scale*sr/hop_length))
+            
+            # Perform peak picking with adaptive parameters
+            peaks = librosa.util.peak_pick(
+                onset_env,
+                pre_max=pre_max_frames,
+                post_max=post_max_frames,
+                pre_avg=pre_avg_frames,
+                post_avg=post_avg_frames,
+                delta=threshold,
+                wait=wait_frames
+            )
+            
+            # Log the adaptive parameters used
+            print(f"Adaptive peak detection: tempo={tempo:.1f} BPM, threshold={threshold:.4f}, wait={min_wait:.3f}s")
+            
+            return peaks
+
+        # Use adaptive peak detection
+        peaks = adaptive_peak_detection(onset_env, sr, hop_length)
         
         # Convert frame indices to sample indices
         peak_times = librosa.frames_to_time(peaks, sr=sr, hop_length=hop_length)

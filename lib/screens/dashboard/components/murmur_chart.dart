@@ -8,6 +8,7 @@ import '../../../utils/navigation_service.dart';
 import '../../../utils/app_routes.dart';
 import '../../../widgets/back_button.dart';
 import 'package:logging/logging.dart' as logging;
+import 'package:firebase_auth/firebase_auth.dart' as auth;
 
 final _logger = logging.Logger('MurmurChart');
 
@@ -39,6 +40,18 @@ class _MurmurChartState extends State<MurmurChart> {
   void initState() {
     super.initState();
     _setupAudioPlayer();
+
+    WidgetsBinding.instance.addPostFrameCallback((_) async {
+      final user = auth.FirebaseAuth.instance.currentUser; // Use prefixed auth
+      if (user != null) {
+        try {
+          final token = await user.getIdToken();
+          print('DEBUG TOKEN FOR POSTMAN: $token');
+        } catch (e) {
+          print('Error getting token: $e');
+        }
+      }
+    });
     
     if (widget.preselectedPatientId != null) {
       _loadSpecificPatient(widget.preselectedPatientId!);
