@@ -157,9 +157,20 @@ class MurmurRecordState extends State<MurmurRecord> {
       int durationSeconds = ((_recordingDuration.inMilliseconds + 500) / 1000).floor();
       _logger.info("Final recording duration: $durationSeconds seconds");
 
-      List<int> audioData = await bleManager.stopRecording();
+      // Show processing indicator
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text("Processing audio..."),
+            duration: Duration(seconds: 10), // Long duration as processing might take time
+          ),
+        );
+      }
 
-      if (audioData.isEmpty) {
+      // The audio processing happens in the BLE manager now, we just get the result
+      List<int> processedAudio = await bleManager.stopRecording();
+
+      if (processedAudio.isEmpty) {
         if (mounted) {
           _showErrorSnackBar("No audio data recorded");
         }
@@ -167,20 +178,34 @@ class MurmurRecordState extends State<MurmurRecord> {
       }
 
       if (mounted) {
+        // Dismiss the processing snackbar if it's still showing
+        ScaffoldMessenger.of(context).hideCurrentSnackBar();
+        
         setState(() {
           _isRecording = false;
           _hasRecordingCompleted = true;
-          _recordedAudioData = audioData;
+          _recordedAudioData = processedAudio;
         });
+        
+        // Show success message
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text("Recording processed successfully"),
+            backgroundColor: Colors.green,
+            duration: Duration(seconds: 2),
+          ),
+        );
       }
     } catch (e) {
       if (mounted) {
+        // Dismiss the processing snackbar if it's still showing
+        ScaffoldMessenger.of(context).hideCurrentSnackBar();
         _showErrorSnackBar("Failed to stop recording: $e");
       }
     }
   }
   
-  Future<void> _playPreviewRecording() async {
+   Future<void> _playPreviewRecording() async {
     if (_recordedAudioData == null) return;
 
     try {
@@ -190,10 +215,10 @@ class MurmurRecordState extends State<MurmurRecord> {
           _isPlaying = false;
         });
       } else {
-        // Convert the raw audio data to WAV format
+        // Convert the processed audio data to WAV format 
         final wavData = _firebaseService.createWavFile(
           _recordedAudioData!,
-          sampleRate: BLEManager.sampleRate,
+          sampleRate: BLEManager.sampleRate, // Updated to 16kHz
           bitsPerSample: 16,
           channels: 1,
         );
@@ -422,6 +447,8 @@ class MurmurRecordState extends State<MurmurRecord> {
           'bitsPerSample': BLEManager.bitsPerSample,
           'channels': BLEManager.channels,
           'peakAmplitude': bleManager.peakAmplitude,
+          // Add flag to indicate this has been processed
+          'processingApplied': true,
         },
       );
 

@@ -10,9 +10,9 @@ class HeartMurmurDetailScreen extends StatefulWidget {
   final HeartMurmur murmur;
   
   const HeartMurmurDetailScreen({
-    Key? key,
+    super.key,
     required this.murmur,
-  }) : super(key: key);
+  });
 
   @override
   State<HeartMurmurDetailScreen> createState() => _HeartMurmurDetailScreenState();
@@ -384,7 +384,7 @@ class _HeartMurmurDetailScreenState extends State<HeartMurmurDetailScreen> {
                             ],
                           ),
                         );
-                      }).toList(),
+                      }),
                     ],
                   ),
                 ),

@@ -193,19 +193,21 @@ class AppRoutes {
           ),
         );
         
-      case quizResult:
-        final args = settings.arguments as Map<String, dynamic>?;
-        if (args?['result'] == null || args?['quiz'] == null || 
-            args?['questions'] == null || args?['userAnswers'] == null) return null;
-        return MaterialPageRoute(
-          builder: (context) => QuizResultScreen(
-            quiz: args!['quiz'],
-            result: args['result'],
-            questions: args['questions'],
-            userAnswers: args['userAnswers'],
-            isTimeUp: args['isTimeUp'] ?? false,
-          ),
-        );
+case quizResult:
+  final args = settings.arguments as Map<String, dynamic>?;
+  if (args?['result'] == null || args?['quiz'] == null || 
+      args?['questions'] == null || args?['userAnswers'] == null) {
+    return null;
+  }
+  return MaterialPageRoute(
+    builder: (context) => QuizResultScreen(
+      quiz: args!['quiz'],
+      result: args['result'],
+      questions: args['questions'],
+      userAnswers: args['userAnswers'],
+      isTimeUp: args['isTimeUp'] ?? false,
+    ),
+  );
         
       default:
         return null;

@@ -7,7 +7,7 @@ import 'package:logging/logging.dart' as logging;
 final _logger = logging.Logger('HeartMurmurLibraryScreen');
 
 class HeartMurmurLibraryScreen extends StatefulWidget {
-  const HeartMurmurLibraryScreen({Key? key}) : super(key: key);
+  const HeartMurmurLibraryScreen({super.key});
 
   @override
   State<HeartMurmurLibraryScreen> createState() => _HeartMurmurLibraryScreenState();
@@ -52,12 +52,6 @@ class _HeartMurmurLibraryScreenState extends State<HeartMurmurLibraryScreen> {
     setState(() {
       _searchQuery = '';
       _searchController.clear();
-    });
-  }
-
-  void _clearFilters() {
-    setState(() {
-      _selectedTimingFilters = ['All'];
     });
   }
 
@@ -191,7 +185,7 @@ class _HeartMurmurLibraryScreenState extends State<HeartMurmurLibraryScreen> {
       spans.add(TextSpan(
         text: text.substring(index, index + lowerQuery.length),
         style: style?.copyWith(
-          backgroundColor: Colors.yellow.withOpacity(0.3),
+          backgroundColor: Colors.yellow.withAlpha(77), // 0.3 * 255 ≈ 77
           fontWeight: FontWeight.bold,
         ),
       ));
