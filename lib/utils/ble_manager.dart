@@ -3,6 +3,7 @@ import 'package:flutter_blue_plus/flutter_blue_plus.dart';
 import 'dart:typed_data';
 import 'dart:async';
 import 'package:logging/logging.dart' as logging;
+import '/utils/audio_processor.dart'; // Import the new audio processor
 
 final _logger = logging.Logger('BLEManager');
 
@@ -15,6 +16,7 @@ class BLEManager extends ChangeNotifier {
   BluetoothDevice? _connectedDevice;
   bool _isRecording = false;
   List<int> _audioBuffer = [];
+  final List<int> _rawAudioBuffer = []; // Added to store unprocessed audio
   final List<Map<String, dynamic>> _currentSessionReadings = [];
 
   // Audio metrics
@@ -24,7 +26,6 @@ class BLEManager extends ChangeNotifier {
 
   // Recording timing control
   DateTime? _recordingStartTime;
-  // Removed _expectedSamples as it's not used
 
   // New ECG and PulseOx buffers and metrics
   final List<int> _ecgBuffer = [];
@@ -37,7 +38,7 @@ class BLEManager extends ChangeNotifier {
   DateTime? _sessionStartTime;
 
   // Constants - renamed to lowerCamelCase
-  static const int sampleRate = 4000;
+  static const int sampleRate = 16000; // Updated to match Arduino and Python script
   static const int bitsPerSample = 16;
   static const int channels = 1;
 
@@ -74,6 +75,9 @@ class BLEManager extends ChangeNotifier {
   List<Map<String, dynamic>> get currentSessionReadings => _currentSessionReadings;
   DateTime? get sessionStartTime => _sessionStartTime;
 
+  // New getter for unprocessed audio
+  List<int> get rawAudioBuffer => _rawAudioBuffer;
+
   Map<String, double> get sessionAverages {
     if (_currentSessionReadings.isEmpty) {
       return {
@@ -104,8 +108,13 @@ class BLEManager extends ChangeNotifier {
     return List<int>.from(_audioBuffer);
   }
 
+  List<int> getRawAudioBuffer() {
+    return List<int>.from(_rawAudioBuffer);
+  }
+
   void clearAudioBuffer() {
     _audioBuffer.clear();
+    _rawAudioBuffer.clear();
     _recentAmplitudes.clear();
     _currentAmplitude = 0;
     _peakAmplitude = 0;
@@ -235,55 +244,45 @@ class BLEManager extends ChangeNotifier {
     }
   }
 
-  // Keep existing _processAudioData method exactly as is
+  // Updated process audio to store raw data and only apply visualization processing
   void _processAudioData(List<int> data) {
     if (data.isEmpty || !_isRecording) return;
 
     try {
-        Duration elapsed = DateTime.now().difference(_recordingStartTime!);
-        int totalExpectedSamples = (sampleRate * elapsed.inMilliseconds) ~/ 1000;
-        int expectedBufferSize = totalExpectedSamples * 2;
+      // Store raw audio data for later processing on stop
+      _rawAudioBuffer.addAll(data);
+      
+      // Process audio data only for visualization purposes
+      Duration elapsed = DateTime.now().difference(_recordingStartTime!);
+      int totalExpectedSamples = (sampleRate * elapsed.inMilliseconds) ~/ 1000;
+      int expectedBufferSize = totalExpectedSamples * 2;
 
-        if (_audioBuffer.length >= expectedBufferSize) {
-            _logger.info("Buffer full, skipping new data");
-            return;
-        }
+      if (_rawAudioBuffer.length % (sampleRate * 2) == 0) {
+        _logger.info("Raw buffer status: ${_rawAudioBuffer.length} bytes / $expectedBufferSize expected");
+      }
 
-        int remainingSpace = expectedBufferSize - _audioBuffer.length;
-        int bytesToAdd = data.length;
-        if (bytesToAdd > remainingSpace) {
-            bytesToAdd = remainingSpace;
-            _logger.info("Truncating incoming data to fit buffer");
-        }
-
-        Int16List samples = Int16List(bytesToAdd ~/ 2);
-        ByteData bytes = ByteData.sublistView(Uint8List.fromList(data.sublist(0, bytesToAdd)));
+      // Process samples for visualization only
+      Int16List samples = Int16List(data.length ~/ 2);
+      ByteData bytes = ByteData.sublistView(Uint8List.fromList(data));
+      
+      for (int i = 0; i < data.length ~/ 2; i++) {
+        samples[i] = bytes.getInt16(i * 2, Endian.little);
+        double amplitude = samples[i].abs() / 32768.0;
         
-        for (int i = 0; i < bytesToAdd ~/ 2; i++) {
-            samples[i] = bytes.getInt16(i * 2, Endian.little);
-            double amplitude = samples[i].abs() / 32768.0;
-            
-            _currentAmplitude = amplitude;
-            if (amplitude > _peakAmplitude) {
-                _peakAmplitude = amplitude;
-            }
-            
-            _recentAmplitudes.add(amplitude);
-            if (_recentAmplitudes.length > 100) {
-                _recentAmplitudes.removeAt(0);
-            }
+        _currentAmplitude = amplitude;
+        if (amplitude > _peakAmplitude) {
+          _peakAmplitude = amplitude;
         }
         
-        _audioBuffer.addAll(data.sublist(0, bytesToAdd));
-
-        if (_audioBuffer.length % (sampleRate * 2) == 0) {
-            _logger.info("Buffer status: ${_audioBuffer.length} bytes / $expectedBufferSize expected");
-            _logger.info("Current time: ${elapsed.inSeconds} seconds");
+        _recentAmplitudes.add(amplitude);
+        if (_recentAmplitudes.length > 100) {
+          _recentAmplitudes.removeAt(0);
         }
-
-        notifyListeners();
+      }
+      
+      notifyListeners();
     } catch (e) {
-        _logger.severe("Error processing audio data: $e");
+      _logger.severe("Error processing audio data: $e");
     }
   }
 
@@ -362,7 +361,7 @@ class BLEManager extends ChangeNotifier {
     _logger.info("ECG notifications setup complete");
   }
 
-  // Keep existing startRecording and stopRecording methods exactly as they are
+  // Updated startRecording method
   Future<void> startRecording() async {
     try {
       _logger.info("Starting recording...");
@@ -401,6 +400,7 @@ class BLEManager extends ChangeNotifier {
     }
   }
   
+  // Updated stopRecording to process audio with our new AudioProcessor
   Future<List<int>> stopRecording() async {
     if (_connectedDevice == null) {
       throw Exception("No device connected");
@@ -411,14 +411,10 @@ class BLEManager extends ChangeNotifier {
         
         Duration totalDuration = DateTime.now().difference(_recordingStartTime!);
         int durationSeconds = ((totalDuration.inMilliseconds + 500) / 1000).floor();
-        int expectedSamples = sampleRate * durationSeconds;
-        int expectedBytes = expectedSamples * 2;
         
         _logger.info("Recording summary:");
         _logger.info("Duration: $durationSeconds seconds");
-        _logger.info("Expected samples: $expectedSamples");
-        _logger.info("Expected bytes: $expectedBytes");
-        _logger.info("Current buffer size: ${_audioBuffer.length}");
+        _logger.info("Raw buffer size: ${_rawAudioBuffer.length} bytes");
 
         await _audioSubscription?.cancel();
         _audioSubscription = null;
@@ -432,20 +428,24 @@ class BLEManager extends ChangeNotifier {
         }
 
         _isRecording = false;
-
-        if (_audioBuffer.length > expectedBytes) {
-            _logger.info("Trimming buffer from ${_audioBuffer.length} to $expectedBytes bytes");
-            _audioBuffer = _audioBuffer.sublist(0, expectedBytes);
-        }
-
-        List<int> recordedData = List<int>.from(_audioBuffer);
+        
+        // Process the raw audio with our new AudioProcessor
+        _logger.info("Starting audio processing pipeline...");
+        List<int> processedAudio = AudioProcessor.processAudioData(_rawAudioBuffer);
+        _logger.info("Audio processing complete, produced ${processedAudio.length} bytes");
+        
+        // Store the processed audio in the main buffer
+        _audioBuffer = processedAudio;
+        
+        // Return a copy of the processed data
+        List<int> recordedData = List<int>.from(processedAudio);
         
         _logger.info("Final recording stats:");
-        _logger.info("Buffer size: ${recordedData.length} bytes");
+        _logger.info("Processed buffer size: ${recordedData.length} bytes");
         _logger.info("Sample count: ${recordedData.length ~/ 2}");
         _logger.info("Actual duration: ${recordedData.length / (2 * sampleRate)} seconds");
 
-        clearAudioBuffer();
+        notifyListeners();
         return recordedData;
     } catch (e) {
         _logger.severe("Error in stopRecording: $e");

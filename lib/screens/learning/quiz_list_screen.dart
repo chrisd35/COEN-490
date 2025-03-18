@@ -8,7 +8,7 @@ import 'package:logging/logging.dart' as logging;
 final _logger = logging.Logger('QuizListScreen');
 
 class QuizListScreen extends StatefulWidget {
-  const QuizListScreen({Key? key}) : super(key: key);
+  const QuizListScreen({super.key});
 
   @override
   State<QuizListScreen> createState() => _QuizListScreenState();
@@ -77,7 +77,7 @@ class _QuizListScreenState extends State<QuizListScreen> {
               style: TextStyle(
                 fontWeight: FontWeight.w500,
                 fontSize: 14,
-                color: Colors.white.withOpacity(0.9),
+                color: Colors.white.withAlpha(230), // 0.9 * 255 ≈ 230
               ),
             ),
           ),
@@ -323,7 +323,7 @@ class _QuizListScreenState extends State<QuizListScreen> {
                     attempts,
                     bestScore,
                   );
-                }).toList(),
+                }),
                 
                 const SizedBox(height: 8),
               ],
@@ -359,7 +359,7 @@ class _QuizListScreenState extends State<QuizListScreen> {
     return Container(
       padding: const EdgeInsets.all(6),
       decoration: BoxDecoration(
-        color: iconColor.withOpacity(0.1),
+        color: iconColor.withAlpha(26), // 0.1 * 255 ≈ 26
         shape: BoxShape.circle,
       ),
       child: Icon(
@@ -563,10 +563,10 @@ class _QuizListScreenState extends State<QuizListScreen> {
       child: Container(
         padding: const EdgeInsets.symmetric(vertical: 8, horizontal: 8),
         decoration: BoxDecoration(
-          color: color.withOpacity(0.08),
+          color: color.withAlpha(20), // 0.08 * 255 ≈ 20
           borderRadius: BorderRadius.circular(8),
           border: Border.all(
-            color: color.withOpacity(0.2),
+            color: color.withAlpha(51), // 0.2 * 255 ≈ 51
             width: 0.5,
           ),
         ),
@@ -575,7 +575,7 @@ class _QuizListScreenState extends State<QuizListScreen> {
             Container(
               padding: const EdgeInsets.all(6),
               decoration: BoxDecoration(
-                color: color.withOpacity(0.1),
+                color: color.withAlpha(26), // 0.1 * 255 ≈ 26
                 shape: BoxShape.circle,
               ),
               child: Icon(
@@ -594,14 +594,14 @@ class _QuizListScreenState extends State<QuizListScreen> {
                     style: TextStyle(
                       fontSize: 14,
                       fontWeight: FontWeight.bold,
-                      color: color.withOpacity(0.9),
+                      color: color.withAlpha(230), // 0.9 * 255 ≈ 230
                     ),
                   ),
                   Text(
                     label,
                     style: TextStyle(
                       fontSize: 10,
-                      color: color.withOpacity(0.7),
+                      color: color.withAlpha(179), // 0.7 * 255 ≈ 179
                     ),
                   ),
                 ],
