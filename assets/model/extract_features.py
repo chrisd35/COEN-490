@@ -222,21 +222,6 @@ def extract_features(file_path, segmentation_file=None):
         wavelet_features = compute_wavelet_features(preprocessed_audio, sr)
         features.update(wavelet_features)
 
-        # # Time-domain features per segment
-        # def compute_segment_features(segment):
-        #     return {
-        #         'ZCR': librosa.feature.zero_crossing_rate(segment)[0].mean(),
-        #         'Kurtosis': np.mean(librosa.feature.kurtosis(y=segment)),
-        #         'Variance': np.var(segment),
-        #         'SampleEntropy': sample_entropy(segment, order=2)
-        #     }
-
-        # # Apply to each segmented heartbeat cycle
-        # if isinstance(preprocessed_audio, list):  # If segmentation succeeded
-        #     for i, segment in enumerate(preprocessed_audio):
-        #         seg_features = compute_segment_features(segment)
-        #         features.update({f'Segment_{i}_{k}': v for k,v in seg_features.items()})
-
         # Q-Factor
         def compute_q_factor(signal, sr):
             spec = np.abs(librosa.stft(signal))
@@ -247,14 +232,7 @@ def extract_features(file_path, segmentation_file=None):
         
         features['Q_Factor'] = compute_q_factor(preprocessed_audio, sr)
 
-        # # 1. Wavelet features
-        # wavelet_features = compute_wavelet_features(preprocessed_audio)
-        # features.update(wavelet_features)
-
-        # # 2. Entropy and non-linear features
-        # features.update(compute_segment_features(preprocessed_audio))
-
-        # 4. Additional spectral features
+        # Additional spectral features
         spectral_flatness = librosa.feature.spectral_flatness(y=preprocessed_audio)
         features['SpectralFlatness'] = float(np.mean(spectral_flatness))
         

@@ -5,7 +5,7 @@ import librosa
 import numpy as np
 import librosa.onset
 import librosa.effects
-from sklearn.ensemble import RandomForestClassifier
+from sklearn.ensemble import RandomForestClassifier, VotingClassifier
 from sklearn.metrics import accuracy_score, recall_score, roc_auc_score, confusion_matrix, f1_score
 from sklearn.model_selection import train_test_split, GridSearchCV, RandomizedSearchCV
 from sklearn.model_selection import StratifiedKFold, LeaveOneGroupOut, GroupKFold, StratifiedGroupKFold
@@ -152,45 +152,53 @@ def evaluate_with_kfold(X, y, patient_ids, n_splits=5, n_components=0.95):
     
     return metrics, best_pipeline
 
-def train_final_model(X, y, best_pipeline=None):
-    """Train final model with full data using safe resampling"""
-    print("\n=== Final Model Training ===")
-    print("Initial class distribution:", np.bincount(y))
+def train_ensemble_model(X, y, patient_ids):
+    # Keep your existing XGBoost model
+    xgb_pipeline = Pipeline([
+        ('scaler', StandardScaler()),
+        ('classifier', XGBClassifier(
+            random_state=RANDOM_STATE,
+            n_estimators=400,
+            max_depth=6,
+            learning_rate=0.05,
+            subsample=0.8,
+            colsample_bytree=0.8
+        ))
+    ])
     
-    # Safe resampling logic
-    class_counts = np.bincount(y)
-    try:
-        if len(class_counts) < 2 or min(class_counts) < 5:
-            print("Insufficient samples for resampling, using original data")
-            X_res, y_res = X, y
-        else:
-            safe_k = max(1, min(3, class_counts[1]-1)) if class_counts[1] < class_counts[0] else max(1, min(3, class_counts[0]-1))
-            smote = SMOTE(
-                sampling_strategy='auto',
-                k_neighbors=safe_k,
-                random_state=RANDOM_STATE
-            )
-            X_res, y_res = smote.fit_resample(X, y)
-            print(f"Resampled class distribution: {np.bincount(y_res)}")
-            
-    except ValueError as e:
-        print(f"Resampling failed: {str(e)}, using original data")
-        X_res, y_res = X, y
-
-    if best_pipeline is not None:
-        model = clone(best_pipeline)
-    else:
-        model = Pipeline([
-            ('scaler', StandardScaler()),
-            ('classifier', XGBClassifier(
-                random_state=RANDOM_STATE,
-                eval_metric='logloss',
-                scale_pos_weight=np.sum(y == 0)/np.sum(y == 1)
-            ))
-        ])
+    # Add a Random Forest model
+    rf_pipeline = Pipeline([
+        ('scaler', StandardScaler()),
+        ('classifier', RandomForestClassifier(
+            n_estimators=200,
+            max_depth=10,
+            random_state=RANDOM_STATE,
+            class_weight='balanced'
+        ))
+    ])
     
-    model.fit(X_res, y_res)
-    return model
+    # Create a voting classifier
+    ensemble = VotingClassifier(
+        estimators=[
+            ('xgb', xgb_pipeline),
+            ('rf', rf_pipeline)
+        ],
+        voting='soft'  # Use probabilities for better performance
+    )
+    
+    # Split data respecting patient groups
+    skf = StratifiedGroupKFold(n_splits=5)
+    train_idx, _ = next(skf.split(X, y, groups=patient_ids))
+    X_train, y_train = X.iloc[train_idx], y.iloc[train_idx]
+    
+    # Apply SMOTE to training data
+    smote = SMOTE(random_state=RANDOM_STATE)
+    X_res, y_res = smote.fit_resample(X_train, y_train)
+    
+    # Train the ensemble
+    ensemble.fit(X_res, y_res)
+    
+    return ensemble
 
 # Main execution
 if __name__ == "__main__":
@@ -200,14 +208,14 @@ if __name__ == "__main__":
     metrics, best_pipeline = evaluate_with_kfold(X, y, patient_ids, n_splits=5)
     
     # 2. Train final model using the best pipeline
-    final_model = train_final_model(X, y, best_pipeline)
+    final_model = train_ensemble_model(X, y, patient_ids)
     joblib.dump(final_model, 'heart_sound_model.joblib')
     joblib.dump(X.columns.tolist(), 'feature_names.joblib')
     print("\nSaved trained heart sound ML model")
     
-    # Optional: Print the number of components used
-    if hasattr(final_model, 'named_steps') and 'pca' in final_model.named_steps:
-        n_components = final_model.named_steps['pca'].n_components_
-        explained_variance = final_model.named_steps['pca'].explained_variance_ratio_.sum()
-        print(f"Number of PCA components used: {n_components}")
-        print(f"Explained variance: {explained_variance:.2%}")
+    # # Optional: Print the number of components used
+    # if hasattr(final_model, 'named_steps') and 'pca' in final_model.named_steps:
+    #     n_components = final_model.named_steps['pca'].n_components_
+    #     explained_variance = final_model.named_steps['pca'].explained_variance_ratio_.sum()
+    #     print(f"Number of PCA components used: {n_components}")
+    #     print(f"Explained variance: {explained_variance:.2%}")

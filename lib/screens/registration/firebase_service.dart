@@ -4,6 +4,9 @@ import 'package:firebase_storage/firebase_storage.dart';
 import 'dart:typed_data';
 import '/utils/models.dart';
 import 'package:logging/logging.dart' as logging;
+import 'package:firebase_auth/firebase_auth.dart' hide User;
+import 'package:http/http.dart' as http;
+import 'dart:convert';  // For JSON handling
 
 final _logger = logging.Logger('FirebaseService');
 
@@ -737,6 +740,29 @@ Future<void> deletePatient(String uid, String medicareNumber, String confirmatio
       return readings;
     } catch (e) {
       _logger.severe('Error fetching ECG readings: $e');
+      rethrow;
+    }
+  }
+    Future<Map<String, dynamic>> analyzeRecording(String filename) async {
+    try {
+      final user = FirebaseAuth.instance.currentUser!;
+      final idToken = await user.getIdToken();
+      
+      final response = await http.post(
+        Uri.parse('http://your-api-url/analyze'),
+        headers: {
+          'Authorization': 'Bearer $idToken',
+          'Content-Type': 'application/json',
+        },
+        body: jsonEncode({'firebase_path': filename}),
+      );
+
+      if (response.statusCode == 200) {
+        return jsonDecode(response.body);
+      }
+      throw Exception('Analysis failed: ${response.statusCode}');
+    } catch (e) {
+      _logger.severe('Analysis error: $e');
       rethrow;
     }
   }
