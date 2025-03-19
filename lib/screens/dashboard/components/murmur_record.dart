@@ -13,7 +13,6 @@ import '../../../utils/app_routes.dart';
 import '../../../widgets/back_button.dart';
 import 'package:logging/logging.dart' as logging;
 
-
 final _logger = logging.Logger('MurmurRecord');
 
 class MurmurRecord extends StatefulWidget {
@@ -28,7 +27,6 @@ class MurmurRecord extends StatefulWidget {
   State<MurmurRecord> createState() => MurmurRecordState();
 }
 
-// Changed from private to public state class
 class MurmurRecordState extends State<MurmurRecord> with SingleTickerProviderStateMixin {
   final AudioPlayer _audioPlayer = AudioPlayer();
   final FirebaseService _firebaseService = FirebaseService();
@@ -37,19 +35,13 @@ class MurmurRecordState extends State<MurmurRecord> with SingleTickerProviderSta
   bool _isPlaying = false;
   bool _cameFromPatientDetails = false;
   List<int>? _recordedAudioData;
-  // Removed _bufferSize as it wasn't being used
   Duration _recordingDuration = Duration.zero;
   Timer? _recordingTimer;
 
-bool _isProcessing = false;
-Map<String, dynamic>? _recordingData;
-String _recordingQuality = 'unknown';
+  bool _isProcessing = false;
+  Map<String, dynamic>? _recordingData;
   
-// UI enhancement variables
-String _recordingMessage = '';
-Color _recordingStatusColor = Colors.grey;
-double _recordingProgress = 0.0;
-late AnimationController _pulseController;
+  late AnimationController _pulseController;
 
   @override
   void initState() {
@@ -60,11 +52,11 @@ late AnimationController _pulseController;
   }
 
   void _setupAnimations() {
-  _pulseController = AnimationController(
-    vsync: this,
-    duration: const Duration(seconds: 1),
-  )..repeat(reverse: true);
-}
+    _pulseController = AnimationController(
+      vsync: this,
+      duration: const Duration(seconds: 1),
+    )..repeat(reverse: true);
+  }
 
   void _setupAudioPlayer() {
     _audioPlayer.onPlayerStateChanged.listen((PlayerState state) {
@@ -80,7 +72,6 @@ late AnimationController _pulseController;
     });
   }
 
-  // Add a new method to handle the back button press
   Future<void> _handleBackButton() async {
     if (_isPlaying) {
       await _audioPlayer.stop();
@@ -114,188 +105,116 @@ late AnimationController _pulseController;
     }
   }
   
- void _startRecording() async {
-  if (!mounted) return;
-  
-  final bleManager = Provider.of<BLEManager>(context, listen: false);
-  if (bleManager.connectedDevice != null) {
-    try {
-      setState(() {
-        _isRecording = true;
-        _hasRecordingCompleted = false;
-        _recordingDuration = Duration.zero;
-        _recordingMessage = 'Initializing...';
-        _recordingStatusColor = Colors.blue;
-        _recordingProgress = 0.0;
-        _recordingQuality = 'unknown';
-      });
-      
-      await bleManager.startRecording();
-      
-      if (!mounted) return;
-      
-      setState(() {
-        _recordingMessage = 'Listening for heartbeats...';
-      });
-
-      // Use a precise timer for updating duration and quality display
-      _recordingTimer = Timer.periodic(const Duration(milliseconds: 100), (timer) {
-        if (mounted) {
-          final int totalMs = timer.tick * 100;
-          
-          setState(() {
-            _recordingDuration = Duration(milliseconds: totalMs);
-            _recordingProgress = _recordingDuration.inMilliseconds / 3000.0; // 3 sec recording
-            
-            // Get recording quality from BLEManager
-            final quality = bleManager.recordingQuality;
-            if (quality != _recordingQuality) {
-              _recordingQuality = quality;
-              
-              // Update UI based on quality
-              switch (_recordingQuality) {
-                case 'excellent':
-                  _recordingStatusColor = Colors.green;
-                  _recordingMessage = 'Heart Sounds Detected!';
-                  break;
-                case 'good':
-                  _recordingStatusColor = Colors.green.shade300;
-                  _recordingMessage = 'Heartbeat Signal Detected';
-                  break;
-                case 'fair':
-                  _recordingStatusColor = Colors.orange;
-                  _recordingMessage = 'Weak Heartbeat Signal';
-                  break;
-                case 'poor':
-                  _recordingStatusColor = Colors.red;
-                  _recordingMessage = 'No Clear Heartbeat - Adjust Position';
-                  break;
-                case 'initializing':
-                  _recordingStatusColor = Colors.blue;
-                  _recordingMessage = 'Analyzing Heartbeat Signal...';
-                  break;
-                default:
-                  _recordingStatusColor = Colors.grey;
-                  _recordingMessage = 'Listening for Heartbeats...';
-              }
-            }
-          });
-        } else {
-          // Cancel timer if widget is no longer mounted
-          timer.cancel();
-        }
-      });
-    } catch (e) {
-      if (mounted) {
-        _showErrorSnackBar("Failed to start recording: $e");
-      }
-    }
-  } else {
-    if (mounted) {
-      _showErrorSnackBar("No device connected");
-    }
-  }
-}
-
-  void _startBufferSizeMonitoring() {
-    Stream.periodic(const Duration(milliseconds: 100)).listen((_) {
-      if (_isRecording && mounted) {
+  void _startRecording() async {
+    if (!mounted) return;
+    
+    final bleManager = Provider.of<BLEManager>(context, listen: false);
+    if (bleManager.connectedDevice != null) {
+      try {
         setState(() {
-          // We're just monitoring buffer state, no need to store it in a field
+          _isRecording = true;
+          _hasRecordingCompleted = false;
+          _recordingDuration = Duration.zero;
         });
+        
+        await bleManager.startRecording();
+        
+        if (!mounted) return;
+
+        // Use a precise timer for updating duration display
+        _recordingTimer = Timer.periodic(const Duration(milliseconds: 100), (timer) {
+          if (mounted) {
+            final int totalMs = timer.tick * 100;
+            
+            setState(() {
+              _recordingDuration = Duration(milliseconds: totalMs);
+            });
+          } else {
+            // Cancel timer if widget is no longer mounted
+            timer.cancel();
+          }
+        });
+      } catch (e) {
+        if (mounted) {
+          _showErrorSnackBar("Failed to start recording: $e");
+        }
       }
-    });
+    } else {
+      if (mounted) {
+        _showErrorSnackBar("No device connected");
+      }
+    }
   }
 
   void _stopRecording() async {
-  setState(() {
-    _isProcessing = true;
-    _recordingMessage = 'Processing audio...';
-  });
-  
-  final bleManager = Provider.of<BLEManager>(context, listen: false);
-  try {
-    _recordingTimer?.cancel();
-
-    // Get processed audio data and metadata from BLEManager
-    Map<String, dynamic> recordingData = await bleManager.stopRecording();
-
-    if (mounted) {
-      setState(() {
-        _isRecording = false;
-        _isProcessing = false;
-        _hasRecordingCompleted = true;
-        _recordingData = recordingData;
-        _recordingQuality = recordingData['metadata']['recordingQuality'] ?? 'unknown';
-      });
-    }
-  } catch (e) {
-    if (mounted) {
-      setState(() {
-        _isProcessing = false;
-        _isRecording = false;
-      });
-      _showErrorSnackBar("Failed to stop recording: $e");
-    }
-  }
-}
-  
- Future<void> _playPreviewRecording() async {
-  if (_recordingData == null || _recordingData!['audioData'] == null) return;
-
-  try {
-    if (_isPlaying) {
-      await _audioPlayer.pause();
-      setState(() {
-        _isPlaying = false;
-      });
-    } else {
-      // Show a processing indicator
-      setState(() {
-        _isProcessing = true;
-      });
-
-      // Get the raw audio data
-      final audioData = List<int>.from(_recordingData!['audioData']);
-      
-      // Process audio using the Python-like algorithm
-      final bleManager = Provider.of<BLEManager>(context, listen: false);
-      
-      // Process with Python-style algorithm
-      final processedAudio = bleManager.processHeartbeatAudio(audioData);
-      
-      // Add sonification to make heartbeats more obvious
-      final sonifiedAudio = bleManager.sonifyHeartbeats(processedAudio);
-      
-      // Create WAV file from the enhanced audio
-      final wavData = _firebaseService.createWavFile(
-        sonifiedAudio,
-        sampleRate: BLEManager.sampleRate,
-        bitsPerSample: BLEManager.bitsPerSample,
-        channels: BLEManager.channels,
-      );
-
-      // Done processing
-      setState(() {
-        _isProcessing = false;
-      });
-
-      // Play the processed audio
-      await _audioPlayer.play(
-        BytesSource(Uint8List.fromList(wavData)),
-      );
-      
-      setState(() {
-        _isPlaying = true;
-      });
-    }
-  } catch (e) {
     setState(() {
-      _isProcessing = false;
+      _isProcessing = true;
     });
-    _showErrorSnackBar("Failed to play recording: $e");
+    
+    final bleManager = Provider.of<BLEManager>(context, listen: false);
+    try {
+      _recordingTimer?.cancel();
+
+      // Get processed audio data and metadata from BLEManager
+      Map<String, dynamic> recordingData = await bleManager.stopRecording();
+
+      if (mounted) {
+        setState(() {
+          _isRecording = false;
+          _isProcessing = false;
+          _hasRecordingCompleted = true;
+          _recordingData = recordingData;
+        });
+      }
+    } catch (e) {
+      if (mounted) {
+        setState(() {
+          _isProcessing = false;
+          _isRecording = false;
+        });
+        _showErrorSnackBar("Failed to stop recording: $e");
+      }
+    }
   }
-}
+  
+  Future<void> _playPreviewRecording() async {
+    if (_recordingData == null || _recordingData!['audioData'] == null) return;
+
+    try {
+      if (_isPlaying) {
+        await _audioPlayer.pause();
+        setState(() {
+          _isPlaying = false;
+        });
+      } else {
+        final audioData = List<int>.from(_recordingData!['audioData']);
+
+        // First process with the Python-like algorithm
+        final bleManager = Provider.of<BLEManager>(context, listen: false);
+        final processedAudio = bleManager.processHeartbeatAudio(audioData);
+
+        // Then add sonification for clearer indication of heartbeats
+        final sonifiedAudio = bleManager.addHeartbeatSonification(processedAudio);
+
+        // Create WAV file from the sonified audio
+        final wavData = _firebaseService.createWavFile(
+          sonifiedAudio,
+          sampleRate: BLEManager.sampleRate,
+          bitsPerSample: BLEManager.bitsPerSample,
+          channels: BLEManager.channels,
+        );
+
+        await _audioPlayer.play(
+          BytesSource(Uint8List.fromList(wavData)),
+        );
+        setState(() {
+          _isPlaying = true;
+        });
+      }
+    } catch (e) {
+      _showErrorSnackBar("Failed to play recording: $e");
+    }
+  }
 
   void _showSaveRecordingDialog() async {
     if (!mounted) return;
@@ -481,61 +400,61 @@ late AnimationController _pulseController;
   }
 
   Future<void> _saveRecordingToPatient(String uid, String patientId) async {
-  if (_recordingData == null || !mounted) return;
-  
-  // Extract recording data and metadata
-  final audioData = List<int>.from(_recordingData!['audioData']);
-  final metadata = Map<String, dynamic>.from(_recordingData!['metadata']);
-  
-  if (!mounted) return;
-  
-  // Show loading dialog
-  await _showLoadingDialog("Saving recording...");
-  
-  if (!mounted) return;
+    if (_recordingData == null || !mounted) return;
+    
+    // Extract recording data and metadata
+    final audioData = List<int>.from(_recordingData!['audioData']);
+    final metadata = Map<String, dynamic>.from(_recordingData!['metadata']);
+    
+    if (!mounted) return;
+    
+    // Show loading dialog
+    await _showLoadingDialog("Saving recording...");
+    
+    if (!mounted) return;
 
-  try {
-    await _firebaseService.saveRecording(
-      uid,
-      patientId,
-      DateTime.now(),
-      audioData,
-      metadata,
-    );
+    try {
+      await _firebaseService.saveRecording(
+        uid,
+        patientId,
+        DateTime.now(),
+        audioData,
+        metadata,
+      );
 
-    if (!mounted) return;
-    
-    // Close loading dialog
-    try {
-      Navigator.of(context).pop();
-    } catch (_) {
-      // Dialog may have been dismissed already, ignore errors
+      if (!mounted) return;
+      
+      // Close loading dialog
+      try {
+        Navigator.of(context).pop();
+      } catch (_) {
+        // Dialog may have been dismissed already, ignore errors
+      }
+      
+      if (!mounted) return;
+      
+      _showSuccessSnackBar("Recording saved successfully");
+      
+      if (!mounted) return;
+      
+      setState(() {
+        _hasRecordingCompleted = false;
+        _recordingData = null;
+      });
+    } catch (e) {
+      if (!mounted) return;
+      
+      // Try to dismiss the dialog
+      try {
+        Navigator.of(context).pop();
+      } catch (_) {
+        // Dialog may have been dismissed already, ignore errors
+      }
+      
+      if (!mounted) return;
+      _showErrorSnackBar("Failed to save recording: $e");
     }
-    
-    if (!mounted) return;
-    
-    _showSuccessSnackBar("Recording saved successfully");
-    
-    if (!mounted) return;
-    
-    setState(() {
-      _hasRecordingCompleted = false;
-      _recordingData = null;
-    });
-  } catch (e) {
-    if (!mounted) return;
-    
-    // Try to dismiss the dialog
-    try {
-      Navigator.of(context).pop();
-    } catch (_) {
-      // Dialog may have been dismissed already, ignore errors
-    }
-    
-    if (!mounted) return;
-    _showErrorSnackBar("Failed to save recording: $e");
   }
-}
 
   void _showLoginPrompt() {
     if (!mounted) return;
@@ -656,109 +575,76 @@ late AnimationController _pulseController;
     );
   }
 
-@override
-void dispose() {
-  // Stop audio playback when navigating away
-  if (_isPlaying) {
-    _audioPlayer.stop();
+  @override
+  void dispose() {
+    // Stop audio playback when navigating away
+    if (_isPlaying) {
+      _audioPlayer.stop();
+    }
+    _audioPlayer.dispose();
+    _recordingTimer?.cancel();
+    _pulseController.dispose();
+    super.dispose();
   }
-  _audioPlayer.dispose();
-  _recordingTimer?.cancel();
-  _pulseController.dispose(); // Add this line
-  super.dispose();
-}
 
-  Widget _buildWaveform(BuildContext context, BLEManager bleManager) {
-  Color waveColor = _recordingStatusColor;
-  
-  return SizedBox(
-    height: 120,
-    child: LineChart(
-      LineChartData(
-        gridData: FlGridData(show: false),
-        titlesData: FlTitlesData(show: false),
-        borderData: FlBorderData(show: false),
-        lineBarsData: [
-          LineChartBarData(
-            spots: bleManager.recentAmplitudes.asMap().entries.map((entry) {
-              return FlSpot(entry.key.toDouble(), entry.value);
-            }).toList(),
-            isCurved: true,
-            color: waveColor,
-            barWidth: 2,
-            dotData: FlDotData(show: false),
-            belowBarData: BarAreaData(
-              show: true,
-              color: waveColor.withAlpha(26),
+  Widget _buildSimpleWaveform(BuildContext context, BLEManager bleManager) {
+    return SizedBox(
+      height: 120,
+      child: LineChart(
+        LineChartData(
+          gridData: FlGridData(show: false),
+          titlesData: FlTitlesData(show: false),
+          borderData: FlBorderData(show: false),
+          lineBarsData: [
+            LineChartBarData(
+              spots: bleManager.recentAmplitudes.asMap().entries.map((entry) {
+                return FlSpot(entry.key.toDouble(), entry.value);
+              }).toList(),
+              isCurved: true,
+              color: Colors.blue,
+              barWidth: 2,
+              dotData: FlDotData(show: false),
+              belowBarData: BarAreaData(
+                show: true,
+                color: Colors.blue.withAlpha(26),
+              ),
             ),
-          ),
-        ],
-        minY: 0,
-        maxY: 1,
-      ),
-    ),
-  );
-}
-
-  Widget _buildRecordingStatus() {
-  return Column(
-    children: [
-      Text(
-        _recordingDuration.toString().split('.').first,
-        style: TextStyle(
-          fontSize: 24,
-          fontWeight: FontWeight.bold,
-          color: Colors.grey[800],
+          ],
+          minY: 0,
+          maxY: 1,
         ),
       ),
-      const SizedBox(height: 8),
-      Consumer<BLEManager>(
-        builder: (context, bleManager, child) {
-          String qualityText = '';
-          switch (_recordingQuality) {
-            case 'excellent':
-              qualityText = 'Excellent Quality';
-              break;
-            case 'good':
-              qualityText = 'Good Quality';
-              break;
-            case 'fair':
-              qualityText = 'Fair Quality';
-              break;
-            case 'poor':
-              qualityText = 'Poor Quality';
-              break;
-            default:
-              qualityText = 'Signal Quality: Unknown';
-          }
-          
-          double amplitudePercentage = (bleManager.peakAmplitude * 100).clamp(0.0, 100.0);
-          
-          return Column(
-            children: [
-              Text(
-                qualityText,
-                style: TextStyle(
-                  fontSize: 16, 
-                  color: _recordingStatusColor,
-                  fontWeight: FontWeight.bold,
-                ),
+    );
+  }
+
+  Widget _buildRecordingStatus() {
+    return Column(
+      children: [
+        Text(
+          _recordingDuration.toString().split('.').first,
+          style: TextStyle(
+            fontSize: 24,
+            fontWeight: FontWeight.bold,
+            color: Colors.grey[800],
+          ),
+        ),
+        const SizedBox(height: 8),
+        Consumer<BLEManager>(
+          builder: (context, bleManager, child) {
+            double amplitudePercentage = (bleManager.currentAmplitude * 100).clamp(0.0, 100.0);
+            
+            return Text(
+              'Signal Strength: ${amplitudePercentage.toStringAsFixed(1)}%',
+              style: TextStyle(
+                fontSize: 16,
+                color: Colors.grey[600],
               ),
-              const SizedBox(height: 4),
-              Text(
-                'Peak Amplitude: ${amplitudePercentage.toStringAsFixed(1)}%',
-                style: TextStyle(
-                  fontSize: 14,
-                  color: Colors.grey[600],
-                ),
-              ),
-            ],
-          );
-        },
-      ),
-    ],
-  );
-}
+            );
+          },
+        ),
+      ],
+    );
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -768,8 +654,8 @@ void dispose() {
         appBar: AppBar(
           title: Text(
             widget.preselectedPatientId != null 
-                ? "Record Patient Murmur"
-                : "Murmur Analysis",
+                ? "Record Patient Audio"
+                : "Audio Recording",
             style: const TextStyle(
               fontWeight: FontWeight.w600,
               color: Colors.black87,
@@ -799,7 +685,7 @@ void dispose() {
                   ),
                   boxShadow: [
                     BoxShadow(
-                      color: Colors.black.withAlpha(13), // Using withAlpha instead of withOpacity
+                      color: Colors.black.withAlpha(13),
                       blurRadius: 10,
                       offset: const Offset(0, 5),
                     ),
@@ -809,7 +695,7 @@ void dispose() {
                   builder: (context, bleManager, child) {
                     return Column(
                       children: [
-                        _buildWaveform(context, bleManager),
+                        _buildSimpleWaveform(context, bleManager),
                         const SizedBox(height: 16),
                         _buildRecordingStatus(),
                       ],
@@ -835,283 +721,162 @@ void dispose() {
   }
 
   Widget _buildMainContent() {
-  if (_isRecording || _isProcessing) {
-    return _buildRecordingContent();
-  } else if (_hasRecordingCompleted) {
-    return _buildRecordingCompleteContent();
-  } else {
-    return _buildInitialContent();
+    if (_isRecording || _isProcessing) {
+      return _buildRecordingContent();
+    } else if (_hasRecordingCompleted) {
+      return _buildRecordingCompleteContent();
+    } else {
+      return _buildInitialContent();
+    }
   }
-}
 
-Widget _buildRecordingContent() {
-  final bleManager = Provider.of<BLEManager>(context, listen: false);
-  
-  return Column(
-    mainAxisSize: MainAxisSize.min,
-    children: [
-      Container(
-        width: 120,
-        height: 120,
-        decoration: BoxDecoration(
-          shape: BoxShape.circle,
-          color: _recordingStatusColor.withAlpha(26),
-        ),
-        child: Center(
-          child: AnimatedBuilder(
-            animation: _pulseController,
-            builder: (context, child) {
-              // Use heart icon if quality is good
-              Widget icon;
-              
-              if (_recordingQuality == 'excellent' || _recordingQuality == 'good') {
-                // Heart icon that pulses with animation
-                icon = Transform.scale(
-                  scale: 0.8 + (_pulseController.value * 0.3),
-                  child: Icon(
-                    Icons.favorite,
-                    color: _recordingStatusColor,
-                    size: 60,
-                  ),
-                );
-              } else if (_isProcessing) {
-                // Processing icon
-                icon = Transform.scale(
-                  scale: 0.8 + (_pulseController.value * 0.2),
-                  child: Icon(
-                    Icons.hourglass_top,
-                    color: Colors.amber,
-                    size: 40,
-                  ),
-                );
-              } else {
-                // Default microphone icon
-                icon = Transform.scale(
-                  scale: 0.8 + (_pulseController.value * 0.2),
-                  child: Icon(
-                    Icons.mic,
-                    color: _recordingStatusColor,
-                    size: 40,
-                  ),
-                );
-              }
-              
-              return icon;
-            },
+  Widget _buildRecordingContent() {
+    return Column(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        Container(
+          width: 120,
+          height: 120,
+          decoration: BoxDecoration(
+            shape: BoxShape.circle,
+            color: Colors.blue.withAlpha(26),
           ),
-        ),
-      ),
-      const SizedBox(height: 24),
-      Text(
-        _isProcessing ? "Processing audio..." : _recordingMessage,
-        style: TextStyle(
-          fontSize: 18,
-          color: Colors.grey[800],
-          fontWeight: FontWeight.w500,
-        ),
-      ),
-      
-      // Show amplitudes
-      const SizedBox(height: 12),
-      Consumer<BLEManager>(
-        builder: (context, bleManager, child) {
-          double amplitudePercentage = (bleManager.currentAmplitude * 100).clamp(0.0, 100.0);
-          
-          return Column(
-            children: [
-              // Show heart rate like display for good quality
-              if (_recordingQuality == 'excellent' || _recordingQuality == 'good')
-                Row(
-                  mainAxisAlignment: MainAxisAlignment.center,
-                  children: [
-                    Icon(
-                      Icons.favorite,
-                      color: Colors.red,
-                      size: 16,
-                    ),
-                    const SizedBox(width: 4),
-                    AnimatedBuilder(
-                      animation: _pulseController,
-                      builder: (context, child) {
-                        // Create a beep-like line
-                        return Container(
-                          width: 30,
-                          height: 20,
-                          child: CustomPaint(
-                            painter: HeartbeatPainter(
-                              progress: _pulseController.value,
-                              color: Colors.red,
-                            ),
-                          ),
-                        );
-                      },
-                    ),
-                  ],
-                ),
-              
-              const SizedBox(height: 8),
-              Text(
-                "Signal Strength: ${amplitudePercentage.toStringAsFixed(1)}%",
-                style: TextStyle(
-                  fontSize: 14,
-                  color: Colors.grey[600],
-                ),
-              ),
-            ],
-          );
-        },
-      ),
-      
-      // Show progress bar
-      const SizedBox(height: 16),
-      Container(
-        width: 200,
-        height: 8,
-        decoration: BoxDecoration(
-          color: Colors.grey[200],
-          borderRadius: BorderRadius.circular(4),
-        ),
-        child: FractionallySizedBox(
-          alignment: Alignment.centerLeft,
-          widthFactor: _recordingProgress.clamp(0.0, 1.0),
-          child: Container(
-            decoration: BoxDecoration(
-              color: _recordingStatusColor,
-              borderRadius: BorderRadius.circular(4),
+          child: Center(
+            child: AnimatedBuilder(
+              animation: _pulseController,
+              builder: (context, child) {
+                return Transform.scale(
+                  scale: 0.8 + (_pulseController.value * 0.2),
+                  child: _isProcessing
+                      ? Icon(
+                          Icons.hourglass_top,
+                          color: Colors.amber,
+                          size: 40,
+                        )
+                      : Icon(
+                          Icons.mic,
+                          color: Colors.blue,
+                          size: 40,
+                        ),
+                );
+              },
             ),
           ),
         ),
-      ),
-    ],
-  );
-}
-
-Widget _buildRecordingCompleteContent() {
-  // Display different icons based on recording quality
-  IconData qualityIcon = Icons.check_circle_outline;
-  Color qualityColor = Colors.green;
-  String qualityText = "Recording complete!";
-  String detailText = "Heart sounds were recorded.";
-  
-  switch (_recordingQuality) {
-    case 'excellent':
-      qualityIcon = Icons.favorite;
-      qualityColor = Colors.green;
-      qualityText = "Excellent heart sound quality!";
-      detailText = "Clear heartbeats were detected.";
-      break;
-    case 'good':
-      qualityIcon = Icons.favorite_border;
-      qualityColor = Colors.green;
-      qualityText = "Good heart sound quality";
-      detailText = "Heartbeats were detected.";
-      break;
-    case 'fair':
-      qualityIcon = Icons.favorite_border;
-      qualityColor = Colors.orange;
-      qualityText = "Fair heart sound quality";
-      detailText = "Some heartbeats detected. May need review.";
-      break;
-    case 'poor':
-      qualityIcon = Icons.heart_broken_outlined;
-      qualityColor = Colors.red;
-      qualityText = "Poor heart sound quality";
-      detailText = "Weak or no heartbeats. Consider recording again.";
-      break;
+        const SizedBox(height: 24),
+        Text(
+          _isProcessing ? "Processing audio..." : "Recording in progress",
+          style: TextStyle(
+            fontSize: 18,
+            color: Colors.grey[800],
+            fontWeight: FontWeight.w500,
+          ),
+        ),
+        
+        // Show signal strength percentage
+        const SizedBox(height: 12),
+        Consumer<BLEManager>(
+          builder: (context, bleManager, child) {
+            double amplitudePercentage = (bleManager.currentAmplitude * 100).clamp(0.0, 100.0);
+            
+            return Text(
+              "Signal Strength: ${amplitudePercentage.toStringAsFixed(1)}%",
+              style: TextStyle(
+                fontSize: 16,
+                color: Colors.grey[600],
+              ),
+            );
+          },
+        ),
+      ],
+    );
   }
 
-  return Column(
-    mainAxisSize: MainAxisSize.min,
-    children: [
-      Container(
-        width: 120,
-        height: 120,
-        decoration: BoxDecoration(
-          shape: BoxShape.circle,
-          color: qualityColor.withAlpha(26),
+  Widget _buildRecordingCompleteContent() {
+    return Column(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        Container(
+          width: 120,
+          height: 120,
+          decoration: BoxDecoration(
+            shape: BoxShape.circle,
+            color: Colors.green.withAlpha(26),
+          ),
+          child: Icon(
+            Icons.check_circle_outline,
+            color: Colors.green,
+            size: 60,
+          ),
         ),
-        child: Icon(
-          qualityIcon,
-          color: qualityColor,
-          size: 60,
+        const SizedBox(height: 24),
+        Text(
+          "Recording complete!",
+          style: TextStyle(
+            fontSize: 18,
+            color: Colors.grey[800],
+            fontWeight: FontWeight.w500,
+          ),
         ),
-      ),
-      const SizedBox(height: 24),
-      Text(
-        qualityText,
-        style: TextStyle(
-          fontSize: 18,
-          color: Colors.grey[800],
-          fontWeight: FontWeight.w500,
+        const SizedBox(height: 16),
+        IconButton(
+          icon: Icon(
+            _isPlaying ? Icons.pause_circle : Icons.play_circle,
+            size: 48,
+            color: Colors.blue[700],
+          ),
+          onPressed: () => _playPreviewRecording(),
         ),
-      ),
-      const SizedBox(height: 8),
-      Text(
-        detailText,
-        style: TextStyle(
-          fontSize: 16,
-          color: Colors.grey[600],
-        ),
-      ),
-      const SizedBox(height: 16),
-      IconButton(
-        icon: Icon(
-          _isPlaying ? Icons.pause_circle : Icons.play_circle,
-          size: 48,
-          color: Colors.blue[700],
-        ),
-        onPressed: () => _playPreviewRecording(),
-      ),
-    ],
-  );
-}
+      ],
+    );
+  }
 
   Widget _buildInitialContent() {
-  return Column(
-    mainAxisSize: MainAxisSize.min,
-    children: [
-      Container(
-        width: 120,
-        height: 120,
-        decoration: BoxDecoration(
-          shape: BoxShape.circle,
-          color: Colors.blue[700]!.withAlpha(26),
+    return Column(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        Container(
+          width: 120,
+          height: 120,
+          decoration: BoxDecoration(
+            shape: BoxShape.circle,
+            color: Colors.blue[700]!.withAlpha(26),
+          ),
+          child: Icon(
+            Icons.mic_none,
+            color: Colors.blue[700],
+            size: 48,
+          ),
         ),
-        child: Icon(
-          Icons.mic_none,
-          color: Colors.blue[700],
-          size: 48,
+        const SizedBox(height: 24),
+        Text(
+          "Tap the button below to start recording",
+          style: TextStyle(
+            fontSize: 16,
+            color: Colors.grey[600],
+          ),
         ),
-      ),
-      const SizedBox(height: 24),
-      Text(
-        "Tap the button below to start recording",
-        style: TextStyle(
-          fontSize: 16,
-          color: Colors.grey[600],
+        const SizedBox(height: 16),
+        Text(
+          "For best results, place the device against the chest\nin a quiet room",
+          textAlign: TextAlign.center,
+          style: TextStyle(
+            fontSize: 14,
+            color: Colors.grey[500],
+          ),
         ),
-      ),
-      const SizedBox(height: 16),
-      Text(
-        "For best results, place the device against the chest\nin a quiet room",
-        textAlign: TextAlign.center,
-        style: TextStyle(
-          fontSize: 14,
-          color: Colors.grey[500],
-        ),
-      ),
-    ],
-  );
-}
-
-Widget _buildFloatingActionButton() {
-  if (_isRecording) {
-    return FloatingActionButton.extended(
-      onPressed: _isProcessing ? null : _stopRecording,
-      backgroundColor: _isProcessing ? Colors.grey : Colors.red,
-      label: Text(_isProcessing ? "Processing..." : "Stop Recording"),
-      icon: Icon(_isProcessing ? Icons.hourglass_top : Icons.stop),
+      ],
     );
+  }
+
+  Widget _buildFloatingActionButton() {
+    if (_isRecording) {
+      return FloatingActionButton.extended(
+        onPressed: _isProcessing ? null : _stopRecording,
+        backgroundColor: _isProcessing ? Colors.grey : Colors.red,
+        label: Text(_isProcessing ? "Processing..." : "Stop Recording"),
+        icon: Icon(_isProcessing ? Icons.hourglass_top : Icons.stop),
+      );
     } else if (_hasRecordingCompleted) {
       return Row(
         mainAxisSize: MainAxisSize.min,
@@ -1152,87 +917,4 @@ Widget _buildFloatingActionButton() {
       );
     }
   }
-}
-class HeartbeatPainter extends CustomPainter {
-  final double progress;
-  final Color color;
-  
-  HeartbeatPainter({required this.progress, required this.color});
-  
-  @override
-  void paint(Canvas canvas, Size size) {
-    final paint = Paint()
-      ..color = color
-      ..strokeWidth = 2.0
-      ..style = PaintingStyle.stroke;
-    
-    final path = Path();
-    path.moveTo(0, size.height / 2);
-    
-    // Draw flatline
-    if (progress < 0.3) {
-      path.lineTo(size.width * progress / 0.3, size.height / 2);
-    } else if (progress < 0.4) {
-      path.lineTo(size.width * 0.3, size.height / 2);
-      // Draw spike up (S1 - lub)
-      final spikeProgress = (progress - 0.3) / 0.1;
-      path.lineTo(
-        size.width * (0.3 + 0.1 * spikeProgress), 
-        size.height / 2 - size.height * 0.4 * spikeProgress
-      );
-    } else if (progress < 0.5) {
-      path.lineTo(size.width * 0.3, size.height / 2);
-      path.lineTo(size.width * 0.4, size.height / 2 - size.height * 0.4);
-      // Draw spike down
-      final spikeProgress = (progress - 0.4) / 0.1;
-      path.lineTo(
-        size.width * (0.4 + 0.1 * spikeProgress), 
-        size.height / 2 - size.height * 0.4 * (1 - spikeProgress)
-      );
-    } else if (progress < 0.6) {
-      path.lineTo(size.width * 0.3, size.height / 2);
-      path.lineTo(size.width * 0.4, size.height / 2 - size.height * 0.4);
-      path.lineTo(size.width * 0.5, size.height / 2);
-      // Small pause
-      path.lineTo(size.width * (0.5 + 0.1 * (progress - 0.5) / 0.1), size.height / 2);
-    } else if (progress < 0.7) {
-      path.lineTo(size.width * 0.3, size.height / 2);
-      path.lineTo(size.width * 0.4, size.height / 2 - size.height * 0.4);
-      path.lineTo(size.width * 0.5, size.height / 2);
-      path.lineTo(size.width * 0.6, size.height / 2);
-      // Draw second spike up (S2 - dub)
-      final spikeProgress = (progress - 0.6) / 0.1;
-      path.lineTo(
-        size.width * (0.6 + 0.1 * spikeProgress), 
-        size.height / 2 - size.height * 0.3 * spikeProgress
-      );
-    } else if (progress < 0.8) {
-      path.lineTo(size.width * 0.3, size.height / 2);
-      path.lineTo(size.width * 0.4, size.height / 2 - size.height * 0.4);
-      path.lineTo(size.width * 0.5, size.height / 2);
-      path.lineTo(size.width * 0.6, size.height / 2);
-      path.lineTo(size.width * 0.7, size.height / 2 - size.height * 0.3);
-      // Draw back down
-      final spikeProgress = (progress - 0.7) / 0.1;
-      path.lineTo(
-        size.width * (0.7 + 0.1 * spikeProgress), 
-        size.height / 2 - size.height * 0.3 * (1 - spikeProgress)
-      );
-    } else {
-      path.lineTo(size.width * 0.3, size.height / 2);
-      path.lineTo(size.width * 0.4, size.height / 2 - size.height * 0.4);
-      path.lineTo(size.width * 0.5, size.height / 2);
-      path.lineTo(size.width * 0.6, size.height / 2);
-      path.lineTo(size.width * 0.7, size.height / 2 - size.height * 0.3);
-      path.lineTo(size.width * 0.8, size.height / 2);
-      // Flatline to end
-      path.lineTo(size.width, size.height / 2);
-    }
-    
-    canvas.drawPath(path, paint);
-  }
-  
-  @override
-  bool shouldRepaint(HeartbeatPainter oldDelegate) => 
-    oldDelegate.progress != progress || oldDelegate.color != color;
 }

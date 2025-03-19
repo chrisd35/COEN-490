@@ -344,112 +344,83 @@ class FirebaseService {
   return filtered;
 }
 
+  // Process audio data to ensure optimal quality for heart murmur detection
   List<int> processAudioForSaving(List<int> rawAudioData, int sampleRate, int bitsPerSample, int channels) {
-  try {
-    if (rawAudioData.isEmpty) {
-      _logger.warning("Empty audio data");
-      return rawAudioData;
-    }
+    try {
+      if (rawAudioData.isEmpty) {
+        _logger.warning("Empty audio data");
+        return rawAudioData;
+      }
 
-    // Convert raw bytes to samples for processing
-    List<int> samples = [];
-    for (int i = 0; i < rawAudioData.length; i += 2) {
-      if (i + 1 < rawAudioData.length) {
-        int sample = rawAudioData[i] | (rawAudioData[i + 1] << 8);
-        // Convert from unsigned to signed if needed
-        if (sample > 32767) {
-          sample = sample - 65536;
+      // Convert raw bytes to samples for processing
+      List<int> samples = [];
+      for (int i = 0; i < rawAudioData.length; i += 2) {
+        if (i + 1 < rawAudioData.length) {
+          int sample = rawAudioData[i] | (rawAudioData[i + 1] << 8);
+          // Convert from unsigned to signed if needed
+          if (sample > 32767) {
+            sample = sample - 65536;
+          }
+          samples.add(sample);
         }
-        samples.add(sample);
       }
-    }
 
-    // Find the peak amplitude for normalization
-    int maxAmp = 0;
-    for (int sample in samples) {
-      int absValue = sample.abs();
-      if (absValue > maxAmp) {
-        maxAmp = absValue;
+      // Find the peak amplitude for normalization
+      int maxAmp = 0;
+      for (int sample in samples) {
+        int absValue = sample.abs();
+        if (absValue > maxAmp) {
+          maxAmp = absValue;
+        }
       }
-    }
 
-    _logger.info("Original peak amplitude: $maxAmp");
+      _logger.info("Original peak amplitude: $maxAmp");
 
-    // Check for DC offset and correct if needed
-    double sum = 0;
-    for (int sample in samples) {
-      sum += sample;
-    }
-    double average = sum / samples.length;
-    
-    _logger.info("DC offset detected: $average");
-    
-    // Perform median filtering to remove random spikes
-    List<int> medianFiltered = _applyMedianFilterToSamples(samples, 5);
-    
-    // Create a new buffer for the processed audio
-    List<int> processedAudio = List<int>.filled(rawAudioData.length, 0);
-    
-    // Apply both DC offset correction, normalization, and adaptive gain
-    double normFactor = 1.0;
-    if (maxAmp > 0 && maxAmp < 8192) { // Less than 25% of max amplitude
-      normFactor = 16384 / maxAmp; // Target ~50% of max amplitude
-      _logger.info("Normalizing audio with factor: $normFactor");
-    }
-    
-    int dcOffset = average.round();
-    
-    // Apply bandpass filter coefficients (30-600Hz) for heart sounds
-    // Butterworth bandpass coefficients for 4kHz sample rate
-    final List<double> a = [1.0000, -3.5797, 4.8849, -3.0092, 0.7056];
-    final List<double> b = [0.0063, 0, -0.0126, 0, 0.0063];
-    
-    // Filter state variables
-    List<double> x = List.filled(5, 0.0);
-    List<double> y = List.filled(5, 0.0);
-    
-    for (int i = 0; i < medianFiltered.length; i++) {
-      // Apply DC offset correction
-      double sample = (medianFiltered[i] - dcOffset).toDouble();
-      
-      // Apply bandpass filter
-      // Shift input values
-      for (int j = x.length - 1; j > 0; j--) {
-        x[j] = x[j-1];
+      // Check for DC offset and correct if needed
+      double sum = 0;
+      for (int sample in samples) {
+        sum += sample;
       }
-      x[0] = sample;
+      double average = sum / samples.length;
       
-      // Apply filter
-      double filtered = b[0] * x[0] + b[1] * x[1] + b[2] * x[2] + b[3] * x[3] + b[4] * x[4]
-                      - a[1] * y[0] - a[2] * y[1] - a[3] * y[2] - a[4] * y[3];
-      
-      // Shift output values
-      for (int j = y.length - 1; j > 0; j--) {
-        y[j] = y[j-1];
-      }
-      y[0] = filtered;
-      
-      // Apply normalization if needed
-      if (normFactor != 1.0) {
-        filtered = filtered * normFactor;
-      }
-      
-      // Clamp to valid range
-      int processedSample = filtered.round().clamp(-32768, 32767);
-      
-      // Convert back to bytes
-      int bytePos = i * 2;
-      processedAudio[bytePos] = processedSample & 0xFF;
-      processedAudio[bytePos + 1] = (processedSample >> 8) & 0xFF;
-    }
+      _logger.info("DC offset detected: $average");
 
-    _logger.info("Audio processing complete with heart murmur optimization");
-    return processedAudio;
-  } catch (e) {
-    _logger.severe("Error in audio processing: $e");
-    return rawAudioData; // Return original on error
+      // Create a new buffer for the processed audio
+      List<int> processedAudio = List<int>.filled(rawAudioData.length, 0);
+      
+      // Apply both DC offset correction and normalization if needed
+      double normFactor = 1.0;
+      if (maxAmp > 0 && maxAmp < 8192) { // Less than 25% of max amplitude
+        normFactor = 16384 / maxAmp; // Target ~50% of max amplitude
+        _logger.info("Normalizing audio with factor: $normFactor");
+      }
+      
+      int dcOffset = average.round();
+      
+      for (int i = 0; i < samples.length; i++) {
+        // Apply DC offset correction and normalization
+        int processedSample = samples[i] - dcOffset;
+        
+        if (normFactor != 1.0) {
+          processedSample = (processedSample * normFactor).round();
+        }
+        
+        // Clamp to valid range
+        processedSample = processedSample.clamp(-32768, 32767);
+        
+        // Convert back to bytes
+        int bytePos = i * 2;
+        processedAudio[bytePos] = processedSample & 0xFF;
+        processedAudio[bytePos + 1] = (processedSample >> 8) & 0xFF;
+      }
+
+      _logger.info("Audio processing complete");
+      return processedAudio;
+    } catch (e) {
+      _logger.severe("Error in audio processing: $e");
+      return rawAudioData; // Return original on error
+    }
   }
-}
 
   // Improved WAV file creation - optimized for heart murmur detection
   List<int> createWavFile(
