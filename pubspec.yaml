@@ -52,7 +52,10 @@ dependencies:
   flutter_markdown: ^0.7.6+2 
   file_picker: ^9.0.2
   http: ^1.3.0
+<<<<<<< Updated upstream
   path: ^1.8.3
+=======
+>>>>>>> Stashed changes
   
 
 dev_dependencies:
