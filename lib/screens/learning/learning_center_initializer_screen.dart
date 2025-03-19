@@ -75,7 +75,7 @@ class LearningCenterInitializer {
         if (file.path == null) continue;
         
         final fileName = path.basename(file.path!);
-        final fileExtension = path.extension(fileName);
+        path.extension(fileName);
         final fileNameWithoutExt = path.basenameWithoutExtension(fileName);
         
         updateProgress('Uploading $fileName...', uploadedFiles / totalFiles);
@@ -116,7 +116,7 @@ class LearningCenterInitializer {
       }
       
       updateProgress('All files uploaded successfully!', 1.0);
-      showMessage('${uploadedFiles} audio files uploaded successfully!');
+      showMessage('$uploadedFiles audio files uploaded successfully!');
     } catch (e) {
       showMessage('Error uploading audio files: $e');
       rethrow;

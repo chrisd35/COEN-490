@@ -11,7 +11,7 @@ import 'package:logging/logging.dart' as logging;
 final _logger = logging.Logger('LearningCenterScreen');
 
 class LearningCenterScreen extends StatefulWidget {
-  const LearningCenterScreen({Key? key}) : super(key: key);
+  const LearningCenterScreen({super.key});
 
   @override
   State<LearningCenterScreen> createState() => _LearningCenterScreenState();
@@ -205,7 +205,7 @@ class _LearningCenterScreenState extends State<LearningCenterScreen> {
       child: Container(
         padding: const EdgeInsets.symmetric(vertical: 12, horizontal: 16),
         decoration: BoxDecoration(
-          color: Colors.white.withOpacity(0.2),
+          color: Colors.white.withAlpha(51), // 0.2 * 255 ≈ 51
           borderRadius: BorderRadius.circular(8),
         ),
         child: Row(
@@ -295,7 +295,7 @@ class _LearningCenterScreenState extends State<LearningCenterScreen> {
       color: Colors.white,
       borderRadius: BorderRadius.circular(12),
       elevation: 1,
-      shadowColor: Colors.black.withOpacity(0.1),
+      shadowColor: Colors.black.withAlpha(26), // 0.1 * 255 ≈ 26
       child: InkWell(
         onTap: onTap,
         borderRadius: BorderRadius.circular(12),
@@ -307,7 +307,7 @@ class _LearningCenterScreenState extends State<LearningCenterScreen> {
               Container(
                 padding: const EdgeInsets.all(12),
                 decoration: BoxDecoration(
-                  color: color.withOpacity(0.1),
+                  color: color.withAlpha(26), // 0.1 * 255 ≈ 26
                   shape: BoxShape.circle,
                 ),
                 child: Icon(
@@ -462,7 +462,7 @@ class _LearningCenterScreenState extends State<LearningCenterScreen> {
                     width: 44,
                     height: 44,
                     decoration: BoxDecoration(
-                      color: Theme.of(context).primaryColor.withOpacity(0.1),
+                      color: Theme.of(context).primaryColor.withAlpha(26), // 0.1 * 255 ≈ 26
                       shape: BoxShape.circle,
                     ),
                     child: Icon(

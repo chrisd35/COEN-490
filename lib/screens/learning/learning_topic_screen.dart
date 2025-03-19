@@ -11,9 +11,9 @@ class LearningTopicScreen extends StatefulWidget {
   final LearningTopic topic;
   
   const LearningTopicScreen({
-    Key? key,
+    super.key,
     required this.topic,
-  }) : super(key: key);
+  });
 
   @override
   State<LearningTopicScreen> createState() => _LearningTopicScreenState();
@@ -285,7 +285,7 @@ class _LearningTopicScreenState extends State<LearningTopicScreen> with SingleTi
               Container(
                 width: double.infinity,
                 padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 16),
-                color: Theme.of(context).primaryColor.withOpacity(0.1),
+                color: Theme.of(context).primaryColor.withAlpha(26), // 0.1 * 255 ≈ 26
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
@@ -342,7 +342,7 @@ class _LearningTopicScreenState extends State<LearningTopicScreen> with SingleTi
             shape: BoxShape.circle,
             color: index == _currentResourceIndex
                 ? Theme.of(context).primaryColor
-                : Theme.of(context).primaryColor.withOpacity(0.3),
+                : Theme.of(context).primaryColor.withAlpha(77), // 0.3 * 255 ≈ 77
           ),
         ),
       ),
@@ -356,7 +356,7 @@ class _LearningTopicScreenState extends State<LearningTopicScreen> with SingleTi
         color: Colors.white,
         boxShadow: [
           BoxShadow(
-            color: Colors.black.withOpacity(0.05),
+            color: Colors.black.withAlpha(13), // 0.05 * 255 ≈ 13
             blurRadius: 2,
             offset: const Offset(0, 2),
           ),
@@ -413,7 +413,7 @@ class _LearningTopicScreenState extends State<LearningTopicScreen> with SingleTi
       shape: RoundedRectangleBorder(
         borderRadius: BorderRadius.circular(12),
         side: BorderSide(
-          color: Colors.grey.withOpacity(0.2),
+          color: Colors.grey.withAlpha(51), // 0.2 * 255 ≈ 51
           width: 1,
         ),
       ),
@@ -433,10 +433,10 @@ class _LearningTopicScreenState extends State<LearningTopicScreen> with SingleTi
                   return Container(
                     padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
                     decoration: BoxDecoration(
-                      color: Theme.of(context).primaryColor.withOpacity(0.1),
+                      color: Theme.of(context).primaryColor.withAlpha(26), // 0.1 * 255 ≈ 26
                       borderRadius: BorderRadius.circular(12),
                       border: Border.all(
-                        color: Theme.of(context).primaryColor.withOpacity(0.2),
+                        color: Theme.of(context).primaryColor.withAlpha(51), // 0.2 * 255 ≈ 51
                         width: 1,
                       ),
                     ),
@@ -528,7 +528,7 @@ class _LearningTopicScreenState extends State<LearningTopicScreen> with SingleTi
         color: Colors.grey[50],
         borderRadius: BorderRadius.circular(12),
         border: Border.all(
-          color: Colors.grey.withOpacity(0.2),
+          color: Colors.grey.withAlpha(51), // 0.2 * 255 ≈ 51
         ),
       ),
       child: Column(
@@ -591,7 +591,7 @@ class _LearningTopicScreenState extends State<LearningTopicScreen> with SingleTi
         color: Colors.grey[50],
         borderRadius: BorderRadius.circular(12),
         border: Border.all(
-          color: Colors.grey.withOpacity(0.2),
+          color: Colors.grey.withAlpha(51), // 0.2 * 255 ≈ 51
         ),
       ),
       child: Column(

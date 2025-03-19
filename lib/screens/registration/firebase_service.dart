@@ -330,54 +330,49 @@ Future<void> deletePatient(String uid, String medicareNumber, String confirmatio
     try {
       String sanitizedMedicalCard = medicalCardNumber.replaceAll('/', '_');
       
-      // Validate and adjust audio data if necessary
-      int expectedBytes = (metadata['sampleRate'] ?? 4000) * 
-                         (metadata['duration'] ?? 0) * 
-                         2;  // 2 bytes per sample
+      _logger.info("Starting saveRecording with ${audioData.length} bytes of audio");
+      _logger.info("Metadata: $metadata");
       
-      List<int> processedAudioData = audioData;
-      if (audioData.length != expectedBytes) {
-        _logger.warning("Warning: Audio data length mismatch");
-        _logger.warning("Expected: $expectedBytes bytes");
-        _logger.warning("Actual: ${audioData.length} bytes");
-        
-        if (audioData.length > expectedBytes) {
-          processedAudioData = audioData.sublist(0, expectedBytes);
-          _logger.info("Trimmed audio data to expected length");
-        }
+      // Log some additional debug information about the audio
+      int expectedSamples = (metadata['sampleRate'] ?? 16000) * (metadata['duration'] ?? 0);
+      int bytesPerSample = (metadata['bitsPerSample'] ?? 16) ~/ 8;
+      num expectedBytes = expectedSamples * bytesPerSample * (metadata['channels'] ?? 1);
+      
+      _logger.info("Expected bytes: $expectedBytes, Actual bytes: ${audioData.length}");
+      
+      // Ensure we have valid audio data
+      if (audioData.isEmpty) {
+        throw Exception("Audio data is empty");
       }
-
-      // Debug processed data
-      debugAudioData(
-        processedAudioData,
-        metadata['sampleRate'] ?? 4000,
-        metadata['duration']
-      );
-
-      // Create WAV file
+      
+      // Create WAV file with proper header
       final wavData = createWavFile(
-        processedAudioData,
-        sampleRate: metadata['sampleRate'] ?? 4000,
+        audioData,
+        sampleRate: metadata['sampleRate'] ?? 16000, // Default to 16kHz
         bitsPerSample: metadata['bitsPerSample'] ?? 16,
         channels: metadata['channels'] ?? 1,
       );
 
       // Generate filename
       String filename = 'users/$uid/patients/$sanitizedMedicalCard/recordings/${timestamp.millisecondsSinceEpoch}.wav';
+      _logger.info("Saving to path: $filename");
 
-      // Upload to Firebase Storage
+      // Upload to Firebase Storage with additional metadata
       await _storage.ref(filename).putData(
         Uint8List.fromList(wavData),
         SettableMetadata(
           contentType: 'audio/wav',
           customMetadata: {
-            'sampleRate': (metadata['sampleRate'] ?? 4000).toString(),
+            'sampleRate': (metadata['sampleRate'] ?? 16000).toString(),
             'duration': metadata['duration'].toString(),
             'bitsPerSample': (metadata['bitsPerSample'] ?? 16).toString(),
             'channels': (metadata['channels'] ?? 1).toString(),
+            'processingApplied': 'true', // Flag to indicate this audio has been processed
+            'processingDetails': 'bandpass,median,adaptiveGain,noiseReduction,normalization',
           },
         ),
       );
+      _logger.info("Successfully uploaded audio to storage");
 
       // Save metadata to Realtime Database
       await _database
@@ -391,27 +386,31 @@ Future<void> deletePatient(String uid, String medicareNumber, String confirmatio
             'timestamp': timestamp.toIso8601String(),
             'filename': filename,
             'duration': metadata['duration'],
-            'sampleRate': metadata['sampleRate'] ?? 4000,
+            'sampleRate': metadata['sampleRate'] ?? 16000,
             'bitsPerSample': metadata['bitsPerSample'] ?? 16,
             'channels': metadata['channels'] ?? 1,
             'peakAmplitude': metadata['peakAmplitude'],
+            'processingApplied': true,
+            'processingDetails': 'bandpass(30-600Hz),median,adaptiveGain,noiseReduction,normalization',
           });
 
-      _logger.info("Recording saved successfully with correct duration");
+      _logger.info("Recording metadata saved to database");
     } catch (e) {
       _logger.severe('Error saving recording: $e');
       rethrow;
     }
   }
 
-  List<int> createWavFile(
+   List<int> createWavFile(
     List<int> audioData, {
-    int sampleRate = 4000,
+    int sampleRate = 16000, // Updated default to 16kHz
     int bitsPerSample = 16,
     int channels = 1,
   }) {
     final int byteRate = sampleRate * channels * (bitsPerSample ~/ 8);
     final int blockAlign = channels * (bitsPerSample ~/ 8);
+    
+    _logger.info("Creating WAV with: Sample rate: $sampleRate Hz, Bits: $bitsPerSample, Channels: $channels");
     
     ByteData header = ByteData(44);
     
@@ -433,6 +432,8 @@ Future<void> deletePatient(String uid, String medicareNumber, String confirmatio
     // Data chunk
     header.setUint32(36, 0x64617461, Endian.big);  // "data"
     header.setUint32(40, audioData.length, Endian.little);  // Data size
+    
+    _logger.info("WAV header created for ${audioData.length} bytes of audio data");
     
     return [...header.buffer.asUint8List(), ...audioData];
   }

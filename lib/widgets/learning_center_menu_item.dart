@@ -5,7 +5,7 @@ import '../utils/app_routes.dart';
 import '../../../utils/navigation_service.dart';
 
 class LearningCenterMenuItem extends StatelessWidget {
-  const LearningCenterMenuItem({Key? key}) : super(key: key);
+  const LearningCenterMenuItem({super.key});
 
   @override
   Widget build(BuildContext context) {
