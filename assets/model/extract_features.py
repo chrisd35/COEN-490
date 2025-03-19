@@ -35,7 +35,7 @@ def preprocess_heart_sound(file_path):
         y, sr = librosa.load(file_path, sr=None)
 
         # Add pre-emphasis before filtering
-        y_preemph = librosa.effects.preemphasis(y, coef=0.98)  # coef from speech processing
+        y_preemph = librosa.effects.preemphasis(y, coef=0.97)  # coef from speech processing
         
         # Enhanced noise removal with bandpass filter (20-400 Hz)
         # Heart sounds typically concentrated in 20-200 Hz range

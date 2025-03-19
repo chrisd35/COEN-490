@@ -203,22 +203,43 @@ class _MurmurChartState extends State<MurmurChart> {
   }
 
   String _parseMurmurType(Map<String, dynamic> features) {
-    // Implement based on your feature values
-    if (features['Energy_100_150Hz'] > 0.8) return 'Systolic ejection';
-    return 'Undetermined';
+    // Systolic characteristics
+    if (features['Systole_Mean'] > 0.75 && 
+        features['Wavelet_1_Energy'] > 0.65) {
+      return 'Systolic ejection murmur';
+    }
+    // Diastolic characteristics
+    if (features['Wavelet_2_Shannon'] > 4.2 &&
+        features['Energy_200_400Hz'] < 0.4) {
+      return 'Diastolic murmur';
+    }
+    return 'Undetermined type';
   }
 
   String _parseMurmurLocation(Map<String, dynamic> features) {
-    // Implement based on your feature values
-    if (features['SpectralContrast_2'] > 5) return 'Mitral area';
-    return 'General';
+    // Aortic area detection
+    if (features['Energy_200_400Hz'] > 0.7 && 
+        features['Wavelet_1_Shannon'] > 3.8) {
+      return 'Aortic area (right sternal border)';
+    }
+    // Mitral area detection
+    if (features['MFCC_mean_13'] < -0.4 && 
+        features['Energy_100_200Hz'] > 0.6) {
+      return 'Mitral area (cardiac apex)';
+    }
+    return 'General cardiac area';
   }
 
   String _parseMurmurGrade(Map<String, dynamic> features) {
-    final confidence = features['confidence'] ?? 0;
-    if (confidence > 0.8) return '4/6';
-    if (confidence > 0.6) return '3/6';
-    return '2/6';
+    // Grade based on systole characteristics and heart rate
+    final systoleScore = (features['Systole_Mean'] * 0.7) + 
+                        (features['Systole_Std'] * 0.3);
+    final hr = features['HeartRate'] ?? 72;
+
+    if (systoleScore > 0.85 && hr > 100) return 'Grade 4/6';
+    if (systoleScore > 0.7) return 'Grade 3/6';
+    if (systoleScore > 0.55) return 'Grade 2/6';
+    return 'Grade 1/6';
   }
 
   void _showLoginPrompt() {
