@@ -1,4 +1,6 @@
 from fastapi import FastAPI, File, UploadFile, HTTPException, Depends
+from fastapi import Body
+from fastapi.security import OAuth2PasswordBearer
 from fastapi.middleware.cors import CORSMiddleware
 import firebase_admin
 from firebase_admin import credentials, storage, auth
@@ -11,6 +13,8 @@ import os
 import pandas as pd
 
 app = FastAPI()
+
+oauth2_scheme = OAuth2PasswordBearer(tokenUrl="token")
 
 # Add CORS middleware
 app.add_middleware(
@@ -29,7 +33,7 @@ firebase_admin.initialize_app(cred, {'storageBucket': 'respirhythm.firebasestora
 model = joblib.load('heart_sound_model.joblib')
 
 @app.post("/analyze")
-async def analyze_heart_sound(firebase_path: str, token: str = Depends()):
+async def analyze_heart_sound(firebase_path: str = Body(..., embed=True), token: str = Depends(oauth2_scheme)):
     try:
         # Verify Firebase Auth token
         decoded_token = auth.verify_id_token(token)
@@ -44,6 +48,7 @@ async def analyze_heart_sound(firebase_path: str, token: str = Depends()):
         blob = bucket.blob(firebase_path)
         temp_file = tempfile.NamedTemporaryFile(delete=False)
         blob.download_to_filename(temp_file.name)
+        temp_file.close()  # Explicitly close the file
         
         # 2. Extract features
         features, _ = extract_features(temp_file.name)

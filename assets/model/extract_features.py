@@ -108,6 +108,19 @@ def preprocess_heart_sound(file_path):
 
         # Use adaptive peak detection
         peaks = adaptive_peak_detection(onset_env, sr, hop_length)
+
+        # If too few peaks detected, fall back to the original method
+        if len(peaks) < 4:  # Need at least 2 complete heart cycles
+            print("Adaptive peak detection found too few peaks. Falling back to fixed parameters.")
+            peaks = librosa.util.peak_pick(
+                onset_env,
+                pre_max=max(1, int(0.05*sr/hop_length)),
+                post_max=max(1, int(0.05*sr/hop_length)),
+                pre_avg=max(1, int(0.1*sr/hop_length)),
+                post_avg=max(1, int(0.1*sr/hop_length)),
+                delta=0.07,
+                wait=max(1, int(0.25*sr/hop_length))
+            )
         
         # Convert frame indices to sample indices
         peak_times = librosa.frames_to_time(peaks, sr=sr, hop_length=hop_length)
@@ -143,6 +156,55 @@ def preprocess_heart_sound(file_path):
         import traceback
         traceback.print_exc()
         return None, None, None, None, None
+    
+def select_optimal_features(features):
+    """Select optimal feature set for heart sound classification"""
+    
+    # Essential timing features
+    timing_features = {
+        k: features[k] for k in [
+            'HeartRate',
+            'Systole_Mean', 'Systole_Std',
+            'Diastole_Mean', 'Diastole_Std'
+        ] if k in features
+    }
+    
+    # Primary spectral features
+    spectral_features = {
+        k: features[k] for k in [
+            'Q_Factor',
+            'SpectralFlatness',
+            'ZeroCrossingRate'
+        ] if k in features
+    }
+    
+    # Reduced MFCCs (first 13 only)
+    mfcc_features = {
+        k: features[k] for k in features.keys() 
+        if 'MFCC_mean' in k and int(k.split('_')[-1]) <= 13
+    }
+    
+    # Energy bands (all three are physiologically relevant)
+    energy_features = {
+        k: features[k] for k in features.keys()
+        if 'Energy_' in k
+    }
+    
+    # Select only the first 3 levels of wavelet features
+    wavelet_features = {
+        k: features[k] for k in features.keys()
+        if ('Wavelet_' in k and 
+            int(k.split('_')[1]) <= 2 and
+            any(x in k for x in ['Energy', 'Shannon']))
+    }
+    
+    return {
+        **timing_features,
+        **spectral_features,
+        **mfcc_features,
+        **energy_features,
+        **wavelet_features
+    }
 
 def extract_features(file_path, segmentation_file=None):
     """Cardiac-specific feature extraction with preprocessing and validation"""
@@ -163,8 +225,8 @@ def extract_features(file_path, segmentation_file=None):
         mfccs = librosa.feature.mfcc(
         y=preprocessed_audio, 
         sr=sr, 
-        n_mfcc=25,          # Changed from 13 to 25
-        n_mels=40,          # Custom Mel banks (closer to study's "25–42")
+        n_mfcc=13,          # Changed from 13 to 25
+        n_mels=26,          # Custom Mel banks (closer to study's "25–42")
         hop_length=256      # Match segmentation hop_length
     )
         mfccs_mean = np.mean(mfccs.T, axis=0)
@@ -177,6 +239,12 @@ def extract_features(file_path, segmentation_file=None):
         heartbeat_features = {}
         if len(peak_times) >= 2:
             intervals = np.diff(peak_times)
+
+            # Group intervals into pairs (S1-S2 + S2-S1 = one complete cycle)
+            cycle_intervals = []
+            for i in range(0, len(intervals)-1, 2):
+                cycle_intervals.append(intervals[i] + intervals[i+1])
+            
             systole_times = intervals[::2] if len(intervals) > 1 else []
             diastole_times = intervals[1::2] if len(intervals) > 1 else []
             
@@ -190,7 +258,9 @@ def extract_features(file_path, segmentation_file=None):
                     "Diastole_Mean": float(np.mean(diastole_times)),
                     "Diastole_Std": float(np.std(diastole_times))
                 })
-            heartbeat_features["HeartRate"] = 60/np.mean(intervals) if len(intervals) > 0 else 0
+            # Calculate heart rate using complete cardiac cycles
+            heartbeat_features["HeartRate"] = float(60/np.mean(cycle_intervals) if cycle_intervals else 
+                                                60/np.mean(intervals)/2)  # Divide by 2 if using raw intervals
         
         # Spectral features
         spectral_contrast = librosa.feature.spectral_contrast(
@@ -198,8 +268,12 @@ def extract_features(file_path, segmentation_file=None):
         )
         spectral_contrast_mean = np.mean(spectral_contrast, axis=1)
         
-        # Energy bands
-        bands = [(20, 50), (50, 100), (100, 150), (150, 200), (200, 400)]
+        # Broader, physiologically relevant energy bands
+        bands = [
+            (20, 100),   # S1 fundamental frequencies
+            (100, 200),  # S2 fundamental frequencies
+            (200, 400)   # Murmur frequencies
+        ]
         band_energies = []
         for low, high in bands:
             spec = np.abs(librosa.stft(preprocessed_audio))
@@ -210,7 +284,7 @@ def extract_features(file_path, segmentation_file=None):
             band_energies.append(band_energy)
 
         # Add wavelet decomposition
-        def compute_wavelet_features(signal, sr, wavelet='db4', levels=5):
+        def compute_wavelet_features(signal, sr, wavelet='db4', levels=4):
             """Extract comprehensive wavelet features for heart sound analysis"""
             # Perform wavelet decomposition
             coeffs = pywt.wavedec(signal, wavelet, level=levels)
@@ -226,27 +300,10 @@ def extract_features(file_path, segmentation_file=None):
                 normalized_c = c**2 / (np.sum(c**2) + 1e-12)
                 wavelet_features[f'Wavelet_{i}_Shannon'] = float(-np.sum(normalized_c * np.log2(normalized_c + 1e-12)))
                 
-                # Statistical features
-                wavelet_features[f'Wavelet_{i}_Mean'] = float(np.mean(np.abs(c)))
-                wavelet_features[f'Wavelet_{i}_Std'] = float(np.std(c))
-                wavelet_features[f'Wavelet_{i}_Skewness'] = float(stats.skew(c))
-                wavelet_features[f'Wavelet_{i}_Kurtosis'] = float(stats.kurtosis(c))
-                
-                # Frequency band power - helps with murmur detection
-                # Different wavelet levels correspond to different frequency bands
-                frequency_range = sr / (2**(i+1)) if i < len(coeffs)-1 else 0
-                wavelet_features[f'Wavelet_{i}_MaxFreq'] = float(frequency_range)  # Store as Hz value
-                
                 # Ratio between adjacent scales (helps detect transients like S1/S2)
                 if i < len(coeffs)-1:
                     energy_ratio = np.sum(c**2) / (np.sum(coeffs[i+1]**2) + 1e-12)
                     wavelet_features[f'Wavelet_{i}_EnergyRatio'] = float(energy_ratio)
-            
-            # Cross-scale features
-            # Useful for detecting murmurs (which appear across multiple scales)
-            total_energy = sum(np.sum(c**2) for c in coeffs)
-            for i, c in enumerate(coeffs):
-                wavelet_features[f'Wavelet_{i}_RelativeEnergy'] = float(np.sum(c**2) / total_energy)
             
             return wavelet_features
 
@@ -267,14 +324,22 @@ def extract_features(file_path, segmentation_file=None):
         spectral_flatness = librosa.feature.spectral_flatness(y=preprocessed_audio)
         features['SpectralFlatness'] = float(np.mean(spectral_flatness))
         
-        # Compile features
+        # Feature compilation
         features.update({
+            # Timing and rhythm features
+            **heartbeat_features, 
+            
+            # Spectral features
             **{f"MFCC_mean_{i+1}": float(v) for i, v in enumerate(mfccs_mean)},
             **{f"MFCC_std_{i+1}": float(v) for i, v in enumerate(mfccs_std)},
             **{f"SpectralContrast_{i+1}": float(v) for i, v in enumerate(spectral_contrast_mean)},
+            
+            # Energy distribution
             **{f"Energy_{low}_{high}Hz": float(e) for (low, high), e in zip(bands, band_energies)},
+            
+            # Additional features
             "ZeroCrossingRate": float(np.mean(librosa.feature.zero_crossing_rate(preprocessed_audio))),
-            **heartbeat_features
+            "SpectralFlatness": float(np.mean(spectral_flatness))
         })
         
         # If segmentation data provided, run validation
@@ -332,6 +397,8 @@ def extract_features(file_path, segmentation_file=None):
                 
                 # Create validation visualization
                 create_validation_plot(file_path, full_audio, sr, peak_times_full, segmentation)
+
+        features = select_optimal_features(features)
         
         return features, validation_info
         
