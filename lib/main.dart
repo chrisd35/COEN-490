@@ -10,13 +10,22 @@ import 'utils/app_routes.dart';
 import 'package:logging/logging.dart' as logging;
 
 // Create a logger instance
-final _logger = logging.Logger('Navigation');
+final _logger = logging.Logger('Main');
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
+  
+  // Configure logging
+  _configureLogging();
+  
+  _logger.info('Starting application');
+  
   await Firebase.initializeApp(
     options: DefaultFirebaseOptions.currentPlatform,
   );
+  
+  _logger.info('Firebase initialized');
+  
   runApp(
     MultiProvider(
       providers: [
@@ -32,6 +41,32 @@ void main() async {
       child: const MyApp(),
     ),
   );
+  
+  _logger.info('Application started');
+}
+
+/// Configure the logging system
+void _configureLogging() {
+  // Set the logging level
+  logging.Logger.root.level = logging.Level.ALL;
+  
+  // Listen to log messages and print them
+  logging.Logger.root.onRecord.listen((record) {
+    // Format: [LEVEL] LOGGER_NAME: MESSAGE
+    print('[${record.level.name}] ${record.loggerName}: ${record.message}');
+    
+    // If there's an error object, print it too
+    if (record.error != null) {
+      print('Error: ${record.error}');
+    }
+    
+    // If there's a stack trace, print it too
+    if (record.stackTrace != null) {
+      print('Stack trace:\n${record.stackTrace}');
+    }
+  });
+  
+  _logger.info('Logging configured');
 }
 
 class MyApp extends StatelessWidget {
@@ -40,6 +75,8 @@ class MyApp extends StatelessWidget {
   
   @override
   Widget build(BuildContext context) {
+    _logger.fine('Building MyApp widget');
+    
     return MaterialApp(
       title: 'RespiRhythm',
       theme: ThemeData(
@@ -91,27 +128,29 @@ class MyApp extends StatelessWidget {
 
 /// Navigation observer to track route changes
 class _NavigationHistoryObserver extends NavigatorObserver {
+  final _navLogger = logging.Logger('Navigation');
+  
   @override
   void didPush(Route<dynamic> route, Route<dynamic>? previousRoute) {
-    _logger.info('Pushed ${route.settings.name} (from ${previousRoute?.settings.name})');
+    _navLogger.info('Pushed ${route.settings.name} (from ${previousRoute?.settings.name})');
     super.didPush(route, previousRoute);
   }
 
   @override
   void didPop(Route<dynamic> route, Route<dynamic>? previousRoute) {
-    _logger.info('Popped ${route.settings.name} (back to ${previousRoute?.settings.name})');
+    _navLogger.info('Popped ${route.settings.name} (back to ${previousRoute?.settings.name})');
     super.didPop(route, previousRoute);
   }
 
   @override
   void didReplace({Route<dynamic>? newRoute, Route<dynamic>? oldRoute}) {
-    _logger.info('Replaced ${oldRoute?.settings.name} with ${newRoute?.settings.name}');
+    _navLogger.info('Replaced ${oldRoute?.settings.name} with ${newRoute?.settings.name}');
     super.didReplace(newRoute: newRoute, oldRoute: oldRoute);
   }
 
   @override
   void didRemove(Route<dynamic> route, Route<dynamic>? previousRoute) {
-    _logger.info('Removed ${route.settings.name}');
+    _navLogger.info('Removed ${route.settings.name}');
     super.didRemove(route, previousRoute);
   }
 }
