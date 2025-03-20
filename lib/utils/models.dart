@@ -187,6 +187,7 @@ extension PulseOxSessionExtension on PulseOxSession {
     }).toList();
   }
 }
+
 class ECGReading {
   final DateTime timestamp;
   final String filename;
@@ -194,13 +195,17 @@ class ECGReading {
   final int sampleRate;
   String? downloadUrl;
 
+  
+
   ECGReading({
     required this.timestamp,
     required this.filename,
     required this.duration,
     required this.sampleRate,
     this.downloadUrl,
+    
   });
+  
 
   Map<String, dynamic> toMap() {
     return {
@@ -211,6 +216,7 @@ class ECGReading {
       'downloadUrl': downloadUrl,
     };
   }
+  
 
   factory ECGReading.fromMap(Map<dynamic, dynamic> data) {
     return ECGReading(
@@ -221,7 +227,9 @@ class ECGReading {
       downloadUrl: data['downloadUrl'],
     );
   }
+  
 }
+
 
 class Patient {
   final String fullName;

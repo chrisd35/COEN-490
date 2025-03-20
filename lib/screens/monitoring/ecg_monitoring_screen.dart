@@ -28,14 +28,14 @@ class ECGMonitoring extends StatefulWidget {
   State<ECGMonitoring> createState() => ECGMonitoringState();
 }
 
-// Made state class public
-class ECGMonitoringState extends State<ECGMonitoring> {
+class ECGMonitoringState extends State<ECGMonitoring> with SingleTickerProviderStateMixin {
   final List<Point<double>> _points = [];
   final double minY = 0;
   final double maxY = 4095;
   double zoomLevel = 1.0;
   final FirebaseService _firebaseService = FirebaseService();
 
+  // These metrics are still calculated in the background but not displayed
   double currentHeartRate = 0.0;
   double rrInterval = 0.0;
   double signalQuality = 0.0;
@@ -47,6 +47,7 @@ class ECGMonitoringState extends State<ECGMonitoring> {
   Patient? selectedPatient;
 
   ScrollController scrollController = ScrollController();
+  late AnimationController _animationController;
 
   @override
   void initState() {
@@ -56,6 +57,13 @@ class ECGMonitoringState extends State<ECGMonitoring> {
     }
     widget.bleManager.clearECGBuffer();
     widget.bleManager.addListener(_onBLEUpdate);
+    
+    // Animation controller for UI elements
+    _animationController = AnimationController(
+      duration: const Duration(milliseconds: 300),
+      vsync: this,
+    );
+    _animationController.forward();
   }
 
   Future<void> _loadPatientDetails(String medicalCardNumber) async {
@@ -82,6 +90,7 @@ class ECGMonitoringState extends State<ECGMonitoring> {
   void dispose() {
     widget.bleManager.removeListener(_onBLEUpdate);
     scrollController.dispose();
+    _animationController.dispose();
     super.dispose();
   }
 
@@ -100,7 +109,7 @@ class ECGMonitoringState extends State<ECGMonitoring> {
           }
         }
       });
-      _calculateECGMetrics(); 
+      _calculateECGMetrics(); // Still calculate metrics but don't display
       widget.bleManager.clearECGBuffer();
 
       // Auto-scroll to the latest data
@@ -112,77 +121,6 @@ class ECGMonitoringState extends State<ECGMonitoring> {
         );
       }
     }
-  }
-  
-  Widget _buildMetricsPanel() {
-    return Padding(
-      padding: const EdgeInsets.all(16),
-      child: Row(
-        mainAxisAlignment: MainAxisAlignment.spaceEvenly,
-        children: [
-          _buildMetricCard(
-            'Heart Rate',
-            currentHeartRate.toStringAsFixed(1),
-            'BPM',
-            Icons.favorite,
-            Colors.red,
-          ),
-          _buildMetricCard(
-            'R-R Interval',
-            rrInterval.toStringAsFixed(3),
-            'sec',
-            Icons.timeline,
-            Colors.blue,
-          ),
-          _buildMetricCard(
-            'Signal Quality',
-            signalQuality.toStringAsFixed(1),
-            '%',
-            Icons.signal_cellular_alt,
-            Colors.green,
-          ),
-        ],
-      ),
-    );
-  }
-
-  Widget _buildMetricCard(String title, String value, String unit, IconData icon, Color color) {
-    return Card(
-      elevation: 4,
-      child: Padding(
-        padding: const EdgeInsets.all(12.0),
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Icon(icon, color: color, size: 24),
-            const SizedBox(height: 8),
-            Text(
-              title,
-              style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w500),
-            ),
-            const SizedBox(height: 4),
-            Row(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                Text(
-                  value,
-                  style: TextStyle(
-                    fontSize: 20,
-                    fontWeight: FontWeight.bold,
-                    color: color,
-                  ),
-                ),
-                const SizedBox(width: 4),
-                Text(
-                  unit,
-                  style: const TextStyle(fontSize: 12),
-                ),
-              ],
-            ),
-          ],
-        ),
-      ),
-    );
   }
 
   void _adjustZoom(double delta) {
@@ -210,7 +148,10 @@ class ECGMonitoringState extends State<ECGMonitoring> {
 
     if (currentUser == null) {
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('User not logged in')),
+        const SnackBar(
+          content: Text('User not logged in'),
+          behavior: SnackBarBehavior.floating,
+        ),
       );
       return;
     }
@@ -240,12 +181,24 @@ class ECGMonitoringState extends State<ECGMonitoring> {
     
     if (_points.isEmpty) {
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('No ECG data to save')),
+        const SnackBar(
+          content: Text('No ECG data to save'),
+          behavior: SnackBarBehavior.floating,
+        ),
       );
       return;
     }
 
     try {
+      // Show loading indicator
+      showDialog(
+        context: context,
+        barrierDismissible: false,
+        builder: (context) => const Center(
+          child: CircularProgressIndicator(),
+        ),
+      );
+
       // Convert points to ECG data format
       List<int> ecgData = _points.map((point) => point.y.toInt()).toList();
       
@@ -259,16 +212,34 @@ class ECGMonitoringState extends State<ECGMonitoring> {
         },
       );
 
+      // Close loading indicator
+      if (mounted) {
+        Navigator.of(context, rootNavigator: true).pop();
+      }
+
       if (!mounted) return;
       
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('ECG Recording saved successfully')),
+        const SnackBar(
+          content: Text('ECG Recording saved successfully'),
+          behavior: SnackBarBehavior.floating,
+          backgroundColor: Colors.green,
+        ),
       );
     } catch (e) {
+      // Close loading indicator
+      if (mounted) {
+        Navigator.of(context, rootNavigator: true).pop();
+      }
+      
       if (!mounted) return;
       
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Error saving ECG recording: $e')),
+        SnackBar(
+          content: Text('Error saving ECG recording: $e'),
+          behavior: SnackBarBehavior.floating,
+          backgroundColor: Colors.red,
+        ),
       );
     }
   }
@@ -280,7 +251,10 @@ class ECGMonitoringState extends State<ECGMonitoring> {
 
     if (currentUser == null) {
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('User not logged in')),
+        const SnackBar(
+          content: Text('User not logged in'),
+          behavior: SnackBarBehavior.floating,
+        ),
       );
       return;
     }
@@ -409,78 +383,125 @@ class ECGMonitoringState extends State<ECGMonitoring> {
   Widget build(BuildContext context) {
     final isConnected = widget.bleManager.connectedDevice != null;
     String title = selectedPatient != null 
-        ? 'ECG Monitoring - ${selectedPatient!.fullName}'
+        ? 'ECG - ${selectedPatient!.fullName}'
         : 'ECG Monitoring';
 
     return BackButtonHandler(
       strategy: BackButtonHandlingStrategy.normal,
       child: Scaffold(
+        backgroundColor: Colors.grey[50],
         appBar: AppBar(
           title: Text(title),
+          elevation: 0,
+          backgroundColor: Colors.white,
           actions: [
             IconButton(
               icon: const Icon(Icons.history),
+              tooltip: 'View History',
               onPressed: _showHistory,
             ),
             IconButton(
               icon: const Icon(Icons.save),
+              tooltip: 'Save Recording',
               onPressed: _showSaveDialog,
             ),
             IconButton(
-              icon: const Icon(Icons.zoom_in),
-              onPressed: () => _adjustZoom(0.1),
-            ),
-            IconButton(
-              icon: const Icon(Icons.zoom_out),
-              onPressed: () => _adjustZoom(-0.1),
-            ),
-            // Added Reset Button to clear the screen/graph and metrics
-            IconButton(
               icon: const Icon(Icons.refresh),
+              tooltip: 'Reset Display',
               onPressed: _resetDisplay,
             ),
           ],
         ),
         body: Column(
           children: [
+            // Show ECG status at the top with zoom controls
             Padding(
-              padding: const EdgeInsets.all(16.0),
+              padding: const EdgeInsets.fromLTRB(16, 16, 16, 0),
               child: Row(
                 mainAxisAlignment: MainAxisAlignment.spaceBetween,
                 children: [
-                  Text(
-                    'Live ECG Monitor',
-                    style: Theme.of(context).textTheme.titleLarge,
+                  Row(
+                    children: [
+                      IconButton(
+                        icon: const Icon(Icons.zoom_in),
+                        onPressed: () => _adjustZoom(0.1),
+                        tooltip: 'Zoom In',
+                        padding: EdgeInsets.zero,
+                        constraints: const BoxConstraints(),
+                      ),
+                      const SizedBox(width: 12),
+                      IconButton(
+                        icon: const Icon(Icons.zoom_out),
+                        onPressed: () => _adjustZoom(-0.1),
+                        tooltip: 'Zoom Out',
+                        padding: EdgeInsets.zero,
+                        constraints: const BoxConstraints(),
+                      ),
+                    ],
                   ),
                   Container(
                     padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
                     decoration: BoxDecoration(
-                      color: isConnected ? Colors.green : Colors.red,
+                      color: isConnected ? Colors.green.withOpacity(0.2) : Colors.red.withOpacity(0.2),
                       borderRadius: BorderRadius.circular(12),
+                      border: Border.all(
+                        color: isConnected ? Colors.green : Colors.red,
+                        width: 1,
+                      ),
                     ),
-                    child: Text(
-                      isConnected ? 'Connected' : 'Disconnected',
-                      style: const TextStyle(color: Colors.white),
+                    child: Row(
+                      children: [
+                        Container(
+                          width: 8,
+                          height: 8,
+                          decoration: BoxDecoration(
+                            color: isConnected ? Colors.green : Colors.red,
+                            shape: BoxShape.circle,
+                          ),
+                        ),
+                        const SizedBox(width: 6),
+                        Text(
+                          isConnected ? 'Connected' : 'Disconnected',
+                          style: TextStyle(
+                            color: isConnected ? Colors.green : Colors.red,
+                            fontSize: 12,
+                            fontWeight: FontWeight.bold,
+                          ),
+                        ),
+                      ],
                     ),
                   ),
                 ],
               ),
             ),
-            _buildMetricsPanel(), 
+            
+            // Main ECG Graph (takes full space)
             Expanded(
-              child: SingleChildScrollView(
-                controller: scrollController,
-                scrollDirection: Axis.horizontal,
-                child: SizedBox(
-                  width: _points.length * 2.0 * zoomLevel, // Adjust width based on zoom
-                  child: CustomPaint(
-                    painter: ECGPainter(
-                      points: _points,
-                      minY: minY,
-                      maxY: maxY,
-                      zoomLevel: zoomLevel,
+              child: Card(
+                margin: const EdgeInsets.all(16),
+                elevation: 3,
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(16),
+                ),
+                child: ClipRRect(
+                  borderRadius: BorderRadius.circular(16),
+                  child: SingleChildScrollView(
+                    controller: scrollController,
+                    scrollDirection: Axis.horizontal,
+                    physics: const BouncingScrollPhysics(),
+                    child: SizedBox(
+                      width: max(MediaQuery.of(context).size.width - 32, _points.length * 2.0 * zoomLevel),
+                      height: MediaQuery.of(context).size.height - 160,
+                      child: CustomPaint(
+                        painter: ECGPainter(
+                          points: _points,
+                          minY: minY,
+                          maxY: maxY,
+                          zoomLevel: zoomLevel,
+                        ),
+                        size: Size.infinite,
+                      ),
                     ),
-                    size: Size.infinite,
                   ),
                 ),
               ),
@@ -492,12 +513,12 @@ class ECGMonitoringState extends State<ECGMonitoring> {
   }
 }
 
+// ECGPainter class - keeping the original implementation to avoid errors
 class ECGPainter extends CustomPainter {
   final List<Point<double>> points;
   final double minY;
   final double maxY;
   final double zoomLevel;
-  // (Optional) sample rate for X-axis labeling. Update if needed.
   final double sampleRate;
 
   const ECGPainter({
@@ -520,7 +541,7 @@ class ECGPainter extends CustomPainter {
     final double plotWidth = size.width - leftMargin - rightMargin;
     final double plotHeight = size.height - topMargin - bottomMargin;
 
-    // Draw a white background (optional)
+    // Draw a white background
     final Paint backgroundPaint = Paint()..color = Colors.white;
     canvas.drawRect(Rect.fromLTWH(0, 0, size.width, size.height), backgroundPaint);
 
@@ -644,7 +665,6 @@ class PatientSelectionDialog extends StatefulWidget {
   State<PatientSelectionDialog> createState() => PatientSelectionDialogState();
 }
 
-// Made state class public
 class PatientSelectionDialogState extends State<PatientSelectionDialog> {
   List<Patient> patients = [];
   bool isLoading = true;
@@ -691,6 +711,9 @@ class PatientSelectionDialogState extends State<PatientSelectionDialog> {
   Widget build(BuildContext context) {
     return AlertDialog(
       title: const Text('Select Patient'),
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.circular(16),
+      ),
       content: SizedBox(
         width: double.maxFinite,
         height: 300,

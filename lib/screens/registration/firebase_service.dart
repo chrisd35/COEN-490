@@ -746,4 +746,235 @@ Future<void> deletePatient(String uid, String medicareNumber, String confirmatio
       rethrow;
     }
   }
+
+  // Add these methods to your FirebaseService class in paste.txt
+
+  // Delete specific recording
+  Future<void> deleteRecording(String uid, String medicalCardNumber, String recordingId) async {
+    try {
+      String sanitizedMedicalCard = medicalCardNumber.replaceAll('/', '_');
+      
+      // Get recording metadata
+      DataSnapshot snapshot = await _database
+          .child('users')
+          .child(uid)
+          .child('patients')
+          .child(sanitizedMedicalCard)
+          .child('recordings')
+          .child(recordingId)
+          .get();
+      
+      if (!snapshot.exists || snapshot.value == null) {
+        throw Exception('Recording not found');
+      }
+      
+      Map<dynamic, dynamic> recordingData = snapshot.value as Map<dynamic, dynamic>;
+      String filename = recordingData['filename'] as String;
+      
+      // Delete file from storage
+      await _storage.ref(filename).delete();
+      
+      // Delete metadata from database
+      await _database
+          .child('users')
+          .child(uid)
+          .child('patients')
+          .child(sanitizedMedicalCard)
+          .child('recordings')
+          .child(recordingId)
+          .remove();
+      
+      _logger.info('Recording deleted successfully!');
+    } catch (e) {
+      _logger.severe('Error deleting recording: $e');
+      rethrow;
+    }
+  }
+
+  // Delete all recordings for a patient
+  Future<void> deleteAllRecordings(String uid, String medicalCardNumber) async {
+    try {
+      String sanitizedMedicalCard = medicalCardNumber.replaceAll('/', '_');
+      
+      // Get all recordings
+      DataSnapshot snapshot = await _database
+          .child('users')
+          .child(uid)
+          .child('patients')
+          .child(sanitizedMedicalCard)
+          .child('recordings')
+          .get();
+      
+      if (!snapshot.exists || snapshot.value == null) {
+        _logger.info('No recordings found to delete');
+        return;
+      }
+      
+      Map<dynamic, dynamic> recordingsMap = snapshot.value as Map<dynamic, dynamic>;
+      
+      // Delete each file from storage
+      for (var entry in recordingsMap.entries) {
+        Map<dynamic, dynamic> recording = entry.value as Map<dynamic, dynamic>;
+        String filename = recording['filename'] as String;
+        
+        try {
+          await _storage.ref(filename).delete();
+        } catch (e) {
+          _logger.warning('Error deleting recording file: $e');
+          // Continue with deleting other files
+        }
+      }
+      
+      // Remove all recordings metadata
+      await _database
+          .child('users')
+          .child(uid)
+          .child('patients')
+          .child(sanitizedMedicalCard)
+          .child('recordings')
+          .remove();
+      
+      _logger.info('All recordings deleted successfully!');
+    } catch (e) {
+      _logger.severe('Error deleting all recordings: $e');
+      rethrow;
+    }
+  }
+
+  // Delete specific ECG reading
+  Future<void> deleteECGReading(String uid, String medicalCardNumber, String ecgId) async {
+    try {
+      String sanitizedMedicalCard = medicalCardNumber.replaceAll('/', '_');
+      
+      // Get ECG metadata
+      DataSnapshot snapshot = await _database
+          .child('users')
+          .child(uid)
+          .child('patients')
+          .child(sanitizedMedicalCard)
+          .child('ecgData')
+          .child(ecgId)
+          .get();
+      
+      if (!snapshot.exists || snapshot.value == null) {
+        throw Exception('ECG reading not found');
+      }
+      
+      Map<dynamic, dynamic> ecgData = snapshot.value as Map<dynamic, dynamic>;
+      String filename = ecgData['filename'] as String;
+      
+      // Delete file from storage
+      await _storage.ref(filename).delete();
+      
+      // Delete metadata from database
+      await _database
+          .child('users')
+          .child(uid)
+          .child('patients')
+          .child(sanitizedMedicalCard)
+          .child('ecgData')
+          .child(ecgId)
+          .remove();
+      
+      _logger.info('ECG reading deleted successfully!');
+    } catch (e) {
+      _logger.severe('Error deleting ECG reading: $e');
+      rethrow;
+    }
+  }
+
+  // Delete all ECG readings for a patient
+  Future<void> deleteAllECGReadings(String uid, String medicalCardNumber) async {
+    try {
+      String sanitizedMedicalCard = medicalCardNumber.replaceAll('/', '_');
+      
+      // Get all ECG readings
+      DataSnapshot snapshot = await _database
+          .child('users')
+          .child(uid)
+          .child('patients')
+          .child(sanitizedMedicalCard)
+          .child('ecgData')
+          .get();
+      
+      if (!snapshot.exists || snapshot.value == null) {
+        _logger.info('No ECG readings found to delete');
+        return;
+      }
+      
+      Map<dynamic, dynamic> ecgMap = snapshot.value as Map<dynamic, dynamic>;
+      
+      // Delete each file from storage
+      for (var entry in ecgMap.entries) {
+        Map<dynamic, dynamic> ecgReading = entry.value as Map<dynamic, dynamic>;
+        String filename = ecgReading['filename'] as String;
+        
+        try {
+          await _storage.ref(filename).delete();
+        } catch (e) {
+          _logger.warning('Error deleting ECG file: $e');
+          // Continue with deleting other files
+        }
+      }
+      
+      // Remove all ECG metadata
+      await _database
+          .child('users')
+          .child(uid)
+          .child('patients')
+          .child(sanitizedMedicalCard)
+          .child('ecgData')
+          .remove();
+      
+      _logger.info('All ECG readings deleted successfully!');
+    } catch (e) {
+      _logger.severe('Error deleting all ECG readings: $e');
+      rethrow;
+    }
+  }
+
+  // Delete specific PulseOx session
+  Future<void> deletePulseOxSession(String uid, String medicalCardNumber, String sessionId) async {
+    try {
+      String sanitizedMedicalCard = medicalCardNumber.replaceAll('/', '_');
+      
+      // Delete session from database
+      await _database
+          .child('users')
+          .child(uid)
+          .child('patients')
+          .child(sanitizedMedicalCard)
+          .child('pulseOxSessions')
+          .child(sessionId)
+          .remove();
+      
+      _logger.info('PulseOx session deleted successfully!');
+    } catch (e) {
+      _logger.severe('Error deleting PulseOx session: $e');
+      rethrow;
+    }
+  }
+
+  // Delete all PulseOx sessions for a patient
+  Future<void> deleteAllPulseOxSessions(String uid, String medicalCardNumber) async {
+    try {
+      String sanitizedMedicalCard = medicalCardNumber.replaceAll('/', '_');
+      
+      // Remove all PulseOx sessions
+      await _database
+          .child('users')
+          .child(uid)
+          .child('patients')
+          .child(sanitizedMedicalCard)
+          .child('pulseOxSessions')
+          .remove();
+      
+      _logger.info('All PulseOx sessions deleted successfully!');
+    } catch (e) {
+      _logger.severe('Error deleting all PulseOx sessions: $e');
+      rethrow;
+    }
+  }
+
+  
 }

@@ -1,3 +1,4 @@
+import 'package:coen_490/utils/editpatientscreen.dart';
 import 'package:flutter/material.dart';
 import 'package:coen_490/screens/dashboard/dashboard_screen.dart';
 import 'package:coen_490/screens/registration/auth_page.dart';
@@ -58,6 +59,7 @@ class AppRoutes {
   static const String quiz = '/quiz';
   static const String quizResult = '/quiz-result';
   static const String userProgress = '/user-progress';
+   static const String editPatient = '/edit-patient';
 
   
   // Route map
@@ -174,6 +176,15 @@ class AppRoutes {
             topic: args!['topic'],
           ),
         );
+
+         case editPatient:
+    final args = settings.arguments as Map<String, dynamic>?;
+    if (args?['patient'] == null) return null;
+    return MaterialPageRoute(
+      builder: (context) => EditPatientScreen(
+        patient: args!['patient'],
+      ),
+    );
         
       case heartMurmurDetail:
         final args = settings.arguments as Map<String, dynamic>?;
