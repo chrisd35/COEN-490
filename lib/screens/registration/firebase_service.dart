@@ -1012,7 +1012,8 @@ class FirebaseService {
       final idToken = await user.getIdToken();
 
       final response = await http.post(
-        Uri.parse('http://localhost:8000/analyze'),
+        Uri.parse(
+            'https://2e86-2001-56b-9ff1-10a6-8c48-2ff-f87e-1b7c.ngrok-free.app/analyze'),
         headers: {
           'Authorization': 'Bearer $idToken',
           'Content-Type': 'application/json',
