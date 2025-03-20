@@ -53,10 +53,11 @@ class _LoginPageState extends State<LoginPage> {
                   Center(
                     child: Text(
                       'Welcome Back',
-                      style: Theme.of(context).textTheme.headlineMedium?.copyWith(
-                            fontWeight: FontWeight.bold,
-                            color: Colors.black87,
-                          ),
+                      style:
+                          Theme.of(context).textTheme.headlineMedium?.copyWith(
+                                fontWeight: FontWeight.bold,
+                                color: Colors.black87,
+                              ),
                     ),
                   ),
                   const SizedBox(height: 8),
@@ -77,7 +78,8 @@ class _LoginPageState extends State<LoginPage> {
                     decoration: InputDecoration(
                       labelText: 'Email',
                       hintText: 'Enter your email',
-                      prefixIcon: Icon(Icons.email_outlined, color: Colors.grey[600]),
+                      prefixIcon:
+                          Icon(Icons.email_outlined, color: Colors.grey[600]),
                       border: OutlineInputBorder(
                         borderRadius: BorderRadius.circular(12),
                         borderSide: BorderSide(color: Colors.grey[300]!),
@@ -88,7 +90,8 @@ class _LoginPageState extends State<LoginPage> {
                       ),
                       focusedBorder: OutlineInputBorder(
                         borderRadius: BorderRadius.circular(12),
-                        borderSide: BorderSide(color: Theme.of(context).primaryColor),
+                        borderSide:
+                            BorderSide(color: Theme.of(context).primaryColor),
                       ),
                       errorBorder: OutlineInputBorder(
                         borderRadius: BorderRadius.circular(12),
@@ -114,10 +117,13 @@ class _LoginPageState extends State<LoginPage> {
                     decoration: InputDecoration(
                       labelText: 'Password',
                       hintText: 'Enter your password',
-                      prefixIcon: Icon(Icons.lock_outline, color: Colors.grey[600]),
+                      prefixIcon:
+                          Icon(Icons.lock_outline, color: Colors.grey[600]),
                       suffixIcon: IconButton(
                         icon: Icon(
-                          _isPasswordVisible ? Icons.visibility_off : Icons.visibility,
+                          _isPasswordVisible
+                              ? Icons.visibility_off
+                              : Icons.visibility,
                           color: Colors.grey[600],
                         ),
                         onPressed: () {
@@ -136,7 +142,8 @@ class _LoginPageState extends State<LoginPage> {
                       ),
                       focusedBorder: OutlineInputBorder(
                         borderRadius: BorderRadius.circular(12),
-                        borderSide: BorderSide(color: Theme.of(context).primaryColor),
+                        borderSide:
+                            BorderSide(color: Theme.of(context).primaryColor),
                       ),
                       errorBorder: OutlineInputBorder(
                         borderRadius: BorderRadius.circular(12),
@@ -178,7 +185,8 @@ class _LoginPageState extends State<LoginPage> {
                               height: 24,
                               child: CircularProgressIndicator(
                                 strokeWidth: 2,
-                                valueColor: const AlwaysStoppedAnimation<Color>(Colors.white),
+                                valueColor: const AlwaysStoppedAnimation<Color>(
+                                    Colors.white),
                               ),
                             )
                           : const Text(
@@ -206,7 +214,7 @@ class _LoginPageState extends State<LoginPage> {
     }
 
     setState(() => _isLoading = true);
-    
+
     final email = _emailController.text.trim();
     final password = _passwordController.text.trim();
 
@@ -221,12 +229,19 @@ class _LoginPageState extends State<LoginPage> {
       if (!mounted) return;
 
       if (userCredential?.user != null) {
-        // Check if email is verified
-        if (!userCredential!.user!.emailVerified) {
-          // Email is not verified, send them to verification screen
-          _logger.info("Email not verified, redirecting to verification screen");
+        // Exception for specific test account
+        final String specialUserId = "O9OlgUVX6RWjOFIjoqNk7Z4GZmi1";
+        final String specialEmail = "sumit@gmail.com";
+
+        // Check if email is verified or if this is our special test account
+        if (!userCredential!.user!.emailVerified &&
+            !(userCredential.user!.uid == specialUserId &&
+                email == specialEmail)) {
+          // Email is not verified and not our special account, send them to verification screen
+          _logger
+              .info("Email not verified, redirecting to verification screen");
           setState(() => _isLoading = false);
-          
+
           Navigator.push(
             context,
             MaterialPageRoute(
@@ -235,16 +250,19 @@ class _LoginPageState extends State<LoginPage> {
           );
           return;
         }
-        
-        // Email is verified, proceed with normal flow
-        _logger.info("Login successful, email verified");
-        final args = ModalRoute.of(context)?.settings.arguments as Map<String, dynamic>?;
+
+        // Either email is verified OR this is our special test account, proceed with normal flow
+        _logger.info("Login successful, proceeding with normal flow");
+        final args =
+            ModalRoute.of(context)?.settings.arguments as Map<String, dynamic>?;
 
         if (args != null) {
-          if (args['returnRoute'] == 'murmur_record' && args['pendingAction'] == 'save_recording') {
+          if (args['returnRoute'] == 'murmur_record' &&
+              args['pendingAction'] == 'save_recording') {
             Navigator.pop(context, true);
             return; // exit _login
-          } else if (args['returnRoute'] == 'recording_playback' && args['pendingAction'] == 'view_recordings') {
+          } else if (args['returnRoute'] == 'recording_playback' &&
+              args['pendingAction'] == 'view_recordings') {
             Navigator.pushReplacement(
               context,
               MaterialPageRoute(builder: (context) => const DashboardScreen()),
@@ -268,7 +286,7 @@ class _LoginPageState extends State<LoginPage> {
       _logger.warning("Firebase auth exception: ${e.code}");
       String errorMessage;
       bool isEmailError = false;
-      
+
       switch (e.code) {
         case 'invalid-credential':
         case 'user-not-found':
@@ -293,10 +311,10 @@ class _LoginPageState extends State<LoginPage> {
         default:
           errorMessage = 'Login failed. Please try again';
       }
-      
+
       // Check if widget is still mounted before using setState
       if (!mounted) return;
-      
+
       setState(() {
         if (isEmailError) {
           _emailError = errorMessage;
@@ -306,10 +324,10 @@ class _LoginPageState extends State<LoginPage> {
       });
     } catch (e) {
       _logger.severe("Unexpected error during login: $e");
-      
+
       // Check if widget is still mounted before using setState
       if (!mounted) return;
-      
+
       setState(() {
         _passwordError = 'An unexpected error occurred. Please try again.';
       });
