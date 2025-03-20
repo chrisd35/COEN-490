@@ -3,7 +3,6 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:flutter_blue_plus/flutter_blue_plus.dart';
 import 'dart:async';
-//import '../learning/learning_center_initializer_screen.dart'; only use once to initialize remove eventually!
 import '/utils/ble_manager.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import '..//registration/firebase_service.dart';
@@ -11,6 +10,7 @@ import '../../utils/navigation_service.dart';
 import '../../utils/app_routes.dart';
 import '../../widgets/back_button.dart';
 import 'package:logging/logging.dart' as logging;
+import 'package:flutter_animate/flutter_animate.dart'; // Add this for animations
 
 final _logger = logging.Logger('DashboardScreen');
 
@@ -21,22 +21,33 @@ class DashboardScreen extends StatefulWidget {
   State<DashboardScreen> createState() => DashboardScreenState();
 }
 
-// Changed from private to public state class
-class DashboardScreenState extends State<DashboardScreen> {
+class DashboardScreenState extends State<DashboardScreen> with SingleTickerProviderStateMixin {
   bool _wasConnected = false;
   final FirebaseService _firebaseService = FirebaseService();
   String _userName = '';
+  late AnimationController _animationController;
+  final ScrollController _scrollController = ScrollController();
 
   @override
   void initState() {
     super.initState();
     _loadUserName();
+    _animationController = AnimationController(
+      vsync: this,
+      duration: const Duration(milliseconds: 300),
+    );
+  }
+
+  @override
+  void dispose() {
+    _animationController.dispose();
+    _scrollController.dispose();
+    super.dispose();
   }
 
   @override
   void didChangeDependencies() {
     super.didChangeDependencies();
-    // Refresh state when the screen becomes visible
     _loadUserName();
   }
 
@@ -77,6 +88,7 @@ class DashboardScreenState extends State<DashboardScreen> {
   Widget build(BuildContext context) {
     final bleManager = Provider.of<BLEManager>(context, listen: true);
     final connectedDevice = bleManager.connectedDevice;
+    final screenSize = MediaQuery.of(context).size;
 
     // Use the BackButtonHandler widget with doubleTapToExit strategy
     return BackButtonHandler(
@@ -94,7 +106,7 @@ class DashboardScreenState extends State<DashboardScreen> {
                   color: Colors.white,
                   boxShadow: [
                     BoxShadow(
-                      color: Colors.black.withAlpha(13), // Using withAlpha instead of withOpacity
+                      color: Colors.black.withAlpha(13),
                       blurRadius: 10,
                       offset: const Offset(0, 2),
                     ),
@@ -108,18 +120,13 @@ class DashboardScreenState extends State<DashboardScreen> {
                         fontSize: 24,
                         fontWeight: FontWeight.bold,
                       ),
-                    ),
+                    ).animate().fadeIn(duration: 500.ms, delay: 100.ms).slideX(begin: -0.2, end: 0),
                     const Spacer(),
-                    // Bluetooth Connection Button
-                    IconButton(
-                      icon: Icon(Icons.bluetooth, color: Theme.of(context).primaryColor),
-                      onPressed: () => NavigationService.navigateTo(AppRoutes.bleScreen),
-                    ),
                     // Logout Button
                     IconButton(
                       icon: Icon(Icons.logout_rounded, color: Colors.grey[700]),
                       onPressed: () => _showLogoutDialog(),
-                    ),
+                    ).animate().fadeIn(duration: 500.ms, delay: 300.ms),
                   ],
                 ),
               ),
@@ -127,6 +134,8 @@ class DashboardScreenState extends State<DashboardScreen> {
               // Main Content
               Expanded(
                 child: SingleChildScrollView(
+                  controller: _scrollController,
+                  physics: const BouncingScrollPhysics(),
                   padding: const EdgeInsets.all(24),
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
@@ -139,7 +148,7 @@ class DashboardScreenState extends State<DashboardScreen> {
                           borderRadius: BorderRadius.circular(16),
                           boxShadow: [
                             BoxShadow(
-                              color: Colors.black.withAlpha(13), // Using withAlpha instead of withOpacity
+                              color: Colors.black.withAlpha(13),
                               blurRadius: 10,
                               offset: const Offset(0, 2),
                             ),
@@ -172,7 +181,7 @@ class DashboardScreenState extends State<DashboardScreen> {
                                 isConnected: false,
                                 deviceName: "No device connected",
                               ),
-                      ),
+                      ).animate().fadeIn(duration: 500.ms, delay: 200.ms).slideY(begin: -0.2, end: 0),
                       const SizedBox(height: 32),
 
                       // Welcome Text
@@ -183,7 +192,7 @@ class DashboardScreenState extends State<DashboardScreen> {
                           fontWeight: FontWeight.bold,
                           color: Colors.black87,
                         ),
-                      ),
+                      ).animate().fadeIn(duration: 500.ms, delay: 300.ms).slideX(begin: -0.2, end: 0),
                       const SizedBox(height: 8),
                       Text(
                         'What would you like to do today?',
@@ -191,7 +200,7 @@ class DashboardScreenState extends State<DashboardScreen> {
                           fontSize: 16,
                           color: Colors.grey[600],
                         ),
-                      ),
+                      ).animate().fadeIn(duration: 500.ms, delay: 400.ms).slideX(begin: -0.2, end: 0),
                       const SizedBox(height: 32),
 
                       // Feature Grid based on user type
@@ -199,22 +208,50 @@ class DashboardScreenState extends State<DashboardScreen> {
                         future: Provider.of<AuthService>(context, listen: false).isGuest(),
                         builder: (context, snapshot) {
                           if (snapshot.connectionState == ConnectionState.waiting) {
-                            return const CircularProgressIndicator();
+                            return Center(
+                              child: CircularProgressIndicator().animate()
+                                .fadeIn(duration: 300.ms)
+                                .shimmer(delay: 1000.ms, duration: 1000.ms),
+                            );
                           }
 
                           final isGuest = snapshot.data ?? false;
+                          
+                          // Responsive layout based on screen width
+                          final itemCount = isGuest ? 4 : 7;
+                          final crossAxisCount = screenSize.width > 600 ? 3 : 2;
+                          
+                          // Calculate appropriate aspect ratio
+                          final childAspectRatio = screenSize.width > 600 ? 1.3 : 1.1;
 
-                         return GridView.count(
-  shrinkWrap: true,
-  physics: const NeverScrollableScrollPhysics(),
-  crossAxisCount: 2,
-  mainAxisSpacing: 16,
-  crossAxisSpacing: 16,
-  childAspectRatio: 1.1,
-  children: isGuest 
-    ? _buildGuestFeatureCards()
-    : _buildUserFeatureCards(),
-);
+                          return GridView.builder(
+                            shrinkWrap: true,
+                            physics: const NeverScrollableScrollPhysics(),
+                            gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
+                              crossAxisCount: crossAxisCount,
+                              mainAxisSpacing: 16,
+                              crossAxisSpacing: 16,
+                              childAspectRatio: childAspectRatio,
+                            ),
+                            itemCount: itemCount,
+                            itemBuilder: (context, index) {
+                              final cards = isGuest
+                                  ? _buildGuestFeatureCards()
+                                  : _buildUserFeatureCards();
+                              
+                              if (index < cards.length) {
+                                // Add staggered animations to each card
+                                return cards[index]
+                                  .animate()
+                                  .fadeIn(
+                                    duration: 400.ms, 
+                                    delay: Duration(milliseconds: 500 + (index * 100))
+                                  )
+                                  .slideY(begin: 0.2, end: 0);
+                              }
+                              return const SizedBox.shrink();
+                            },
+                          );
                         },
                       ),
                     ],
@@ -229,221 +266,81 @@ class DashboardScreenState extends State<DashboardScreen> {
   }
 
   List<Widget> _buildUserFeatureCards() {
-  return [
-    FeatureCard(
-      title: 'Patient Folders',
-      icon: Icons.folder_rounded,
-      color: Colors.blue,
-      onTap: () => NavigationService.navigateTo(AppRoutes.patientCard),
-    ),
-    FeatureCard(
-      title: 'AI Murmur',
-      icon: Icons.analytics_rounded,
-      color: Colors.purple,
-      onTap: () => NavigationService.navigateTo(AppRoutes.murmurChart),
-    ),
-    FeatureCard(
-      title: 'Murmur Record',
-      icon: Icons.mic_rounded,
-      color: Colors.orange,
-      onTap: () => NavigationService.navigateTo(AppRoutes.murmurRecord),
-    ),
-    FeatureCard(
-      title: 'View Recordings',
-      icon: Icons.playlist_play,
-      color: Colors.teal,
-      onTap: () => _handleViewRecordings(),
-    ),
-    FeatureCard(
-      title: 'ECG Monitoring',
-      icon: Icons.monitor_heart_outlined,
-      color: Colors.green,
-      onTap: () => NavigationService.navigateTo(AppRoutes.ecgMonitoring),
-    ),
-    FeatureCard(
-      title: 'Oxygen Monitoring',
-      icon: Icons.air,
-      color: Colors.blue[700] ?? Colors.blue,
-      onTap: () => NavigationService.navigateTo(AppRoutes.oxygenMonitoring),
-    ),
-    // New Learning Center card
-    FeatureCard(
-      title: 'Learning Center',
-      icon: Icons.school,
-      color: Colors.amber,
-      onTap: () => NavigationService.navigateTo(AppRoutes.learningCenter),
-    ),
-    // Placeholder card for future feature
-    FeatureCard(
-  title: 'Coming Soon',
-  icon: Icons.new_releases,
-  color: Colors.grey,
-  onTap: () {
-    // Show standard message to regular users
-    ScaffoldMessenger.of(context).showSnackBar(
-      const SnackBar(
-        content: Text('This feature is coming soon!'),
-        behavior: SnackBarBehavior.floating,
+    return [
+      FeatureCard(
+        title: 'Patient Folders',
+        icon: Icons.folder_rounded,
+        color: Colors.blue,
+        onTap: () => NavigationService.navigateTo(AppRoutes.patientCard),
       ),
-    );
-     },
-),
-  ];
-}
-    /*
-    // Increment tap counter
-    _adminTapCount++;
-    
-    // If secret tap pattern is met (5 taps), show admin dialog
-    if (_adminTapCount >= 5) {
-      _adminTapCount = 0;
-      _showAdminDialog();
-    }
- 
-int _adminTapCount = 0; 
-*/
-
-/*void _showAdminDialog() {
-  showDialog(
-    context: context,
-    builder: (dialogContext) => AlertDialog(
-      shape: RoundedRectangleBorder(
-        borderRadius: BorderRadius.circular(16),
+      FeatureCard(
+        title: 'AI Murmur',
+        icon: Icons.analytics_rounded,
+        color: Colors.purple,
+        onTap: () => NavigationService.navigateTo(AppRoutes.murmurChart),
       ),
-      title: const Text('Admin Access'),
-      content: Column(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          const Text('Enter admin password:'),
-          const SizedBox(height: 16),
-          TextField(
-            obscureText: true,
-            decoration: const InputDecoration(
-              border: OutlineInputBorder(),
-              hintText: 'Password',
-            ),
-            onSubmitted: (value) {
-              // Simple admin password - replace with more secure method in production
-              if (value == 'admin123') {
-                Navigator.of(dialogContext).pop();
-                _initializeDatabase(context);
-              } else {
-                Navigator.of(dialogContext).pop();
-                ScaffoldMessenger.of(context).showSnackBar(
-                  const SnackBar(
-                    content: Text('Incorrect password'),
-                    behavior: SnackBarBehavior.floating,
-                    backgroundColor: Colors.red,
-                  ),
-                );
-              }
-            },
-          ),
-        ],
+      FeatureCard(
+        title: 'Murmur Record',
+        icon: Icons.mic_rounded,
+        color: Colors.orange,
+        onTap: () => NavigationService.navigateTo(AppRoutes.murmurRecord),
       ),
-      actions: [
-        TextButton(
-          onPressed: () => Navigator.of(dialogContext).pop(),
-          child: const Text('Cancel'),
-        ),
-      ],
-    ),
-  );
-}*/
-
-/*void _initializeDatabase(BuildContext context) {
-  // Show loading dialog
-  showDialog(
-    context: context,
-    barrierDismissible: false,
-    builder: (loadingContext) => AlertDialog(
-      content: Row(
-        children: [
-          CircularProgressIndicator(),
-          SizedBox(width: 16),
-          Text("Initializing database...")
-        ],
+      FeatureCard(
+        title: 'View Recordings',
+        icon: Icons.playlist_play,
+        color: Colors.teal,
+        onTap: () => _handleViewRecordings(),
       ),
-    ),
-  );
-  
-  // Create initializer
-  final initializer = LearningCenterInitializer(
-    context: context,
-    showMessage: (message) {
-      // Close loading dialog first if it's showing
-      Navigator.of(context, rootNavigator: true).pop();
-      // Show message
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text(message))
-      );
-    },
-    updateProgress: (message, progress) {
-      print('$message: $progress'); // You could update a progress indicator here
-    },
-  );
-  
-  // Initialize data
-  initializer.initializeAllData().then((_) {
-    // Make sure dialog is closed when done
-    Navigator.of(context, rootNavigator: true).pop();
-  }).catchError((error) {
-    // Handle errors
-    Navigator.of(context, rootNavigator: true).pop();
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(
-        content: Text("Error initializing database: $error"),
-        backgroundColor: Colors.red,
-      )
-    );
-  });
-}*/
+      FeatureCard(
+        title: 'ECG Monitoring',
+        icon: Icons.monitor_heart_outlined,
+        color: Colors.green,
+        onTap: () => NavigationService.navigateTo(AppRoutes.ecgMonitoring),
+      ),
+      FeatureCard(
+        title: 'Oxygen Monitoring',
+        icon: Icons.air,
+        color: Colors.blue[700] ?? Colors.blue,
+        onTap: () => NavigationService.navigateTo(AppRoutes.oxygenMonitoring),
+      ),
+      // Learning Center card
+      FeatureCard(
+        title: 'Learning Center',
+        icon: Icons.school,
+        color: Colors.amber,
+        onTap: () => NavigationService.navigateTo(AppRoutes.learningCenter),
+      ),
+    ];
+  }
 
-
-
-
-List<Widget> _buildGuestFeatureCards() {
-  return [
-    FeatureCard(
-      title: 'Murmur Record',
-      icon: Icons.mic_rounded,
-      color: Colors.orange,
-      onTap: () => NavigationService.navigateTo(AppRoutes.murmurRecord),
-    ),
-    FeatureCard(
-      title: 'ECG Monitoring',
-      icon: Icons.monitor_heart_outlined,
-      color: Colors.green,
-      onTap: () => NavigationService.navigateTo(AppRoutes.ecgMonitoring),
-    ),
-    FeatureCard(
-      title: 'Oxygen Monitoring',
-      icon: Icons.air,
-      color: Colors.blue,
-      onTap: () => NavigationService.navigateTo(AppRoutes.oxygenMonitoring),
-    ),
-    FeatureCard(
-      title: 'View Recordings',
-      icon: Icons.playlist_play,
-      color: Colors.purple,
-      onTap: () => _showPlaybackLoginPrompt(),
-    ),
-    // Removed the Learning Center card - only available for logged-in users
-    FeatureCard(
-      title: 'Coming Soon',
-      icon: Icons.new_releases,
-      color: Colors.grey,
-      onTap: () {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: Text('This feature is coming soon!'),
-            behavior: SnackBarBehavior.floating,
-          ),
-        );
-      },
-    ),
-  ];
-}
+  List<Widget> _buildGuestFeatureCards() {
+    return [
+      FeatureCard(
+        title: 'Murmur Record',
+        icon: Icons.mic_rounded,
+        color: Colors.orange,
+        onTap: () => NavigationService.navigateTo(AppRoutes.murmurRecord),
+      ),
+      FeatureCard(
+        title: 'ECG Monitoring',
+        icon: Icons.monitor_heart_outlined,
+        color: Colors.green,
+        onTap: () => NavigationService.navigateTo(AppRoutes.ecgMonitoring),
+      ),
+      FeatureCard(
+        title: 'Oxygen Monitoring',
+        icon: Icons.air,
+        color: Colors.blue,
+        onTap: () => NavigationService.navigateTo(AppRoutes.oxygenMonitoring),
+      ),
+      FeatureCard(
+        title: 'View Recordings',
+        icon: Icons.playlist_play,
+        color: Colors.purple,
+        onTap: () => _showPlaybackLoginPrompt(),
+      ),
+    ];
+  }
 
   // New method to handle view recordings flow with async operations
   Future<void> _handleViewRecordings() async {
@@ -463,6 +360,11 @@ List<Widget> _buildGuestFeatureCards() {
           SnackBar(
             content: const Text('Create a patient and save a recording to access playback history'),
             duration: const Duration(seconds: 4),
+            behavior: SnackBarBehavior.floating,
+            action: SnackBarAction(
+              label: 'CREATE',
+              onPressed: () => NavigationService.navigateTo(AppRoutes.patientCard),
+            ),
           ),
         );
         return;
@@ -476,6 +378,7 @@ List<Widget> _buildGuestFeatureCards() {
         SnackBar(
           content: Text('Failed to check recordings: $e'),
           backgroundColor: Colors.red,
+          behavior: SnackBarBehavior.floating,
         ),
       );
     }
@@ -484,12 +387,20 @@ List<Widget> _buildGuestFeatureCards() {
   Widget _buildConnectionStatus({required bool isConnected, required String deviceName}) {
     return Row(
       children: [
-        Container(
+        AnimatedContainer(
+          duration: const Duration(milliseconds: 300),
           width: 12,
           height: 12,
           decoration: BoxDecoration(
             color: isConnected ? Colors.green : Colors.red,
             shape: BoxShape.circle,
+            boxShadow: [
+              BoxShadow(
+                color: (isConnected ? Colors.green : Colors.red).withOpacity(0.4),
+                blurRadius: 6,
+                spreadRadius: 1,
+              ),
+            ],
           ),
         ),
         const SizedBox(width: 12),
@@ -503,6 +414,12 @@ List<Widget> _buildGuestFeatureCards() {
             ),
           ),
         ),
+        if (!isConnected)
+          TextButton.icon(
+            icon: const Icon(Icons.bluetooth_searching),
+            label: const Text('Connect'),
+            onPressed: () => NavigationService.navigateTo(AppRoutes.bleScreen),
+          ).animate().fadeIn(duration: 300.ms),
       ],
     );
   }
@@ -528,14 +445,14 @@ List<Widget> _buildGuestFeatureCards() {
                 borderRadius: const BorderRadius.vertical(top: Radius.circular(16)),
               ),
               child: Column(
-                children: const [
-                  Icon(
+                children: [
+                  const Icon(
                     Icons.bluetooth_disabled_rounded,
                     color: Colors.red,
                     size: 48,
-                  ),
-                  SizedBox(height: 16),
-                  Text(
+                  ).animate().shake(duration: 700.ms),
+                  const SizedBox(height: 16),
+                  const Text(
                     'Connection Lost',
                     textAlign: TextAlign.center,
                     style: TextStyle(
@@ -724,7 +641,6 @@ List<Widget> _buildGuestFeatureCards() {
   }
 }
 
-// Changed from private to public class
 class FeatureCard extends StatelessWidget {
   final String title;
   final IconData icon;
@@ -732,7 +648,7 @@ class FeatureCard extends StatelessWidget {
   final VoidCallback onTap;
 
   const FeatureCard({
-    super.key, // Added key parameter
+    super.key,
     required this.title,
     required this.icon,
     required this.color,
@@ -744,9 +660,13 @@ class FeatureCard extends StatelessWidget {
     return Material(
       color: Colors.white,
       borderRadius: BorderRadius.circular(16),
+      elevation: 2,
+      shadowColor: Colors.black.withOpacity(0.05),
       child: InkWell(
         onTap: onTap,
         borderRadius: BorderRadius.circular(16),
+        splashColor: color.withOpacity(0.1),
+        highlightColor: color.withOpacity(0.05),
         child: Container(
           padding: const EdgeInsets.all(16),
           decoration: BoxDecoration(
@@ -756,10 +676,11 @@ class FeatureCard extends StatelessWidget {
           child: Column(
             mainAxisAlignment: MainAxisAlignment.center,
             children: [
-              Container(
+              AnimatedContainer(
+                duration: const Duration(milliseconds: 300),
                 padding: const EdgeInsets.all(12),
                 decoration: BoxDecoration(
-                  color: color.withAlpha(26), // Using withAlpha instead of withOpacity (0.1)
+                  color: color.withAlpha(26),
                   shape: BoxShape.circle,
                 ),
                 child: Icon(icon, size: 32, color: color),
