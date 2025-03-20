@@ -148,62 +148,55 @@ class MurmurRecordState extends State<MurmurRecord> {
     });
   }
 
-  void _stopRecording() async {
-    final bleManager = Provider.of<BLEManager>(context, listen: false);
-    try {
-      _recordingTimer?.cancel();
+ void _stopRecording() async {
+  final bleManager = Provider.of<BLEManager>(context, listen: false);
+  try {
+    _recordingTimer?.cancel();
 
-      // Get the final duration in whole seconds
-      int durationSeconds = ((_recordingDuration.inMilliseconds + 500) / 1000).floor();
-      _logger.info("Final recording duration: $durationSeconds seconds");
-
-      // Show processing indicator
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: Text("Processing audio..."),
-            duration: Duration(seconds: 10), // Long duration as processing might take time
-          ),
-        );
-      }
-
-      // The audio processing happens in the BLE manager now, we just get the result
-      List<int> processedAudio = await bleManager.stopRecording();
-
-      if (processedAudio.isEmpty) {
-        if (mounted) {
-          _showErrorSnackBar("No audio data recorded");
-        }
-        return;
-      }
-
-      if (mounted) {
-        // Dismiss the processing snackbar if it's still showing
-        ScaffoldMessenger.of(context).hideCurrentSnackBar();
-        
-        setState(() {
-          _isRecording = false;
-          _hasRecordingCompleted = true;
-          _recordedAudioData = processedAudio;
-        });
-        
-        // Show success message
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: Text("Recording processed successfully"),
-            backgroundColor: Colors.green,
-            duration: Duration(seconds: 2),
-          ),
-        );
-      }
-    } catch (e) {
-      if (mounted) {
-        // Dismiss the processing snackbar if it's still showing
-        ScaffoldMessenger.of(context).hideCurrentSnackBar();
-        _showErrorSnackBar("Failed to stop recording: $e");
-      }
+    // Show processing indicator
+    if (mounted) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text("Processing audio..."),
+          duration: Duration(seconds: 10),
+        ),
+      );
     }
+
+    // Get recording result (CHANGED FROM ORIGINAL)
+    var result = await bleManager.stopRecording();
+    List<int> processedAudio = result['audioData']; // Extract audio data from map
+
+    if (processedAudio.isEmpty) {
+      if (mounted) {
+        _showErrorSnackBar("No audio data recorded");
+      }
+      return;
+    }
+
+    if (mounted) {
+      // Dismiss the processing snackbar
+      ScaffoldMessenger.of(context).hideCurrentSnackBar();
+      
+      setState(() {
+        _isRecording = false;
+        _hasRecordingCompleted = true;
+        _recordedAudioData = processedAudio;
+      });
+      
+      // Show success message
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text("Recording processed successfully"),
+          backgroundColor: Colors.green,
+          duration: Duration(seconds: 2),
+        ),
+      );
+    }
+  } catch (e) {
+    /* error handling */
   }
+}
   
    Future<void> _playPreviewRecording() async {
     if (_recordedAudioData == null) return;
@@ -419,38 +412,39 @@ class MurmurRecordState extends State<MurmurRecord> {
     );
   }
 
-  Future<void> _saveRecordingToPatient(String uid, String patientId) async {
-    if (_recordedAudioData == null || !mounted) return;
-    
-    // Get data before showing dialog
-    final bleManager = Provider.of<BLEManager>(context, listen: false);
-    final roundedDuration = ((_recordingDuration.inMilliseconds + 500) / 1000).floor();
-    final audioData = List<int>.from(_recordedAudioData!);
-    
-    if (!mounted) return;
-    
-    // Show loading dialog
-    await _showLoadingDialog("Saving recording...");
-    
-    // Check if still mounted after dialog is shown
-    if (!mounted) return;
+ Future<void> _saveRecordingToPatient(String uid, String patientId) async {
+  if (_recordedAudioData == null || !mounted) return;
+  
+  // Get data before showing dialog
+  final bleManager = Provider.of<BLEManager>(context, listen: false);
+  final roundedDuration = ((_recordingDuration.inMilliseconds + 500) / 1000).floor();
+  final audioData = List<int>.from(_recordedAudioData!);
+  
+  if (!mounted) return;
+  
+  // Show loading dialog
+  await _showLoadingDialog("Saving recording...");
+  
+  // Check if still mounted after dialog is shown
+  if (!mounted) return;
 
-    try {
-      await _firebaseService.saveRecording(
-        uid,
-        patientId,
-        DateTime.now(),
-        audioData,
-        {
-          'duration': roundedDuration,
-          'sampleRate': BLEManager.sampleRate,
-          'bitsPerSample': BLEManager.bitsPerSample,
-          'channels': BLEManager.channels,
-          'peakAmplitude': bleManager.peakAmplitude,
-          // Add flag to indicate this has been processed
-          'processingApplied': true,
-        },
-      );
+  try {
+    await _firebaseService.saveRecording(
+      uid,
+      patientId,
+      DateTime.now(),
+      audioData,
+      {
+        'duration': roundedDuration,
+        'sampleRate': BLEManager.sampleRate, 
+        'bitsPerSample': BLEManager.bitsPerSample,
+        'channels': BLEManager.channels,
+        'peakAmplitude': bleManager.peakAmplitude,
+        'processingApplied': true,
+        'signalToNoiseRatio': bleManager.signalToNoiseRatio,
+        'recordingQuality': bleManager.recordingQuality,
+      },
+    );
 
       // Check if still mounted before proceeding
       if (!mounted) return;

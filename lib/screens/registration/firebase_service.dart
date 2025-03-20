@@ -318,59 +318,61 @@ Future<void> deletePatient(String uid, String medicareNumber, String confirmatio
   }
 
   Future<void> saveRecording(
-    String uid,
-    String medicalCardNumber,
-    DateTime timestamp,
-    List<int> audioData,
-    Map<String, dynamic> metadata,
-  ) async {
+  String uid,
+  String medicalCardNumber,
+  DateTime timestamp,
+  List<int> audioData,
+  Map<String, dynamic> metadata,
+) async {
+  try {
+    String sanitizedMedicalCard = medicalCardNumber.replaceAll('/', '_');
+    
+    _logger.info("Starting saveRecording with ${audioData.length} bytes of audio");
+    _logger.info("Metadata: $metadata");
+    
+    // Add debug point 1
+    _logger.info("DEBUG 1: Preparing to create WAV file");
+    
+    // Create WAV file with proper header
+    final wavData = createWavFile(
+      audioData,
+      sampleRate: metadata['sampleRate'] ?? 4000, // Default to 4kHz
+      bitsPerSample: metadata['bitsPerSample'] ?? 16,
+      channels: metadata['channels'] ?? 1,
+    );
+
+    // Add debug point 2
+    _logger.info("DEBUG 2: WAV file created with ${wavData.length} bytes");
+
+    // Generate filename
+    String filename = 'users/$uid/patients/$sanitizedMedicalCard/recordings/${timestamp.millisecondsSinceEpoch}.wav';
+    _logger.info("DEBUG 3: Saving to path: $filename");
+
+    // Add debug point 3
     try {
-      String sanitizedMedicalCard = medicalCardNumber.replaceAll('/', '_');
-      
-      _logger.info("Starting saveRecording with ${audioData.length} bytes of audio");
-      _logger.info("Metadata: $metadata");
-      
-      // Log some additional debug information about the audio
-      int expectedSamples = (metadata['sampleRate'] ?? 16000) * (metadata['duration'] ?? 0);
-      int bytesPerSample = (metadata['bitsPerSample'] ?? 16) ~/ 8;
-      num expectedBytes = expectedSamples * bytesPerSample * (metadata['channels'] ?? 1);
-      
-      _logger.info("Expected bytes: $expectedBytes, Actual bytes: ${audioData.length}");
-      
-      // Ensure we have valid audio data
-      if (audioData.isEmpty) {
-        throw Exception("Audio data is empty");
-      }
-      
-      // Create WAV file with proper header
-      final wavData = createWavFile(
-        audioData,
-        sampleRate: metadata['sampleRate'] ?? 16000, // Default to 16kHz
-        bitsPerSample: metadata['bitsPerSample'] ?? 16,
-        channels: metadata['channels'] ?? 1,
-      );
-
-      // Generate filename
-      String filename = 'users/$uid/patients/$sanitizedMedicalCard/recordings/${timestamp.millisecondsSinceEpoch}.wav';
-      _logger.info("Saving to path: $filename");
-
       // Upload to Firebase Storage with additional metadata
       await _storage.ref(filename).putData(
         Uint8List.fromList(wavData),
         SettableMetadata(
           contentType: 'audio/wav',
           customMetadata: {
-            'sampleRate': (metadata['sampleRate'] ?? 16000).toString(),
+            'sampleRate': (metadata['sampleRate'] ?? 4000).toString(),
             'duration': metadata['duration'].toString(),
             'bitsPerSample': (metadata['bitsPerSample'] ?? 16).toString(),
             'channels': (metadata['channels'] ?? 1).toString(),
-            'processingApplied': 'true', // Flag to indicate this audio has been processed
+            'processingApplied': 'true',
             'processingDetails': 'bandpass,median,adaptiveGain,noiseReduction,normalization',
           },
         ),
       );
-      _logger.info("Successfully uploaded audio to storage");
+      _logger.info("DEBUG 4: Successfully uploaded audio to storage");
+    } catch (e) {
+      _logger.severe("DEBUG ERROR STORAGE: Error in storage upload: $e");
+      rethrow;
+    }
 
+    // Add debug point 4
+    try {
       // Save metadata to Realtime Database
       await _database
           .child('users')
@@ -383,20 +385,23 @@ Future<void> deletePatient(String uid, String medicareNumber, String confirmatio
             'timestamp': timestamp.toIso8601String(),
             'filename': filename,
             'duration': metadata['duration'],
-            'sampleRate': metadata['sampleRate'] ?? 16000,
+            'sampleRate': metadata['sampleRate'] ?? 4000,
             'bitsPerSample': metadata['bitsPerSample'] ?? 16,
             'channels': metadata['channels'] ?? 1,
             'peakAmplitude': metadata['peakAmplitude'],
             'processingApplied': true,
-            'processingDetails': 'bandpass(30-600Hz),median,adaptiveGain,noiseReduction,normalization',
+            'processingDetails': 'bandpass,median,adaptiveGain,noiseReduction,normalization',
           });
-
-      _logger.info("Recording metadata saved to database");
+      _logger.info("DEBUG 5: Recording metadata saved to database");
     } catch (e) {
-      _logger.severe('Error saving recording: $e');
+      _logger.severe("DEBUG ERROR DATABASE: Error in database save: $e");
       rethrow;
     }
+  } catch (e) {
+    _logger.severe('Error saving recording: $e');
+    rethrow;
   }
+}
 
    List<int> createWavFile(
     List<int> audioData, {
