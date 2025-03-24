@@ -4,6 +4,14 @@ import 'auth_service.dart';
 import 'register_page.dart';
 import 'login_page.dart';
 import 'package:coen_490/screens/dashboard/dashboard_screen.dart';
+import 'package:google_fonts/google_fonts.dart'; // For custom fonts
+
+// Make sure to add the logo image to your assets in pubspec.yaml:
+// assets:
+//   - assets/images/respirhythm_logo.png
+//
+// IMPORTANT: The logo image should have a transparent background,
+// not a white background, to properly blend with the page background
 
 class AuthPage extends StatefulWidget {
   const AuthPage({super.key});
@@ -12,7 +20,6 @@ class AuthPage extends StatefulWidget {
   State<AuthPage> createState() => AuthPageState();
 }
 
-// Changed from private to public class
 class AuthPageState extends State<AuthPage> with SingleTickerProviderStateMixin {
   late AnimationController _animationController;
   late Animation<double> _fadeAnimation;
@@ -26,30 +33,30 @@ class AuthPageState extends State<AuthPage> with SingleTickerProviderStateMixin 
     // Initialize animation controller
     _animationController = AnimationController(
       vsync: this,
-      duration: const Duration(milliseconds: 1500),
+      duration: const Duration(milliseconds: 1200),
     );
     
-    // Create fade animation
+    // Create smooth fade animation
     _fadeAnimation = Tween<double>(begin: 0.0, end: 1.0).animate(
       CurvedAnimation(
         parent: _animationController,
-        curve: const Interval(0.0, 0.6, curve: Curves.easeOut),
+        curve: const Interval(0.0, 0.7, curve: Curves.easeOut),
       ),
     );
     
-    // Create slide animation for buttons
-    _slideAnimation = Tween<Offset>(begin: const Offset(0, 0.5), end: Offset.zero).animate(
+    // Create subtle slide animation for buttons
+    _slideAnimation = Tween<Offset>(begin: const Offset(0, 0.3), end: Offset.zero).animate(
       CurvedAnimation(
         parent: _animationController,
         curve: const Interval(0.3, 0.8, curve: Curves.easeOutCubic),
       ),
     );
     
-    // Create scale animation for logo
-    _scaleAnimation = Tween<double>(begin: 0.8, end: 1.0).animate(
+    // Create refined scale animation for logo
+    _scaleAnimation = Tween<double>(begin: 0.9, end: 1.0).animate(
       CurvedAnimation(
         parent: _animationController,
-        curve: const Interval(0.0, 0.5, curve: Curves.easeOutBack),
+        curve: const Interval(0.1, 0.6, curve: Curves.easeOutBack),
       ),
     );
     
@@ -78,12 +85,20 @@ class AuthPageState extends State<AuthPage> with SingleTickerProviderStateMixin 
     } catch (e) {
       if (!mounted) return;
       
+      // Modern snackbar with less intrusive design
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
-          content: const Text('Error accessing guest mode. Please try again.'),
-          backgroundColor: Colors.red[400],
+          content: Row(
+            children: [
+              const Icon(Icons.error_outline, color: Colors.white, size: 18),
+              const SizedBox(width: 8),
+              const Text('Unable to access guest mode'),
+            ],
+          ),
+          backgroundColor: Colors.black87,
           behavior: SnackBarBehavior.floating,
           margin: const EdgeInsets.all(16),
+          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
           shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
         ),
       );
@@ -92,37 +107,27 @@ class AuthPageState extends State<AuthPage> with SingleTickerProviderStateMixin 
 
   @override
   Widget build(BuildContext context) {
+    // Get screen dimensions for better sizing
+    final screenWidth = MediaQuery.of(context).size.width;
+    
+    // Logo color constant
+    const logoBlue = Color(0xFF1D557E);
+    
     return Scaffold(
+      backgroundColor: const Color(0xFFE6EDF7), // Light blue that matches logo and screenshot
+      extendBodyBehindAppBar: true, // Ensure content can go edge-to-edge
       body: Stack(
         children: [
-          // Background Image with Gradient Overlay
-          AnimatedBuilder(
-            animation: _fadeAnimation,
-            builder: (context, child) {
-              return Opacity(
-                opacity: _fadeAnimation.value,
-                child: child,
-              );
-            },
+          // Decorative element (circle) in top right
+          Positioned(
+            top: -100,
+            right: -100,
             child: Container(
+              width: 300,
+              height: 300,
               decoration: const BoxDecoration(
-                image: DecorationImage(
-                  image: AssetImage('assets/images/homepage.jpg'),
-                  fit: BoxFit.cover,
-                  alignment: Alignment.topCenter,
-                ),
-              ),
-              child: Container(
-                decoration: BoxDecoration(
-                  gradient: LinearGradient(
-                    begin: Alignment.topCenter,
-                    end: Alignment.bottomCenter,
-                    colors: [
-                      Colors.black.withAlpha(26), // Using withAlpha instead of withOpacity(0.1)
-                      Colors.black.withAlpha(153), // Using withAlpha instead of withOpacity(0.6)
-                    ],
-                  ),
-                ),
+                shape: BoxShape.circle,
+                color: Color(0xFFD6E1EF), // Slightly darker shade of background
               ),
             ),
           ),
@@ -130,16 +135,23 @@ class AuthPageState extends State<AuthPage> with SingleTickerProviderStateMixin 
           // Content Layer
           SafeArea(
             child: Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 24.0),
-              child: Column(
+              padding: EdgeInsets.symmetric(
+                horizontal: 16.0,
+                vertical: MediaQuery.of(context).padding.bottom > 0 ? 16.0 : 24.0
+              ), // Add different padding for devices with/without bottom notch
+              child: Padding(
+                padding: const EdgeInsets.only(bottom: 16.0), // Add bottom padding
+                child: Column(
                 children: [
-                  // App Logo/Name Section
+                  const SizedBox(height: 20),
+                  
+                  // App Logo/Name Section moved higher on screen
                   Expanded(
-                    flex: 3,
+                    flex: 5, // Increased flex for more central positioning
                     child: Column(
-                      mainAxisAlignment: MainAxisAlignment.center,
+                      mainAxisAlignment: MainAxisAlignment.center, // Center in the space
                       children: [
-                        // Animated Logo
+                        // Perfectly centered logo
                         AnimatedBuilder(
                           animation: _scaleAnimation,
                           builder: (context, child) {
@@ -148,217 +160,126 @@ class AuthPageState extends State<AuthPage> with SingleTickerProviderStateMixin 
                               child: child,
                             );
                           },
-                          child: TweenAnimationBuilder<double>(
-                            tween: Tween<double>(begin: 0.0, end: 1.0),
-                            duration: const Duration(milliseconds: 1800),
-                            builder: (context, value, child) {
-                              return Transform.rotate(
-                                angle: (1.0 - value) * 0.3,
-                                child: Opacity(
-                                  opacity: value,
-                                  child: child,
-                                ),
-                              );
-                            },
-                            child: const Icon(
-                              Icons.favorite_rounded,
-                              size: 90,
-                              color: Colors.white,
-                            ),
-                          ),
-                        ),
-                        const SizedBox(height: 24),
-                        
-                        // Animated App Name
-                        FadeTransition(
-                          opacity: _fadeAnimation,
-                          child: Text(
-                            'RespiRhythm',
-                            style: TextStyle(
-                              fontSize: 40,
-                              fontWeight: FontWeight.bold,
-                              color: Colors.white,
-                              letterSpacing: 1.5,
-                              shadows: [
-                                Shadow(
-                                  color: Colors.black.withAlpha(128), // Using withAlpha instead of withOpacity(0.5)
-                                  offset: const Offset(1, 1),
-                                  blurRadius: 5,
-                                ),
-                              ],
-                            ),
-                          ),
-                        ),
-                        const SizedBox(height: 16),
-                        
-                        // Animated Tagline
-                        SlideTransition(
-                          position: Tween<Offset>(
-                            begin: const Offset(0.0, 0.5),
-                            end: Offset.zero,
-                          ).animate(
-                            CurvedAnimation(
-                              parent: _animationController,
-                              curve: const Interval(0.2, 0.7, curve: Curves.easeOut),
-                            ),
-                          ),
-                          child: FadeTransition(
-                            opacity: _fadeAnimation,
-                            child: Text(
-                              'All-in-one medical tool',
-                              textAlign: TextAlign.center,
-                              style: TextStyle(
-                                fontSize: 18,
-                                color: Colors.white.withAlpha(230), // Using withAlpha instead of withOpacity(0.9)
-                                letterSpacing: 0.5,
+                          child: Center(
+                            child: Container(
+                              width: screenWidth, // Full screen width
+                              alignment: Alignment.center, // Ensure center alignment
+                              child: Image.asset(
+                                'assets/images/respirhythm_logo.png',
+                                width: screenWidth * 0.95, // 85% of screen width
+                                height: screenWidth * 0.85, // Adjusted height ratio
+                                fit: BoxFit.contain, // Preserve aspect ratio
                               ),
                             ),
                           ),
                         ),
+                        // Space after logo - significantly reduced
+                        const SizedBox(height: 20),
                       ],
                     ),
                   ),
                   
-                  // Buttons Section
+                  // Buttons Section moved lower
                   Expanded(
-                    flex: 2,
+                    flex: 4, // Adjusted flex ratio
                     child: SlideTransition(
                       position: _slideAnimation,
                       child: FadeTransition(
                         opacity: _fadeAnimation,
                         child: Column(
-                          mainAxisAlignment: MainAxisAlignment.center,
+                          mainAxisAlignment: MainAxisAlignment.end, // Position at bottom of space
                           children: [
-                            // Login Button with hover effect
-                            TweenAnimationBuilder<double>(
-                              tween: Tween<double>(begin: 0.0, end: 1.0),
-                              duration: const Duration(milliseconds: 300),
-                              builder: (context, value, child) {
-                                return Transform.scale(
-                                  scale: 0.95 + (0.05 * value),
-                                  child: child,
-                                );
-                              },
-                              child: SizedBox(
-                                width: double.infinity,
-                                height: 58,
-                                child: ElevatedButton(
-                                  onPressed: () => Navigator.push(
-                                    context,
-                                    PageRouteBuilder(
-                                      pageBuilder: (context, animation, secondaryAnimation) => LoginPage(),
-                                      transitionsBuilder: (context, animation, secondaryAnimation, child) {
-                                        var begin = const Offset(1.0, 0.0);
-                                        var end = Offset.zero;
-                                        var curve = Curves.easeInOut;
-                                        var tween = Tween(begin: begin, end: end).chain(CurveTween(curve: curve));
-                                        return SlideTransition(position: animation.drive(tween), child: child);
-                                      },
-                                      transitionDuration: const Duration(milliseconds: 300),
-                                    ),
+                            // Login Button
+                            SizedBox(
+                              width: double.infinity,
+                              height: 56,
+                              child: ElevatedButton(
+                                onPressed: () => Navigator.push(
+                                  context,
+                                  PageRouteBuilder(
+                                    pageBuilder: (context, animation, secondaryAnimation) => LoginPage(),
+                                    transitionsBuilder: (context, animation, secondaryAnimation, child) {
+                                      return FadeTransition(opacity: animation, child: child);
+                                    },
+                                    transitionDuration: const Duration(milliseconds: 250),
                                   ),
-                                  style: ElevatedButton.styleFrom(
-                                    backgroundColor: Colors.white,
-                                    foregroundColor: Colors.black87,
-                                    elevation: 2,
-                                    shadowColor: Colors.black.withAlpha(77), // Using withAlpha instead of withOpacity(0.3)
-                                    shape: RoundedRectangleBorder(
-                                      borderRadius: BorderRadius.circular(16),
-                                    ),
+                                ),
+                                style: ElevatedButton.styleFrom(
+                                  backgroundColor: logoBlue, // Matches screenshot blue
+                                  foregroundColor: Colors.white,
+                                  elevation: 0,
+                                  shape: RoundedRectangleBorder(
+                                    borderRadius: BorderRadius.circular(8),
                                   ),
-                                  child: const Text(
-                                    'Login',
-                                    style: TextStyle(
-                                      fontSize: 17,
-                                      fontWeight: FontWeight.bold,
-                                    ),
+                                ),
+                                child: Text(
+                                  'Log In',
+                                  style: GoogleFonts.inter(
+                                    fontSize: 16,
+                                    fontWeight: FontWeight.w500,
                                   ),
                                 ),
                               ),
                             ),
                             const SizedBox(height: 20),
                             
-                            // Sign Up Button with animation
-                            TweenAnimationBuilder<double>(
-                              tween: Tween<double>(begin: 0.0, end: 1.0),
-                              duration: const Duration(milliseconds: 300),
-                              builder: (context, value, child) {
-                                return Transform.scale(
-                                  scale: 0.95 + (0.05 * value),
-                                  child: child,
-                                );
-                              },
-                              child: SizedBox(
-                                width: double.infinity,
-                                height: 58,
-                                child: ElevatedButton(
-                                  onPressed: () => Navigator.push(
-                                    context,
-                                    PageRouteBuilder(
-                                      pageBuilder: (context, animation, secondaryAnimation) => RegisterPage(),
-                                      transitionsBuilder: (context, animation, secondaryAnimation, child) {
-                                        var begin = const Offset(1.0, 0.0);
-                                        var end = Offset.zero;
-                                        var curve = Curves.easeInOut;
-                                        var tween = Tween(begin: begin, end: end).chain(CurveTween(curve: curve));
-                                        return SlideTransition(position: animation.drive(tween), child: child);
-                                      },
-                                      transitionDuration: const Duration(milliseconds: 300),
-                                    ),
+                            // Create Account button
+                            SizedBox(
+                              width: double.infinity,
+                              height: 56,
+                              child: ElevatedButton(
+                                onPressed: () => Navigator.push(
+                                  context,
+                                  PageRouteBuilder(
+                                    pageBuilder: (context, animation, secondaryAnimation) => RegisterPage(),
+                                    transitionsBuilder: (context, animation, secondaryAnimation, child) {
+                                      return FadeTransition(opacity: animation, child: child);
+                                    },
+                                    transitionDuration: const Duration(milliseconds: 250),
                                   ),
-                                  style: ElevatedButton.styleFrom(
-                                    backgroundColor: Colors.transparent,
-                                    foregroundColor: Colors.white,
-                                    elevation: 0,
-                                    shape: RoundedRectangleBorder(
-                                      borderRadius: BorderRadius.circular(16),
-                                      side: const BorderSide(color: Colors.white, width: 2),
-                                    ),
+                                ),
+                                style: ElevatedButton.styleFrom(
+                                  backgroundColor: Colors.white,
+                                  foregroundColor: logoBlue, // Matches screenshot blue
+                                  elevation: 0,
+                                  shape: RoundedRectangleBorder(
+                                    borderRadius: BorderRadius.circular(8),
+                                    side: const BorderSide(color: logoBlue, width: 1.0),
                                   ),
-                                  child: const Text(
-                                    'Sign Up',
-                                    style: TextStyle(
-                                      fontSize: 17,
-                                      fontWeight: FontWeight.bold,
-                                    ),
+                                ),
+                                child: Text(
+                                  'Create Account',
+                                  style: GoogleFonts.inter(
+                                    fontSize: 16,
+                                    fontWeight: FontWeight.w500,
                                   ),
                                 ),
                               ),
                             ),
                             
-                            const SizedBox(height: 24),
+                            const SizedBox(height: 34),
                             
-                            // Guest Button with animation
-                            TweenAnimationBuilder<double>(
-                              tween: Tween<double>(begin: 0.0, end: 1.0),
-                              duration: const Duration(milliseconds: 200),
-                              builder: (context, value, child) {
-                                return Opacity(
-                                  opacity: 0.7 + (0.3 * value),
-                                  child: child,
-                                );
-                              },
-                              child: TextButton(
-                                onPressed: _handleGuestSignIn,
-                                style: TextButton.styleFrom(
-                                  foregroundColor: Colors.white,
-                                  padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 12),
-                                ),
-                                child: Row(
-                                  mainAxisSize: MainAxisSize.min,
-                                  children: [
-                                    const Icon(Icons.person_outline, size: 18),
-                                    const SizedBox(width: 8),
-                                    Text(
-                                      'Continue as Guest',
-                                      style: TextStyle(
-                                        fontSize: 16,
-                                        decoration: TextDecoration.underline,
-                                        decorationColor: Colors.white.withAlpha(128), // Using withAlpha instead of withOpacity(0.5)
-                                      ),
+                            // Guest sign-in option
+                            GestureDetector(
+                              onTap: _handleGuestSignIn,
+                              child: Row(
+                                mainAxisAlignment: MainAxisAlignment.center,
+                                children: [
+                                  Icon(
+                                    Icons.person_outline,
+                                    size: 16,
+                                    color: logoBlue.withAlpha(204),
+                                  ),
+                                  const SizedBox(width: 6),
+                                  Text(
+                                    'Continue as Guest',
+                                    style: GoogleFonts.inter(
+                                      fontSize: 14,
+                                      fontWeight: FontWeight.w400,
+                                      color: logoBlue.withAlpha(204),
                                     ),
-                                  ],
-                                ),
+                                  ),
+                                ],
                               ),
                             ),
                           ],
@@ -368,12 +289,12 @@ class AuthPageState extends State<AuthPage> with SingleTickerProviderStateMixin 
                   ),
                   
                   // Bottom Padding
-                  SizedBox(height: MediaQuery.of(context).padding.bottom + 16),
+                  SizedBox(height: MediaQuery.of(context).padding.bottom + 8),
                 ],
               ),
             ),
           ),
-        ],
+      ),],
       ),
     );
   }
