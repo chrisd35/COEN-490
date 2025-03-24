@@ -442,7 +442,7 @@ class ECGMonitoringState extends State<ECGMonitoring> with SingleTickerProviderS
                   Container(
                     padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
                     decoration: BoxDecoration(
-                      color: isConnected ? Colors.green.withOpacity(0.2) : Colors.red.withOpacity(0.2),
+                      color: isConnected ? Colors.green.withAlpha(51) : Colors.red.withAlpha(51),  // 0.2 * 255 = 51
                       borderRadius: BorderRadius.circular(12),
                       border: Border.all(
                         color: isConnected ? Colors.green : Colors.red,

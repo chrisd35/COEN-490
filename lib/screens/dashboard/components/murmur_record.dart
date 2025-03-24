@@ -11,9 +11,8 @@ import '/utils/models.dart';
 import '../../../utils/navigation_service.dart';
 import '../../../utils/app_routes.dart';
 import '../../../widgets/back_button.dart';
-import 'package:logging/logging.dart' as logging;
 
-final _logger = logging.Logger('MurmurRecord');
+
 
 class MurmurRecord extends StatefulWidget {
   final String? preselectedPatientId;
