@@ -1,13 +1,12 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_animate/flutter_animate.dart';
+import 'package:google_fonts/google_fonts.dart';
 import 'account_profile_page.dart';
-// Add a logging package import
 import 'package:logging/logging.dart' as logging;
 
-// Create a logger instance
 final _logger = logging.Logger('RegisterPage');
 
 class RegisterPage extends StatefulWidget {
-  // Use super parameter syntax for key
   const RegisterPage({super.key});
 
   @override
@@ -15,33 +14,16 @@ class RegisterPage extends StatefulWidget {
 }
 
 class _RegisterPageState extends State<RegisterPage> with SingleTickerProviderStateMixin {
-  // Removed unused _authService field
   late AnimationController _animationController;
-  late Animation<double> _fadeAnimation;
-  late Animation<Offset> _slideAnimation;
-
+  
   @override
   void initState() {
     super.initState();
     
-    // Initialize animations
+    // Initialize animation controller
     _animationController = AnimationController(
       vsync: this,
-      duration: const Duration(milliseconds: 600),
-    );
-    
-    _fadeAnimation = Tween<double>(begin: 0.0, end: 1.0).animate(
-      CurvedAnimation(
-        parent: _animationController,
-        curve: Curves.easeOut,
-      ),
-    );
-    
-    _slideAnimation = Tween<Offset>(begin: const Offset(0, 0.1), end: Offset.zero).animate(
-      CurvedAnimation(
-        parent: _animationController,
-        curve: Curves.easeOutCubic,
-      ),
+      duration: const Duration(milliseconds: 800),
     );
     
     // Start the animation
@@ -54,7 +36,7 @@ class _RegisterPageState extends State<RegisterPage> with SingleTickerProviderSt
     super.dispose();
   }
   
-  // Extract navigation to a separate method to avoid async gap issues
+  // Navigation method
   void _navigateToProfile(String role, Map<String, dynamic>? args) {
     _logger.info('$role role selected');
     Navigator.push(
@@ -86,92 +68,150 @@ class _RegisterPageState extends State<RegisterPage> with SingleTickerProviderSt
 
   @override
   Widget build(BuildContext context) {
+    // App theme colors for consistency
+    const Color primaryColor = Color(0xFF1D557E);
+    const Color secondaryColor = Color(0xFFE6EDF7);
+    
     // Get the route arguments
     final args = ModalRoute.of(context)?.settings.arguments as Map<String, dynamic>?;
     
     return Scaffold(
-      backgroundColor: Colors.grey[50],
+      backgroundColor: secondaryColor, // Match login page background
       body: SafeArea(
-        child: Column(
+        child: Stack(
           children: [
-            // Custom App Bar
-            Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 8.0),
-              child: Row(
-                children: [
-                  IconButton(
-                    icon: const Icon(Icons.arrow_back_ios_new, size: 20),
-                    onPressed: () => Navigator.pop(context),
-                  ),
-                  const Expanded(
-                    child: Text(
-                      'Create Account',
-                      style: TextStyle(
-                        fontSize: 18,
-                        fontWeight: FontWeight.w600,
-                      ),
-                      textAlign: TextAlign.center,
-                    ),
-                  ),
-                  const SizedBox(width: 48),
-                ],
+            // Decorative element (circle) in top right - consistent with other screens
+            Positioned(
+              top: -80,
+              right: -80,
+              child: Container(
+                width: 200,
+                height: 200,
+                decoration: const BoxDecoration(
+                  shape: BoxShape.circle,
+                  color: Color(0xFFD6E1EF), // Slightly darker shade of background
+                ),
               ),
             ),
             
-            Expanded(
-              child: FadeTransition(
-                opacity: _fadeAnimation,
-                child: SlideTransition(
-                  position: _slideAnimation,
+            Column(
+              children: [
+                // Custom App Bar with refined styling
+                Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 8.0, vertical: 16.0),
+                  decoration: BoxDecoration(
+                    color: Colors.white,
+                    boxShadow: [
+                      BoxShadow(
+                        color: Colors.black.withAlpha(8),
+                        blurRadius: 6,
+                        offset: const Offset(0, 2),
+                      ),
+                    ],
+                  ),
+                  child: Row(
+                    children: [
+                      // Back button with refined styling
+                      Material(
+                        color: Colors.transparent,
+                        child: InkWell(
+                          borderRadius: BorderRadius.circular(50),
+                          onTap: () => Navigator.pop(context),
+                          child: Container(
+                            padding: const EdgeInsets.all(8),
+                            child: Icon(
+                              Icons.arrow_back_ios_new_rounded,
+                              size: 18,
+                              color: primaryColor,
+                            ),
+                          ),
+                        ),
+                      ).animate().fadeIn(duration: 400.ms),
+                      
+                      Expanded(
+                        child: Text(
+                          'Create Account',
+                          style: GoogleFonts.inter(
+                            fontSize: 18,
+                            fontWeight: FontWeight.w600,
+                            color: const Color(0xFF263238),
+                          ),
+                          textAlign: TextAlign.center,
+                        ).animate().fadeIn(duration: 500.ms),
+                      ),
+                      
+                      // Empty container to balance the back button
+                      const SizedBox(width: 40),
+                    ],
+                  ),
+                ),
+                
+                // Main content
+                Expanded(
                   child: SingleChildScrollView(
+                    physics: const BouncingScrollPhysics(),
                     child: Padding(
                       padding: const EdgeInsets.all(24.0),
                       child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.stretch,
+                        crossAxisAlignment: CrossAxisAlignment.center,
                         children: [
-                          const SizedBox(height: 40),
+                          const SizedBox(height: 20),
                           
-                          // Header Section
+                          // Header Section with refined typography
                           Text(
                             'Choose Your Role',
-                            style: Theme.of(context).textTheme.headlineMedium?.copyWith(
+                            style: GoogleFonts.inter(
+                              fontSize: 28,
                               fontWeight: FontWeight.bold,
-                              color: Colors.black87,
+                              color: primaryColor,
+                              letterSpacing: -0.5,
                             ),
-                            textAlign: TextAlign.center,
-                          ),
+                          ).animate(controller: _animationController)
+                            .fadeIn(duration: 500.ms, delay: 100.ms)
+                            .slideY(begin: -0.2, end: 0),
+                          
                           const SizedBox(height: 12),
+                          
                           Text(
                             'Select the role that best describes you',
-                            style: Theme.of(context).textTheme.bodyLarge?.copyWith(
-                              color: Colors.grey[600],
+                            style: GoogleFonts.inter(
+                              fontSize: 16,
+                              color: const Color(0xFF546E7A),
+                              fontWeight: FontWeight.w400,
                             ),
-                            textAlign: TextAlign.center,
-                          ),
+                          ).animate(controller: _animationController)
+                            .fadeIn(duration: 500.ms, delay: 200.ms)
+                            .slideY(begin: -0.1, end: 0),
+                          
                           const SizedBox(height: 48),
 
-                          // Medical Professional Card
+                          // Medical Professional Card with enhanced design
                           _RoleCard(
                             title: 'Medical Professional',
                             description: 'Healthcare providers, doctors, and medical staff',
                             icon: Icons.medical_services_rounded,
+                            color: primaryColor,
                             onTap: () => _navigateToProfile('Medical Professional', args),
+                            delay: 300,
                           ),
-                          const SizedBox(height: 16),
+                          
+                          const SizedBox(height: 20),
 
-                          // Student Card
+                          // Student Card with enhanced design
                           _RoleCard(
                             title: 'Student',
                             description: 'Medical students and healthcare learners',
                             icon: Icons.school_rounded,
+                            color: primaryColor,
                             onTap: () => _navigateToProfile('Student', args),
+                            delay: 400,
                           ),
                         ],
                       ),
                     ),
                   ),
                 ),
-              ),
+              ],
             ),
           ],
         ),
@@ -180,93 +220,119 @@ class _RegisterPageState extends State<RegisterPage> with SingleTickerProviderSt
   }
 }
 
-// Custom Role Selection Card Widget
+// Redesigned Role Selection Card Widget
 class _RoleCard extends StatelessWidget {
   final String title;
   final String description;
   final IconData icon;
+  final Color color;
   final VoidCallback onTap;
+  final int delay;
 
   const _RoleCard({
-    // No need to add key parameter for private widgets
     required this.title,
     required this.description,
     required this.icon,
+    required this.color,
     required this.onTap,
+    required this.delay,
   });
 
   @override
   Widget build(BuildContext context) {
-    return TweenAnimationBuilder<double>(
-      tween: Tween<double>(begin: 0.95, end: 1.0),
-      duration: const Duration(milliseconds: 200),
-      builder: (context, scale, child) {
-        return Transform.scale(
-          scale: scale,
-          child: Card(
-            elevation: 2,
-            shadowColor: Colors.black.withAlpha(26), // Using withAlpha(26) instead of withOpacity(0.1)
-            shape: RoundedRectangleBorder(
-              borderRadius: BorderRadius.circular(16),
-              side: BorderSide(color: Colors.grey[200]!),
-            ),
-            child: InkWell(
-              onTap: onTap,
-              borderRadius: BorderRadius.circular(16),
-              splashColor: Theme.of(context).primaryColor.withAlpha(26), // Using withAlpha(26) instead of withOpacity(0.1)
-              highlightColor: Theme.of(context).primaryColor.withAlpha(13), // Using withAlpha(13) instead of withOpacity(0.05)
-              child: Padding(
-                padding: const EdgeInsets.all(20),
-                child: Row(
-                  children: [
-                    Container(
-                      padding: const EdgeInsets.all(12),
-                      decoration: BoxDecoration(
-                        color: Theme.of(context).primaryColor.withAlpha(26), // Using withAlpha(26) instead of withOpacity(0.1)
-                        borderRadius: BorderRadius.circular(12),
+    return Container(
+      width: double.infinity,
+      decoration: BoxDecoration(
+        borderRadius: BorderRadius.circular(16),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withAlpha(10),
+            blurRadius: 8,
+            spreadRadius: 0,
+            offset: const Offset(0, 2),
+          ),
+        ],
+      ),
+      child: Material(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(16),
+        clipBehavior: Clip.antiAlias,
+        child: InkWell(
+          onTap: onTap,
+          splashColor: color.withAlpha(26),
+          highlightColor: color.withAlpha(13),
+          child: Padding(
+            padding: const EdgeInsets.all(20),
+            child: Row(
+              children: [
+                // Icon container with refined styling
+                Container(
+                  padding: const EdgeInsets.all(14),
+                  decoration: BoxDecoration(
+                    color: color.withAlpha(26),
+                    borderRadius: BorderRadius.circular(14),
+                    boxShadow: [
+                      BoxShadow(
+                        color: color.withAlpha(15),
+                        blurRadius: 8,
+                        spreadRadius: 0,
+                        offset: const Offset(0, 2),
                       ),
-                      child: Icon(
-                        icon,
-                        size: 32,
-                        color: Theme.of(context).primaryColor,
-                      ),
-                    ),
-                    const SizedBox(width: 16),
-                    Expanded(
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Text(
-                            title,
-                            style: const TextStyle(
-                              fontSize: 18,
-                              fontWeight: FontWeight.w600,
-                              color: Colors.black87,
-                            ),
-                          ),
-                          const SizedBox(height: 4),
-                          Text(
-                            description,
-                            style: TextStyle(
-                              fontSize: 14,
-                              color: Colors.grey[600],
-                            ),
-                          ),
-                        ],
-                      ),
-                    ),
-                    Icon(
-                      Icons.arrow_forward_ios_rounded,
-                      size: 16,
-                      color: Colors.grey[400],
-                    ),
-                  ],
+                    ],
+                  ),
+                  child: Icon(
+                    icon,
+                    size: 28,
+                    color: color,
+                  ),
                 ),
-              ),
+                
+                const SizedBox(width: 16),
+                
+                // Text content with refined typography
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        title,
+                        style: GoogleFonts.inter(
+                          fontSize: 17,
+                          fontWeight: FontWeight.w600,
+                          color: const Color(0xFF263238),
+                          height: 1.3,
+                          letterSpacing: -0.2,
+                        ),
+                      ),
+                      const SizedBox(height: 4),
+                      Text(
+                        description,
+                        style: GoogleFonts.inter(
+                          fontSize: 14,
+                          color: const Color(0xFF78909C),
+                          height: 1.4,
+                          letterSpacing: -0.1,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+                
+                // Arrow icon with refined styling
+                Container(
+                  padding: const EdgeInsets.all(8),
+                  child: Icon(
+                    Icons.arrow_forward_ios_rounded,
+                    size: 16,
+                    color: const Color(0xFFB0BEC5),
+                  ),
+                ),
+              ],
             ),
           ),
-        );
-      }
-    );
+        ),
+      ),
+    ).animate().fadeIn(duration: 500.ms, delay: Duration(milliseconds: delay))
+      .slideY(begin: 0.2, end: 0);
   }
 }
