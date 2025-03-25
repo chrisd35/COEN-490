@@ -149,15 +149,34 @@ class AppRoutes {
           ),
         );
         
-      case ecgViewer:
-        final args = settings.arguments as Map<String, dynamic>?;
-        if (args?['reading'] == null) return null;
-        return MaterialPageRoute(
-          builder: (context) => ECGViewer(
-            reading: args!['reading'],
-            patientName: args['patientName'] ?? 'Unknown Patient',
+  case ecgViewer:
+  final args = settings.arguments as Map<String, dynamic>?;
+  if (args == null || args['reading'] == null) {
+    // Instead of returning null, show an error screen
+    return MaterialPageRoute(
+      builder: (context) => Scaffold(
+        appBar: AppBar(title: const Text('Error')),
+        body: const Center(
+          child: Padding(
+            padding: EdgeInsets.all(16.0),
+            child: Text(
+              'Error: Invalid ECG reading data was provided.',
+              style: TextStyle(fontSize: 16),
+              textAlign: TextAlign.center,
+            ),
           ),
-        );
+        ),
+      ),
+    );
+  }
+  
+  // If we have valid args, proceed normally
+  return MaterialPageRoute(
+    builder: (context) => ECGViewer(
+      reading: args['reading'],
+      patientName: args['patientName'] ?? 'Unknown Patient',
+    ),
+  );
         
       case pulseOxHistory:
         final args = settings.arguments as Map<String, dynamic>?;
