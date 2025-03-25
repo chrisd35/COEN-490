@@ -14,6 +14,12 @@ final _logger = logging.Logger('Navigation');
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
+
+  logging.Logger.root.level = logging.Level.ALL;
+  logging.Logger.root.onRecord.listen((record) {
+    print('${record.level.name}: ${record.time}: ${record.loggerName}: ${record.message}');
+  });
+  
   await Firebase.initializeApp(
     options: DefaultFirebaseOptions.currentPlatform,
   );

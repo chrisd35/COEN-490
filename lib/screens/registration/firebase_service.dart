@@ -1,3 +1,5 @@
+import 'dart:math';
+
 import 'package:firebase_core/firebase_core.dart';
 import 'package:firebase_database/firebase_database.dart';
 import 'package:firebase_storage/firebase_storage.dart';
@@ -654,30 +656,188 @@ class FirebaseService {
   }
 
   Future<List<int>> downloadECGData(String downloadUrl) async {
+  try {
+    _logger.info('Starting download of ECG data from URL: $downloadUrl');
+    
+    // Try using the stored URL first
     try {
-      final response =
-          await FirebaseStorage.instance.refFromURL(downloadUrl).getData();
-
-      if (response != null) {
-        // Convert bytes to ECG values
-        ByteData byteData = ByteData.sublistView(Uint8List.fromList(response));
-        List<int> ecgData = [];
-
-        for (int i = 0; i < response.length; i += 2) {
-          // Read 16-bit integer (little-endian)
-          int value = byteData.getInt16(i, Endian.little);
-          // Ensure value is within the expected range (e.g., 0–4095)
-          ecgData.add(value.clamp(0, 4095));
-        }
-
-        return ecgData;
+      final response = await FirebaseStorage.instance.refFromURL(downloadUrl).getData();
+      
+      if (response != null && response.isNotEmpty) {
+        _logger.info('Successfully downloaded ECG data with stored URL, size: ${response.length} bytes');
+        return _decodeECGData(response);
       }
-      return [];
     } catch (e) {
-      _logger.severe('Error downloading ECG data: $e');
-      rethrow;
+      _logger.warning('Error with stored URL: $e');
+      // If the stored URL fails, the URL might have expired
+      // Continue to the next approach
+    }
+    
+    // Extract the path from the URL if possible
+    String? path;
+    try {
+      // This is a simplified approach - you might need to adjust based on your URL format
+      if (downloadUrl.contains('firebasestorage.googleapis.com')) {
+        // Extract path from a Firebase Storage URL
+        final uri = Uri.parse(downloadUrl);
+        final pathSegments = uri.pathSegments;
+        
+        // Find the "o" segment which is followed by the bucket name and then the object path
+        int oIndex = pathSegments.indexOf('o');
+        if (oIndex >= 0 && oIndex < pathSegments.length - 1) {
+          path = pathSegments.sublist(oIndex + 1).join('/');
+          path = Uri.decodeComponent(path); // Decode URL-encoded characters
+        }
+      } else if (downloadUrl.contains('/')) {
+        // Might be a direct path
+        path = downloadUrl;
+      }
+      
+      _logger.info('Extracted path from URL: $path');
+    } catch (e) {
+      _logger.warning('Error extracting path from URL: $e');
+    }
+    
+    // If we have a path, try to use it directly
+    if (path != null && path.isNotEmpty) {
+      try {
+        _logger.info('Trying to download using path: $path');
+        final response = await FirebaseStorage.instance.ref(path).getData();
+        
+        if (response != null && response.isNotEmpty) {
+          _logger.info('Successfully downloaded ECG data with path, size: ${response.length} bytes');
+          return _decodeECGData(response);
+        }
+      } catch (e) {
+        _logger.warning('Error with path: $e');
+      }
+    }
+    
+    // If all else fails, throw an error
+    throw Exception('Unable to download ECG data');
+  } catch (e) {
+    _logger.severe('Error downloading ECG data: $e');
+    rethrow;
+  }
+}
+
+List<int> _decodeECGData(List<int> response) {
+  try {
+    _logger.info('Decoding ECG data, byte length: ${response.length}');
+    
+    // Check if we have enough bytes
+    if (response.length < 2) {
+      _logger.warning('ECG data too short, returning empty list');
+      return [];
+    }
+
+    // First, let's check if this is already raw ECG data (not encoded as 16-bit values)
+    // If most values are within expected ECG range (0-4095), it might be raw data
+    bool mightBeRawData = true;
+    for (int i = 0; i < min(20, response.length); i++) {
+      if (response[i] > 4095) {
+        mightBeRawData = false;
+        break;
+      }
+    }
+
+    if (mightBeRawData && response.length >= 100) {
+      _logger.info('Data appears to be already in raw format');
+      return response.map((value) => value.clamp(0, 4095)).toList();
+    }
+    
+    // Otherwise, try different decoding methods to see what works
+    List<List<int>> candidateDecodings = [];
+    
+    // Try little-endian decoding
+    try {
+      ByteData byteData = ByteData.sublistView(Uint8List.fromList(response));
+      List<int> littleEndianData = [];
+      
+      for (int i = 0; i < response.length - 1; i += 2) {
+        int value = byteData.getInt16(i, Endian.little);
+        littleEndianData.add(value.clamp(0, 4095));
+      }
+      
+      candidateDecodings.add(littleEndianData);
+      _logger.info('Added little-endian decoding, ${littleEndianData.length} points');
+    } catch (e) {
+      _logger.warning('Little-endian decoding failed: $e');
+    }
+    
+    // Try big-endian decoding
+    try {
+      ByteData byteData = ByteData.sublistView(Uint8List.fromList(response));
+      List<int> bigEndianData = [];
+      
+      for (int i = 0; i < response.length - 1; i += 2) {
+        int value = byteData.getInt16(i, Endian.big);
+        bigEndianData.add(value.clamp(0, 4095));
+      }
+      
+      candidateDecodings.add(bigEndianData);
+      _logger.info('Added big-endian decoding, ${bigEndianData.length} points');
+    } catch (e) {
+      _logger.warning('Big-endian decoding failed: $e');
+    }
+    
+    // Try unsigned little-endian decoding
+    try {
+      ByteData byteData = ByteData.sublistView(Uint8List.fromList(response));
+      List<int> unsignedLittleEndianData = [];
+      
+      for (int i = 0; i < response.length - 1; i += 2) {
+        int value = byteData.getUint16(i, Endian.little);
+        unsignedLittleEndianData.add(value.clamp(0, 4095));
+      }
+      
+      candidateDecodings.add(unsignedLittleEndianData);
+      _logger.info('Added unsigned little-endian decoding, ${unsignedLittleEndianData.length} points');
+    } catch (e) {
+      _logger.warning('Unsigned little-endian decoding failed: $e');
+    }
+    
+    // Choose the best decoding based on data quality
+    if (candidateDecodings.isEmpty) {
+      _logger.warning('No successful decodings, returning empty list');
+      return [];
+    }
+    
+    // Simple heuristic: Choose the decoding with the most reasonable values
+    // For ECG data, we expect values to be in a certain range
+    List<int> bestDecoding = candidateDecodings.first;
+    int bestScore = _scoreECGData(bestDecoding);
+    
+    for (var decoding in candidateDecodings.skip(1)) {
+      int score = _scoreECGData(decoding);
+      if (score > bestScore) {
+        bestScore = score;
+        bestDecoding = decoding;
+      }
+    }
+    
+    _logger.info('Selected best decoding with score $bestScore, ${bestDecoding.length} points');
+    return bestDecoding;
+  } catch (e) {
+    _logger.severe('Error in ECG data decoding: $e');
+    return [];
+  }
+}
+
+// Add this helper method to score the quality of decoded ECG data
+int _scoreECGData(List<int> data) {
+  // Count how many values are in a reasonable ECG range
+  // For this application, we expect values between ~500 and ~3500
+  int inRange = 0;
+  for (int value in data) {
+    if (value >= 500 && value <= 3500) {
+      inRange++;
     }
   }
+  
+  // Calculate score as percentage of values in range
+  return (inRange * 100) ~/ data.length;
+}
 
   Future<List<Map<String, dynamic>>> getPulseOxReadings(
     String uid,
