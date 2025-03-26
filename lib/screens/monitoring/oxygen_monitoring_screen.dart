@@ -310,17 +310,17 @@ class OxygenMonitoringState extends State<OxygenMonitoring> with SingleTickerPro
               ),
               actions: [
                 IconButton(
-                  icon: const Icon(Icons.history, color: AppTheme.textPrimary),
+                  icon: const Icon(Icons.history, color: AppTheme.primaryColor),
                   onPressed: _showHistory,
                   tooltip: 'View History',
                 ),
                 IconButton(
-                  icon: const Icon(Icons.save, color: AppTheme.textPrimary),
+                  icon: const Icon(Icons.save, color: AppTheme.primaryColor),
                   onPressed: _showSaveDialog,
                   tooltip: 'Save Session',
                 ),
                 IconButton(
-                  icon: const Icon(Icons.refresh, color: AppTheme.textPrimary),
+                  icon: const Icon(Icons.refresh, color: AppTheme.primaryColor),
                   onPressed: _resetGraph,
                   tooltip: 'Reset',
                 ),
