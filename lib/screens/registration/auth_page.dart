@@ -6,12 +6,6 @@ import 'login_page.dart';
 import 'package:coen_490/screens/dashboard/dashboard_screen.dart';
 import 'package:google_fonts/google_fonts.dart'; // For custom fonts
 
-// Make sure to add the logo image to your assets in pubspec.yaml:
-// assets:
-//   - assets/images/respirhythm_logo.png
-//
-// IMPORTANT: The logo image should have a transparent background,
-// not a white background, to properly blend with the page background
 
 class AuthPage extends StatefulWidget {
   const AuthPage({super.key});
