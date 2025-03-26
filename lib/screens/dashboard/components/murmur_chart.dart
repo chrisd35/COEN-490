@@ -21,6 +21,35 @@ class MurmurChart extends StatefulWidget {
   State<MurmurChart> createState() => _MurmurChartState();
 }
 
+class AppTheme {
+  // Updated Main color palette with navy theme
+  static const Color primaryColor = Color(0xFF1D3461); // Navy blue
+  static const Color secondaryColor =
+      Color(0xFFE6EDF4); // Light navy background
+  static const Color accentColor = Color(0xFF1E5187); // Medium navy blue
+
+  // Feature card colors - navy-focused palette
+  static final List<Color> featureCardColors = [
+    const Color(0xFF1D3461), // Deep navy
+    const Color(0xFF1E5187), // Medium navy
+    const Color(0xFF246BAF), // Bright navy
+    const Color(0xFF152B4E), // Dark navy
+    const Color(0xFF0F4C81), // Ocean navy
+    const Color(0xFF2C5F8E), // Steel navy
+    const Color(0xFF1B4F72), // Muted navy
+  ];
+
+  // Status colors - refined for navy theme
+  static const Color successColor = Color(0xFF1B5E20); // Dark green
+  static const Color warningColor = Color(0xFF1D3461); // Navy warning
+  static const Color errorColor = Color(0xFFB71C1C); // Dark red
+
+  // Text colors - adjusted for navy theme
+  static const Color textPrimary = Color(0xFF1D3461); // Navy text
+  static const Color textSecondary = Color(0xFF3A5378); // Medium navy
+  static const Color textLight = Color(0xFF6B84A5); // Light navy
+}
+
 class _MurmurChartState extends State<MurmurChart> {
   final FirebaseService _firebaseService = FirebaseService();
   final AudioPlayer _audioPlayer = AudioPlayer();
@@ -42,7 +71,7 @@ class _MurmurChartState extends State<MurmurChart> {
     _setupAudioPlayer();
 
     WidgetsBinding.instance.addPostFrameCallback((_) async {
-      final user = auth.FirebaseAuth.instance.currentUser; // Use prefixed auth
+      final user = auth.FirebaseAuth.instance.currentUser;
       if (user != null) {
         try {
           final token = await user.getIdToken();
@@ -165,7 +194,6 @@ class _MurmurChartState extends State<MurmurChart> {
     }
   }
 
-  // Modify the _analyzeMurmur method to include better error handling
   Future<void> _analyzeMurmur(Recording recording) async {
     if (!mounted) return;
 
@@ -180,22 +208,15 @@ class _MurmurChartState extends State<MurmurChart> {
 
       if (!mounted) return;
 
-      // Check if features exist in the analysis
       if (analysis['features'] == null) {
         throw Exception("Analysis features are missing");
       }
-
-      // Ensure features is a Map
       final features = analysis['features'] as Map<String, dynamic>;
-
-      // Determine murmur type, location, and grade
       final type = _parseMurmurType(features);
       final location = _parseMurmurLocation(features);
       final grade = _parseMurmurGrade(features);
       final hasMurmur = analysis['prediction'] == "Abnormal";
       final suggestions = _parseSuggestions(features);
-
-      // Generate causes based on type, location, grade and murmur detection
       List<String> causes = _generateCauses(hasMurmur, type, location, grade);
 
       setState(() {
@@ -225,10 +246,7 @@ class _MurmurChartState extends State<MurmurChart> {
     if (!hasMurmur) {
       return ['Normal physiological heart sounds'];
     }
-
     List<String> causes = [];
-
-    // Systolic murmur causes
     if (type.contains('Systolic')) {
       if (location.contains('Aortic')) {
         causes.add('Aortic stenosis');
@@ -248,9 +266,7 @@ class _MurmurChartState extends State<MurmurChart> {
         causes.add('Ventricular septal defect');
         causes.add('Flow murmur');
       }
-    }
-    // Diastolic murmur causes
-    else if (type.contains('Diastolic')) {
+    } else if (type.contains('Diastolic')) {
       if (location.contains('Aortic')) {
         causes.add('Aortic regurgitation');
       } else if (location.contains('Pulmonic')) {
@@ -262,39 +278,30 @@ class _MurmurChartState extends State<MurmurChart> {
       } else {
         causes.add('Diastolic cardiac dysfunction');
       }
-    }
-    // Undetermined
-    else {
+    } else {
       causes.add('Innocent or functional murmur');
       causes.add('Valve pathology requiring further investigation');
       causes.add('Possible structural heart disease');
     }
-
     return causes;
   }
 
-  // Updated _parseMurmurType method with null checks
   String _parseMurmurType(Map<String, dynamic> features) {
-    // Add null safety checks
     final systoleMean = features['Systole_Mean'] ?? 0.0;
     final wavelet1Energy = features['Wavelet_1_Energy'] ?? 0.0;
     final wavelet2Shannon = features['Wavelet_2_Shannon'] ?? 0.0;
     final energy200400 = features['Energy_200_400Hz'] ?? 0.0;
 
-    // Systolic characteristics
     if (systoleMean > 0.75 && wavelet1Energy > 0.65) {
       return 'Systolic ejection murmur';
     }
-    // Diastolic characteristics
     if (wavelet2Shannon > 4.2 && energy200400 < 0.4) {
       return 'Diastolic murmur';
     }
     return 'Undetermined type';
   }
 
-  // Updated _parseMurmurLocation method with null checks
   String _parseMurmurLocation(Map<String, dynamic> features) {
-    // Add null safety checks
     final energy200400 = features['Energy_200_400Hz'] ?? 0.0;
     final wavelet1Shannon = features['Wavelet_1_Shannon'] ?? 0.0;
     final energy150300 = features['Energy_150_300Hz'] ?? 0.0;
@@ -304,37 +311,25 @@ class _MurmurChartState extends State<MurmurChart> {
     final mfcc13 = features['MFCC_mean_13'] ?? 0.0;
     final energy100200 = features['Energy_100_200Hz'] ?? 0.0;
 
-    // Aortic area detection
     if (energy200400 > 0.7 && wavelet1Shannon > 3.8) {
       return 'Aortic area (right 2nd intercostal space)';
     }
-
-    // Pulmonic area detection
     if (energy150300 > 0.65 && wavelet2Energy > 0.55) {
       return 'Pulmonic area (left 2nd intercostal space)';
     }
-
-    // Tricuspid area detection
     if (energy50150 > 0.6 && mfcc7 > 0.3) {
       return 'Tricuspid area (left 4th intercostal space)';
     }
-
-    // Mitral area detection
     if (mfcc13 < -0.4 && energy100200 > 0.6) {
       return 'Mitral area (cardiac apex)';
     }
-
     return 'General cardiac area';
   }
 
-  // Updated _parseMurmurGrade method with null checks
   String _parseMurmurGrade(Map<String, dynamic> features) {
-    // Add null safety checks
     final systoleMean = features['Systole_Mean'] ?? 0.0;
     final systoleStd = features['Systole_Std'] ?? 0.0;
     final hr = features['HeartRate'] ?? 72.0;
-
-    // Grade based on systole characteristics and heart rate
     final systoleScore = (systoleMean * 0.7) + (systoleStd * 0.3);
 
     if (systoleScore > 0.85 && hr > 100) return 'Grade 4/6';
@@ -344,7 +339,6 @@ class _MurmurChartState extends State<MurmurChart> {
   }
 
   String _parseSuggestions(Map<String, dynamic> features) {
-    // Add null safety checks for all feature accesses
     final hr = features['HeartRate'] ?? 72;
     final systoleMean = features['Systole_Mean'] ?? 0.0;
     final waveletEnergy = features['Wavelet_1_Energy'] ?? 0.0;
@@ -352,7 +346,6 @@ class _MurmurChartState extends State<MurmurChart> {
     final mfcc13 = features['MFCC_mean_13'] ?? 0.0;
     final midFreqEnergy = features['Energy_100_200Hz'] ?? 0.0;
 
-    // Suggestion based on various features
     if (systoleMean > 0.7 && waveletEnergy > 0.6) {
       return 'Recommend auscultation in multiple positions';
     } else if (highFreqEnergy > 0.6 && hr > 90) {
@@ -455,27 +448,26 @@ class _MurmurChartState extends State<MurmurChart> {
         ? "Murmur Analysis - ${_selectedPatient!.fullName}"
         : "Murmur Detection";
 
-    return BackButtonHandler(
-      strategy: BackButtonHandlingStrategy.normal,
-      child: Scaffold(
-        appBar: AppBar(
-          title: Text(
-            title,
-            style: const TextStyle(
-              fontWeight: FontWeight.w600,
-              color: Colors.black87,
-            ),
-          ),
-          elevation: 0,
-          backgroundColor: Colors.white,
-          foregroundColor: Colors.black87,
-          leading: IconButton(
-            icon: const Icon(Icons.arrow_back_ios, size: 20),
-            onPressed: () => NavigationService.goBack(),
+    return Scaffold(
+      appBar: AppBar(
+        title: Text(
+          title,
+          style: const TextStyle(
+            fontWeight: FontWeight.w600,
+            color: AppTheme.textPrimary,
           ),
         ),
-        body: SafeArea(
-          // Wrap the entire body in a SingleChildScrollView
+        elevation: 0,
+        backgroundColor: AppTheme.secondaryColor,
+        foregroundColor: AppTheme.primaryColor,
+        leading: IconButton(
+          icon: const Icon(Icons.arrow_back_ios, size: 20),
+          onPressed: () => NavigationService.goBack(),
+        ),
+      ),
+      body: SafeArea(
+        child: Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 16.0, vertical: 8.0),
           child: SingleChildScrollView(
             child: Column(
               children: [
@@ -483,7 +475,7 @@ class _MurmurChartState extends State<MurmurChart> {
                   _buildPatientSelector(),
                 if (_selectedPatient != null)
                   Container(
-                    height: 250, // Fixed height for recordings list
+                    height: 250,
                     child: _buildRecordingsList(),
                   ),
                 if (_selectedRecording != null) _buildPlaybackControls(),
@@ -496,56 +488,105 @@ class _MurmurChartState extends State<MurmurChart> {
     );
   }
 
+  // --- Updated Patient Selector with DropdownButtonFormField ---
   Widget _buildPatientSelector() {
     if (_patients == null) {
-      return const Center(child: CircularProgressIndicator());
+      return Center(
+          child: CircularProgressIndicator(
+        color: AppTheme.primaryColor,
+      ));
     }
-
     if (_patients!.isEmpty) {
-      return const Center(
+      return Center(
         child: Padding(
-          padding: EdgeInsets.all(16.0),
-          child: Text("No patients found"),
+          padding: const EdgeInsets.all(16.0),
+          child: Text(
+            "No patients found",
+            style: TextStyle(color: AppTheme.textPrimary),
+          ),
         ),
       );
     }
-
     return Card(
-      margin: const EdgeInsets.all(16),
-      child: Padding(
+      margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.circular(16),
+      ),
+      elevation: 2,
+      child: Container(
+        decoration: BoxDecoration(
+          gradient: LinearGradient(
+            colors: [AppTheme.secondaryColor, Colors.white],
+            begin: Alignment.topLeft,
+            end: Alignment.bottomRight,
+          ),
+          borderRadius: BorderRadius.circular(16),
+        ),
         padding: const EdgeInsets.all(16),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            const Text(
+            Text(
               "Select Patient",
               style: TextStyle(
-                fontSize: 16, // reduced from 18
+                fontSize: 18,
                 fontWeight: FontWeight.bold,
+                color: AppTheme.primaryColor,
               ),
             ),
-            const SizedBox(height: 8),
-            DropdownButton<Patient>(
-              isExpanded: true,
-              value: _selectedPatient,
-              hint: const Text("Choose a patient"),
-              onChanged: (Patient? patient) {
-                setState(() {
-                  _selectedPatient = patient;
-                  _recordings = null;
-                  _selectedRecording = null;
-                  _murmurAnalysis = null;
-                });
-                if (patient != null) {
-                  _loadRecordings(patient);
-                }
-              },
-              items: _patients!.map((Patient patient) {
-                return DropdownMenuItem<Patient>(
-                  value: patient,
-                  child: Text(patient.fullName),
-                );
-              }).toList(),
+            const SizedBox(height: 12),
+            Container(
+              decoration: BoxDecoration(
+                color: Colors.white,
+                borderRadius: BorderRadius.circular(12),
+                border:
+                    Border.all(color: AppTheme.primaryColor.withOpacity(0.2)),
+              ),
+              child: DropdownButtonFormField<Patient>(
+                value: _selectedPatient,
+                decoration: InputDecoration(
+                  border: OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(12),
+                    borderSide: BorderSide.none,
+                  ),
+                  contentPadding:
+                      const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+                  filled: true,
+                  fillColor: Colors.white,
+                  hintStyle: TextStyle(color: AppTheme.textLight),
+                ),
+                icon: Icon(Icons.arrow_drop_down, color: AppTheme.primaryColor),
+                style: TextStyle(
+                  color: AppTheme.textPrimary,
+                  fontSize: 16,
+                ),
+                dropdownColor: Colors.white,
+                menuMaxHeight: 300,
+                hint: Text("Choose a patient"),
+                onChanged: (Patient? patient) {
+                  setState(() {
+                    _selectedPatient = patient;
+                    _recordings = null;
+                    _selectedRecording = null;
+                    _murmurAnalysis = null;
+                  });
+                  if (patient != null) {
+                    _loadRecordings(patient);
+                  }
+                },
+                items: _patients!.map((Patient patient) {
+                  return DropdownMenuItem<Patient>(
+                    value: patient,
+                    child: Padding(
+                      padding: const EdgeInsets.symmetric(vertical: 4),
+                      child: Text(
+                        patient.fullName,
+                        style: TextStyle(color: AppTheme.textPrimary),
+                      ),
+                    ),
+                  );
+                }).toList(),
+              ),
             ),
           ],
         ),
@@ -553,30 +594,68 @@ class _MurmurChartState extends State<MurmurChart> {
     );
   }
 
+  // --- Updated Recordings List with refined ListTiles ---
   Widget _buildRecordingsList() {
     if (_recordings == null) {
-      return const Center(child: CircularProgressIndicator());
+      return Center(
+          child: CircularProgressIndicator(
+        color: AppTheme.primaryColor,
+      ));
     }
-
     if (_recordings!.isEmpty) {
-      return const Center(
+      return Center(
         child: Padding(
-          padding: EdgeInsets.all(16.0),
-          child: Text("No recordings found for this patient"),
+          padding: const EdgeInsets.all(16.0),
+          child: Text(
+            "No recordings found for this patient",
+            style: TextStyle(color: AppTheme.textPrimary),
+          ),
         ),
       );
     }
-
     return ListView.builder(
       itemCount: _recordings!.length,
-      padding: const EdgeInsets.all(16),
+      padding: const EdgeInsets.symmetric(vertical: 8),
       itemBuilder: (context, index) {
         final recording = _recordings![index];
+        final isSelected = _selectedRecording == recording;
+
         return Card(
+          margin: const EdgeInsets.symmetric(vertical: 6, horizontal: 2),
+          elevation: isSelected ? 3 : 1,
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(12),
+            side: BorderSide(
+              color: isSelected ? AppTheme.primaryColor : Colors.transparent,
+              width: 1.5,
+            ),
+          ),
           child: ListTile(
-            leading: const Icon(Icons.audio_file),
-            title: Text("Recording ${index + 1}"),
-            subtitle: Text(recording.timestamp.toString()),
+            contentPadding:
+                const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+            leading: Container(
+              padding: const EdgeInsets.all(8),
+              decoration: BoxDecoration(
+                color: AppTheme.secondaryColor,
+                borderRadius: BorderRadius.circular(8),
+              ),
+              child: Icon(
+                Icons.audio_file,
+                color: AppTheme.primaryColor,
+                size: 24,
+              ),
+            ),
+            title: Text(
+              "Recording ${index + 1}",
+              style: TextStyle(
+                color: AppTheme.textPrimary,
+                fontWeight: isSelected ? FontWeight.bold : FontWeight.normal,
+              ),
+            ),
+            subtitle: Text(
+              recording.timestamp.toString(),
+              style: TextStyle(color: AppTheme.textLight),
+            ),
             trailing: Row(
               mainAxisSize: MainAxisSize.min,
               children: [
@@ -585,11 +664,15 @@ class _MurmurChartState extends State<MurmurChart> {
                     _isPlaying && _selectedRecording == recording
                         ? Icons.pause
                         : Icons.play_arrow,
+                    color: AppTheme.primaryColor,
                   ),
                   onPressed: () => _playRecording(recording),
                 ),
                 IconButton(
-                  icon: const Icon(Icons.analytics_outlined),
+                  icon: Icon(
+                    Icons.analytics_outlined,
+                    color: AppTheme.accentColor,
+                  ),
                   onPressed: () {
                     setState(() {
                       _selectedRecording = recording;
@@ -606,6 +689,7 @@ class _MurmurChartState extends State<MurmurChart> {
     );
   }
 
+  // --- Updated Playback Controls with Lottie Animation ---
   Widget _buildPlaybackControls() {
     String formatTime(Duration duration) {
       String twoDigits(int n) => n.toString().padLeft(2, '0');
@@ -616,8 +700,10 @@ class _MurmurChartState extends State<MurmurChart> {
 
     return Container(
       padding: const EdgeInsets.all(16),
+      margin: const EdgeInsets.only(top: 16),
       decoration: BoxDecoration(
         color: Colors.white,
+        borderRadius: BorderRadius.circular(12),
         boxShadow: [
           BoxShadow(
             color: Colors.black.withAlpha(26),
@@ -631,7 +717,9 @@ class _MurmurChartState extends State<MurmurChart> {
           Slider(
             value: _position.inSeconds.toDouble(),
             min: 0,
-            max: _duration.inSeconds.toDouble(),
+            max: _duration.inSeconds.toDouble() > 0
+                ? _duration.inSeconds.toDouble()
+                : 1,
             onChanged: (value) async {
               final position = Duration(seconds: value.toInt());
               await _audioPlayer.seek(position);
