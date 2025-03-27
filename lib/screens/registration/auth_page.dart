@@ -161,7 +161,7 @@ class AuthPageState extends State<AuthPage> with SingleTickerProviderStateMixin 
                               child: Image.asset(
                                 'assets/images/respirhythm_logo.png',
                                 width: screenWidth * 0.95, // 85% of screen width
-                                height: screenWidth * 0.85, // Adjusted height ratio
+                                height: screenWidth * 0.95, // Adjusted height ratio
                                 fit: BoxFit.contain, // Preserve aspect ratio
                               ),
                             ),
