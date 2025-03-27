@@ -19,6 +19,8 @@ from imblearn.over_sampling import SMOTE, ADASYN
 import joblib
 from extract_features import extract_features
 # from xgboost import XGBClassifier
+import json
+from tensorflow_decision_forests.keras import RandomForestModel
 
 # Define standard valve prefixes
 VALVE_PREFIXES = ["AV", "MV", "PV", "TV"]  # Aortic, Mitral, Pulmonary, Tricuspid
@@ -150,6 +152,31 @@ def train_model(X, y, patient_ids, n_splits=5):
     search.fit(X_train, y_train, groups=patient_ids[train_mask])
     best_model = search.best_estimator_
     print(f"Best parameters: {search.best_params_}")
+
+    # Export scaler parameters and feature names to JSON
+    try:
+        scaler = best_model.named_steps['scaler']
+        feature_names = X.columns.tolist()
+        
+        with open("scaler_params.json", "w") as f:
+            json.dump({
+                "mean": scaler.mean_.tolist(),
+                "scale": scaler.scale_.tolist(),
+                "feature_names": feature_names
+            }, f)
+        print("Scaler metadata exported")
+        
+    except Exception as e:
+        print(f"Scaler export failed: {str(e)}")
+
+    try:
+        # Convert sklearn model to TF-DF model
+        tf_model = RandomForestModel(python_model=best_model.named_steps['classifier'])
+        tf_model.save("model.tflite")
+        print("Model converted to TFLite")
+        
+    except Exception as e:
+        print(f"TFLite conversion failed: {str(e)}")
     
     # Evaluate on holdout set
     y_pred = best_model.predict(X_test)

@@ -496,6 +496,7 @@ class _MurmurChartState extends State<MurmurChart> {
         color: AppTheme.primaryColor,
       ));
     }
+
     if (_patients!.isEmpty) {
       return Center(
         child: Padding(
@@ -507,72 +508,72 @@ class _MurmurChartState extends State<MurmurChart> {
         ),
       );
     }
+
     return Card(
-      margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-      shape: RoundedRectangleBorder(
-        borderRadius: BorderRadius.circular(16),
-      ),
+      margin: const EdgeInsets.all(16),
       elevation: 2,
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.circular(12),
+      ),
       child: Container(
+        padding: const EdgeInsets.all(16),
         decoration: BoxDecoration(
           gradient: LinearGradient(
             colors: [AppTheme.secondaryColor, Colors.white],
             begin: Alignment.topLeft,
             end: Alignment.bottomRight,
           ),
-          borderRadius: BorderRadius.circular(16),
+          borderRadius: BorderRadius.circular(12),
         ),
-        padding: const EdgeInsets.all(16),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             Text(
               "Select Patient",
               style: TextStyle(
-                fontSize: 18,
+                fontSize: 16,
                 fontWeight: FontWeight.bold,
-                color: AppTheme.primaryColor,
+                color: AppTheme.textPrimary,
               ),
             ),
             const SizedBox(height: 12),
             Container(
               decoration: BoxDecoration(
                 color: Colors.white,
-                borderRadius: BorderRadius.circular(12),
+                borderRadius: BorderRadius.circular(8),
                 border:
                     Border.all(color: AppTheme.primaryColor.withOpacity(0.2)),
               ),
               child: DropdownButtonFormField<Patient>(
                 value: _selectedPatient,
                 decoration: InputDecoration(
+                  contentPadding:
+                      const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
                   border: OutlineInputBorder(
-                    borderRadius: BorderRadius.circular(12),
+                    borderRadius: BorderRadius.circular(8),
                     borderSide: BorderSide.none,
                   ),
-                  contentPadding:
-                      const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
                   filled: true,
                   fillColor: Colors.white,
-                  hintStyle: TextStyle(color: AppTheme.textLight),
+                ),
+                hint: Text(
+                  "Choose a patient",
+                  style: TextStyle(color: AppTheme.textLight),
                 ),
                 icon: Icon(Icons.arrow_drop_down, color: AppTheme.primaryColor),
-                style: TextStyle(
-                  color: AppTheme.textPrimary,
-                  fontSize: 16,
-                ),
+                isExpanded: true,
                 dropdownColor: Colors.white,
                 menuMaxHeight: 300,
-                hint: Text("Choose a patient"),
-                onChanged: (Patient? patient) {
-                  setState(() {
-                    _selectedPatient = patient;
-                    _recordings = null;
-                    _selectedRecording = null;
-                    _murmurAnalysis = null;
-                  });
-                  if (patient != null) {
-                    _loadRecordings(patient);
-                  }
+                selectedItemBuilder: (BuildContext context) {
+                  return _patients!.map<Widget>((Patient patient) {
+                    return Container(
+                      alignment: Alignment.centerLeft,
+                      child: Text(
+                        patient.fullName,
+                        style: TextStyle(color: AppTheme.textPrimary),
+                      ),
+                    );
+                  }).toList();
                 },
                 items: _patients!.map((Patient patient) {
                   return DropdownMenuItem<Patient>(
@@ -586,6 +587,17 @@ class _MurmurChartState extends State<MurmurChart> {
                     ),
                   );
                 }).toList(),
+                onChanged: (Patient? patient) {
+                  setState(() {
+                    _selectedPatient = patient;
+                    _recordings = null;
+                    _selectedRecording = null;
+                    _murmurAnalysis = null;
+                  });
+                  if (patient != null) {
+                    _loadRecordings(patient);
+                  }
+                },
               ),
             ),
           ],
