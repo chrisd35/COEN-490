@@ -349,16 +349,36 @@ class Recording {
   final String filename;
   final int duration;
   final int sampleRate;
-  final dynamic peakAmplitude;
+  final int bitsPerSample;
+  final int channels;
+  dynamic peakAmplitude;
   String? downloadUrl;
+  
+  // Heart murmur detection properties
+  double murmurProbability = 0.0;
+  String murmurType = 'None';
+  String murmurGrade = 'N/A';
+  bool isSystolicMurmur = false;
+  bool isDiastolicMurmur = false;
+  double dominantFrequency = 0.0;
+  double signalToNoiseRatio = 0.0;
 
   Recording({
     required this.timestamp,
     required this.filename,
     required this.duration,
     required this.sampleRate,
+    this.bitsPerSample = 16,
+    this.channels = 1,
     required this.peakAmplitude,
     this.downloadUrl,
+    this.murmurProbability = 0.0,
+    this.murmurType = 'None',
+    this.murmurGrade = 'N/A',
+    this.isSystolicMurmur = false,
+    this.isDiastolicMurmur = false,
+    this.dominantFrequency = 0.0,
+    this.signalToNoiseRatio = 0.0,
   });
 
   Map<String, dynamic> toMap() {
@@ -367,20 +387,102 @@ class Recording {
       'filename': filename,
       'duration': duration,
       'sampleRate': sampleRate,
+      'bitsPerSample': bitsPerSample,
+      'channels': channels,
       'peakAmplitude': peakAmplitude,
+      'downloadUrl': downloadUrl,
+      'murmurProbability': murmurProbability,
+      'murmurType': murmurType,
+      'murmurGrade': murmurGrade,
+      'isSystolicMurmur': isSystolicMurmur,
+      'isDiastolicMurmur': isDiastolicMurmur,
+      'dominantFrequency': dominantFrequency,
+      'signalToNoiseRatio': signalToNoiseRatio,
     };
   }
 
   factory Recording.fromMap(Map<dynamic, dynamic> data) {
+    // Handle peak amplitude
     var amplitude = data['peakAmplitude'];
-    double peakAmplitude = (amplitude is int) ? amplitude.toDouble() : amplitude;
+    double peakAmplitude = 0.0;
+    if (amplitude is int) {
+      peakAmplitude = amplitude.toDouble();
+    } else if (amplitude is double) {
+      peakAmplitude = amplitude;
+    }
+    
+    // Helper function to safely extract numeric values
+    double safeDouble(dynamic value) {
+      if (value == null) return 0.0;
+      if (value is int) return value.toDouble();
+      if (value is double) return value;
+      return 0.0;
+    }
+    
+    // Helper function to safely extract boolean values
+    bool safeBool(dynamic value) {
+      if (value == null) return false;
+      if (value is bool) return value;
+      if (value is String) return value.toLowerCase() == 'true';
+      return false;
+    }
     
     return Recording(
       timestamp: DateTime.parse(data['timestamp']),
       filename: data['filename'],
-      duration: data['duration'],
-      sampleRate: data['sampleRate'],
+      duration: data['duration'] ?? 0,
+      sampleRate: data['sampleRate'] ?? 2000,
+      bitsPerSample: data['bitsPerSample'] ?? 16,
+      channels: data['channels'] ?? 1,
       peakAmplitude: peakAmplitude,
+      downloadUrl: data['downloadUrl'],
+      // Heart murmur properties with safe type handling
+      murmurProbability: safeDouble(data['murmurProbability']),
+      murmurType: data['murmurType'] as String? ?? 'None',
+      murmurGrade: data['murmurGrade'] as String? ?? 'N/A',
+      isSystolicMurmur: safeBool(data['isSystolicMurmur']),
+      isDiastolicMurmur: safeBool(data['isDiastolicMurmur']),
+      dominantFrequency: safeDouble(data['dominantFrequency']),
+      signalToNoiseRatio: safeDouble(data['signalToNoiseRatio']),
     );
+  }
+  
+  // Helper for displaying murmur info
+  String getMurmurDescription() {
+    if (murmurProbability < 0.3) {
+      return 'No significant murmur detected';
+    }
+    
+    String timing = '';
+    if (isSystolicMurmur && isDiastolicMurmur) {
+      timing = 'Continuous';
+    } else if (isSystolicMurmur) {
+      timing = 'Systolic';
+    } else if (isDiastolicMurmur) {
+      timing = 'Diastolic';
+    }
+    
+    return '$timing $murmurType ($murmurGrade)';
+  }
+  
+  // Helper to check if this recording has murmur data
+  bool get hasMurmurData {
+    return murmurProbability > 0.0 || murmurType != 'None';
+  }
+  
+  // Helper to get murmur probability as a percentage string
+  String get murmurProbabilityPercentage {
+    return '${(murmurProbability * 100).toStringAsFixed(1)}%';
+  }
+  
+  // Helper to get color based on murmur severity
+  int getColorForMurmur() {
+    if (murmurProbability < 0.3) {
+      return 0xFF4CAF50; // Green
+    } else if (murmurProbability < 0.6) {
+      return 0xFFFFA726; // Orange
+    } else {
+      return 0xFFF44336; // Red
+    }
   }
 }

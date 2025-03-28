@@ -12,8 +12,6 @@ import '../../../utils/navigation_service.dart';
 import '../../../utils/app_routes.dart';
 import '../../../widgets/back_button.dart';
 
-
-
 class MurmurRecord extends StatefulWidget {
   final String? preselectedPatientId;
 
@@ -26,7 +24,6 @@ class MurmurRecord extends StatefulWidget {
   State<MurmurRecord> createState() => MurmurRecordState();
 }
 
-// Changed from private to public state class
 class MurmurRecordState extends State<MurmurRecord> {
   final AudioPlayer _audioPlayer = AudioPlayer();
   final FirebaseService _firebaseService = FirebaseService();
@@ -35,9 +32,19 @@ class MurmurRecordState extends State<MurmurRecord> {
   bool _isPlaying = false;
   bool _cameFromPatientDetails = false;
   List<int>? _recordedAudioData;
-  // Removed _bufferSize as it wasn't being used
   Duration _recordingDuration = Duration.zero;
   Timer? _recordingTimer;
+  
+  // Heart murmur analysis state
+  double _murmurProbability = 0.0;
+  String _murmurType = 'None';
+  double _dominantFrequency = 0.0;
+  bool _isSystolic = false;
+  bool _isDiastolic = false;
+  String _murmurGrade = 'N/A';
+  
+  // UI display settings
+  bool _showAdvancedAnalysis = false;
 
   @override
   void initState() {
@@ -108,6 +115,12 @@ class MurmurRecordState extends State<MurmurRecord> {
           _isRecording = true;
           _hasRecordingCompleted = false;
           _recordingDuration = Duration.zero;
+          _murmurProbability = 0.0;
+          _murmurType = 'None';
+          _dominantFrequency = 0.0;
+          _murmurGrade = 'N/A';
+          _isSystolic = false;
+          _isDiastolic = false;
         });
 
         _startBufferSizeMonitoring();
@@ -140,64 +153,115 @@ class MurmurRecordState extends State<MurmurRecord> {
   void _startBufferSizeMonitoring() {
     Stream.periodic(const Duration(milliseconds: 100)).listen((_) {
       if (_isRecording && mounted) {
-        setState(() {
-          // We're just monitoring buffer state, no need to store it in a field
-        });
+        final bleManager = Provider.of<BLEManager>(context, listen: false);
+        // Update murmur probability in real-time if available
+        if (bleManager.murmurProbability > 0) {
+          setState(() {
+            _murmurProbability = bleManager.murmurProbability;
+            _murmurType = bleManager.murmurType;
+            _dominantFrequency = bleManager.dominantFrequency;
+            _isSystolic = bleManager.isSystolicMurmur;
+            _isDiastolic = bleManager.isDiastolicMurmur;
+            
+            // Calculate murmur grade based on probability
+            if (_murmurProbability < 0.3) {
+              _murmurGrade = 'N/A';
+            } else if (_murmurProbability < 0.5) {
+              _murmurGrade = 'Grade I';
+            } else if (_murmurProbability < 0.7) {
+              _murmurGrade = 'Grade II';
+            } else if (_murmurProbability < 0.85) {
+              _murmurGrade = 'Grade III';
+            } else {
+              _murmurGrade = 'Grade IV+';
+            }
+          });
+        }
       }
     });
   }
 
-void _stopRecording() async {
-  final bleManager = Provider.of<BLEManager>(context, listen: false);
-  try {
-    _recordingTimer?.cancel();
+  void _stopRecording() async {
+    final bleManager = Provider.of<BLEManager>(context, listen: false);
+    try {
+      _recordingTimer?.cancel();
 
-    // Show processing indicator
-    if (mounted) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text("Processing audio..."),
-          duration: Duration(seconds: 10),
-        ),
-      );
-    }
-
-    // Get recording result
-    var result = await bleManager.stopRecording();
-    List<int> rawAudio = result['audioData']; // Extract audio data from map
-
-    if (rawAudio.isEmpty) {
+      // Show processing indicator
       if (mounted) {
-        _showErrorSnackBar("No audio data recorded");
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text("Processing heart sound data..."),
+            duration: Duration(seconds: 10),
+          ),
+        );
       }
-      return;
-    }
 
-    if (mounted) {
-      // Dismiss the processing snackbar
-      ScaffoldMessenger.of(context).hideCurrentSnackBar();
-      
-      setState(() {
-        _isRecording = false;
-        _hasRecordingCompleted = true;
-        _recordedAudioData = rawAudio;
-      });
-      
-      // Show success message
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text("Recording complete"),
-          backgroundColor: Colors.green,
-          duration: Duration(seconds: 2),
-        ),
-      );
+      // Get recording result
+      var result = await bleManager.stopRecording();
+      List<int> rawAudio = result['audioData']; // Extract audio data from map
+      Map<String, dynamic> metadata = result['metadata'];
+
+      if (rawAudio.isEmpty) {
+        if (mounted) {
+          _showErrorSnackBar("No audio data recorded");
+        }
+        return;
+      }
+
+      if (mounted) {
+        // Dismiss the processing snackbar
+        ScaffoldMessenger.of(context).hideCurrentSnackBar();
+        
+        setState(() {
+          _isRecording = false;
+          _hasRecordingCompleted = true;
+          _recordedAudioData = rawAudio;
+          
+          // Update murmur analysis from metadata
+          _murmurProbability = metadata['murmurProbability'] ?? 0.0;
+          _murmurType = metadata['murmurType'] ?? 'None';
+          _dominantFrequency = metadata['dominantFrequency'] ?? 0.0;
+          _isSystolic = metadata['isSystolicMurmur'] ?? false;
+          _isDiastolic = metadata['isDiastolicMurmur'] ?? false;
+          
+          // Calculate murmur grade based on probability
+          if (_murmurProbability < 0.3) {
+            _murmurGrade = 'N/A';
+          } else if (_murmurProbability < 0.5) {
+            _murmurGrade = 'Grade I';
+          } else if (_murmurProbability < 0.7) {
+            _murmurGrade = 'Grade II';
+          } else if (_murmurProbability < 0.85) {
+            _murmurGrade = 'Grade III';
+          } else {
+            _murmurGrade = 'Grade IV+';
+          }
+        });
+        
+        // Show success message with murmur information
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(
+              _murmurProbability > 0.3 
+                ? "Heart sound recording complete. Potential ${_murmurType.toLowerCase()} detected."
+                : "Heart sound recording complete. No significant murmur detected."
+            ),
+            backgroundColor: _murmurProbability > 0.3 ? Colors.orange : Colors.green,
+            duration: const Duration(seconds: 3),
+          ),
+        );
+      }
+    } catch (e) {
+      if (mounted) {
+        _showErrorSnackBar("Error processing recording: $e");
+        setState(() {
+          _isRecording = false;
+        });
+      }
     }
-  } catch (e) {
-    /* error handling */
   }
-}
   
-   Future<void> _playPreviewRecording() async {
+  Future<void> _playPreviewRecording() async {
     if (_recordedAudioData == null) return;
 
     try {
@@ -210,7 +274,7 @@ void _stopRecording() async {
         // Convert the processed audio data to WAV format 
         final wavData = _firebaseService.createWavFile(
           _recordedAudioData!,
-          sampleRate: BLEManager.sampleRate, // Updated to 16kHz
+          sampleRate: BLEManager.sampleRate, // Using updated sample rate (2000 Hz)
           bitsPerSample: 16,
           channels: 1,
         );
@@ -281,7 +345,7 @@ void _stopRecording() async {
         context: context,
         builder: (dialogContext) { // Use dialogContext to avoid context references
           return AlertDialog(
-            title: const Text('Save Recording'),
+            title: const Text('Save Heart Sound Recording'),
             content: Column(
               mainAxisSize: MainAxisSize.min,
               children: [
@@ -422,7 +486,7 @@ void _stopRecording() async {
   if (!mounted) return;
   
   // Show loading dialog
-  await _showLoadingDialog("Saving recording...");
+  await _showLoadingDialog("Saving heart sound recording...");
   
   // Check if still mounted after dialog is shown
   if (!mounted) return;
@@ -441,7 +505,12 @@ void _stopRecording() async {
         'peakAmplitude': bleManager.peakAmplitude,
         'processingApplied': true,
         'signalToNoiseRatio': bleManager.signalToNoiseRatio,
-  
+        'murmurProbability': _murmurProbability,
+        'murmurType': _murmurType,
+        'dominantFrequency': _dominantFrequency,
+        'isSystolicMurmur': _isSystolic,
+        'isDiastolicMurmur': _isDiastolic,
+        'murmurGrade': _murmurGrade,
       },
     );
 
@@ -457,13 +526,15 @@ void _stopRecording() async {
       
       if (!mounted) return;
       
-      _showSuccessSnackBar("Recording saved successfully");
+      _showSuccessSnackBar("Heart sound recording saved successfully");
       
       if (!mounted) return;
       
       setState(() {
         _hasRecordingCompleted = false;
         _recordedAudioData = null;
+        _murmurProbability = 0.0;
+        _murmurType = 'None';
       });
     } catch (e) {
       // Check if still mounted before using context
@@ -625,12 +696,12 @@ void _stopRecording() async {
                 return FlSpot(entry.key.toDouble(), entry.value);
               }).toList(),
               isCurved: true,
-              color: Colors.blue[700],
+              color: _getMurmurColor(),
               barWidth: 2,
               dotData: FlDotData(show: false),
               belowBarData: BarAreaData(
                 show: true,
-                color: Colors.blue[700]!.withAlpha(26), // Using withAlpha instead of withOpacity
+                color: _getMurmurColor().withAlpha(26),
               ),
             ),
           ],
@@ -639,6 +710,17 @@ void _stopRecording() async {
         ),
       ),
     );
+  }
+  
+  // Get appropriate color based on murmur probability
+  Color _getMurmurColor() {
+    if (_murmurProbability < 0.3) {
+      return Colors.blue[700]!;
+    } else if (_murmurProbability < 0.6) {
+      return Colors.orange;
+    } else {
+      return Colors.red;
+    }
   }
 
   Widget _buildRecordingStatus() {
@@ -669,6 +751,178 @@ void _stopRecording() async {
       ],
     );
   }
+  
+  // Build murmur analysis card (shown after recording)
+  Widget _buildMurmurAnalysisCard() {
+    if (!_hasRecordingCompleted || _murmurProbability < 0.01) {
+      return const SizedBox.shrink();
+    }
+    
+    return Card(
+      margin: const EdgeInsets.all(16),
+      elevation: 4,
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.circular(12),
+      ),
+      child: Padding(
+        padding: const EdgeInsets.all(16),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              children: [
+                Text(
+                  'Heart Sound Analysis',
+                  style: TextStyle(
+                    fontSize: 18,
+                    fontWeight: FontWeight.bold,
+                    color: Colors.grey[800],
+                  ),
+                ),
+                IconButton(
+                  icon: Icon(_showAdvancedAnalysis ? Icons.expand_less : Icons.expand_more),
+                  onPressed: () {
+                    setState(() {
+                      _showAdvancedAnalysis = !_showAdvancedAnalysis;
+                    });
+                  },
+                ),
+              ],
+            ),
+            const SizedBox(height: 8),
+            Row(
+              children: [
+                Text(
+                  'Murmur detected: ',
+                  style: TextStyle(
+                    fontSize: 16,
+                    color: Colors.grey[800],
+                  ),
+                ),
+                Text(
+                  _murmurProbability > 0.3 ? 'Yes' : 'No',
+                  style: TextStyle(
+                    fontSize: 16,
+                    fontWeight: FontWeight.bold,
+                    color: _murmurProbability > 0.3 ? Colors.red : Colors.green,
+                  ),
+                ),
+              ],
+            ),
+            if (_murmurProbability > 0.3) ... [
+              const SizedBox(height: 8),
+              Row(
+                children: [
+                  Text(
+                    'Type: ',
+                    style: TextStyle(
+                      fontSize: 16,
+                      color: Colors.grey[800],
+                    ),
+                  ),
+                  Text(
+                    _murmurType,
+                    style: const TextStyle(
+                      fontSize: 16,
+                      fontWeight: FontWeight.bold,
+                    ),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 8),
+              Row(
+                children: [
+                  Text(
+                    'Grade: ',
+                    style: TextStyle(
+                      fontSize: 16,
+                      color: Colors.grey[800],
+                    ),
+                  ),
+                  Text(
+                    _murmurGrade,
+                    style: TextStyle(
+                      fontSize: 16,
+                      fontWeight: FontWeight.bold,
+                      color: _murmurGrade.contains('III') || _murmurGrade.contains('IV') 
+                          ? Colors.red 
+                          : Colors.orange,
+                    ),
+                  ),
+                ],
+              ),
+              if (_showAdvancedAnalysis) ... [
+                const SizedBox(height: 8),
+                Row(
+                  children: [
+                    Text(
+                      'Systolic: ',
+                      style: TextStyle(
+                        fontSize: 16,
+                        color: Colors.grey[800],
+                      ),
+                    ),
+                    Icon(
+                      _isSystolic ? Icons.check_circle : Icons.cancel,
+                      color: _isSystolic ? Colors.green : Colors.grey,
+                      size: 20,
+                    ),
+                    const SizedBox(width: 16),
+                    Text(
+                      'Diastolic: ',
+                      style: TextStyle(
+                        fontSize: 16,
+                        color: Colors.grey[800],
+                      ),
+                    ),
+                    Icon(
+                      _isDiastolic ? Icons.check_circle : Icons.cancel,
+                      color: _isDiastolic ? Colors.green : Colors.grey,
+                      size: 20,
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 8),
+                Row(
+                  children: [
+                    Text(
+                      'Dominant Frequency: ',
+                      style: TextStyle(
+                        fontSize: 16,
+                        color: Colors.grey[800],
+                      ),
+                    ),
+                    Text(
+                      '${_dominantFrequency.toStringAsFixed(1)} Hz',
+                      style: const TextStyle(
+                        fontSize: 16,
+                        fontWeight: FontWeight.bold,
+                      ),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 8),
+                LinearProgressIndicator(
+                  value: _murmurProbability,
+                  backgroundColor: Colors.grey[200],
+                  valueColor: AlwaysStoppedAnimation<Color>(_getMurmurColor()),
+                ),
+                const SizedBox(height: 4),
+                Text(
+                  'Confidence: ${(_murmurProbability * 100).toStringAsFixed(1)}%',
+                  style: TextStyle(
+                    fontSize: 14,
+                    color: Colors.grey[600],
+                  ),
+                ),
+              ],
+            ],
+          ],
+        ),
+      ),
+    );
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -678,8 +932,8 @@ void _stopRecording() async {
         appBar: AppBar(
           title: Text(
             widget.preselectedPatientId != null 
-                ? "Record Patient Murmur"
-                : "Murmur Analysis",
+                ? "Record Heart Sounds"
+                : "Heart Murmur Analysis",
             style: const TextStyle(
               fontWeight: FontWeight.w600,
               color: Colors.black87,
@@ -709,7 +963,7 @@ void _stopRecording() async {
                   ),
                   boxShadow: [
                     BoxShadow(
-                      color: Colors.black.withAlpha(13), // Using withAlpha instead of withOpacity
+                      color: Colors.black.withAlpha(13),
                       blurRadius: 10,
                       offset: const Offset(0, 5),
                     ),
@@ -727,6 +981,7 @@ void _stopRecording() async {
                   },
                 ),
               ),
+              if (_hasRecordingCompleted) _buildMurmurAnalysisCard(),
               Expanded(
                 child: Center(
                   child: AnimatedSwitcher(
@@ -763,7 +1018,7 @@ void _stopRecording() async {
           height: 120,
           decoration: BoxDecoration(
             shape: BoxShape.circle,
-            color: Colors.red.withAlpha(26), // Using withAlpha instead of withOpacity (0.1)
+            color: Colors.red.withAlpha(26),
           ),
           child: Center(
             child: Container(
@@ -783,18 +1038,32 @@ void _stopRecording() async {
         ),
         const SizedBox(height: 24),
         Text(
-          "Recording in progress...",
+          "Recording heart sounds...",
           style: TextStyle(
             fontSize: 18,
             color: Colors.grey[800],
             fontWeight: FontWeight.w500,
           ),
         ),
+        if (_murmurProbability > 0.3) ... [
+          const SizedBox(height: 12),
+          Text(
+            "Potential murmur detected: ${_murmurType}",
+            style: TextStyle(
+              fontSize: 16,
+              color: _getMurmurColor(),
+              fontWeight: FontWeight.w500,
+            ),
+          ),
+        ],
       ],
     );
   }
 
   Widget _buildRecordingCompleteContent() {
+    Color statusColor = _murmurProbability > 0.3 ? Colors.orange : Colors.green;
+    IconData statusIcon = _murmurProbability > 0.3 ? Icons.warning_amber_rounded : Icons.check_circle_outline;
+    
     return Column(
       mainAxisSize: MainAxisSize.min,
       children: [
@@ -803,17 +1072,19 @@ void _stopRecording() async {
           height: 120,
           decoration: BoxDecoration(
             shape: BoxShape.circle,
-            color: Colors.green.withAlpha(26), // Using withAlpha instead of withOpacity
+            color: statusColor.withAlpha(26),
           ),
-          child: const Icon(
-            Icons.check_circle_outline,
-            color: Colors.green,
+          child: Icon(
+            statusIcon,
+            color: statusColor,
             size: 60,
           ),
         ),
         const SizedBox(height: 24),
         Text(
-          "Recording completed!",
+          _murmurProbability > 0.3 
+              ? "Potential murmur detected"
+              : "Recording completed!",
           style: TextStyle(
             fontSize: 18,
             color: Colors.grey[800],
@@ -850,7 +1121,7 @@ void _stopRecording() async {
           height: 120,
           decoration: BoxDecoration(
             shape: BoxShape.circle,
-            color: Colors.blue[700]!.withAlpha(26), // Using withAlpha instead of withOpacity
+            color: Colors.blue[700]!.withAlpha(26),
           ),
           child: Icon(
             Icons.mic_none,
@@ -860,10 +1131,18 @@ void _stopRecording() async {
         ),
         const SizedBox(height: 24),
         Text(
-          "Tap the button below to start recording",
+          "Tap the button below to start recording heart sounds",
           style: TextStyle(
             fontSize: 16,
             color: Colors.grey[600],
+          ),
+        ),
+        const SizedBox(height: 12),
+        Text(
+          "Make sure the stethoscope is placed properly",
+          style: TextStyle(
+            fontSize: 14,
+            color: Colors.grey[500],
           ),
         ),
       ],
@@ -892,6 +1171,8 @@ void _stopRecording() async {
                 _hasRecordingCompleted = false;
                 _recordedAudioData = null;
                 _isPlaying = false;
+                _murmurProbability = 0.0;
+                _murmurType = 'None';
               });
             },
             backgroundColor: Colors.red,

@@ -326,179 +326,248 @@ class FirebaseService {
   }
 
   Future<void> saveRecording(
-    String uid,
-    String medicalCardNumber,
-    DateTime timestamp,
-    List<int> audioData,
-    Map<String, dynamic> metadata,
-  ) async {
-    try {
-      String sanitizedMedicalCard = medicalCardNumber.replaceAll('/', '_');
-
-      _logger.info(
-          "Starting saveRecording with ${audioData.length} bytes of audio");
-      _logger.info("Metadata: $metadata");
-
-      // Add debug point 1
-      _logger.info("DEBUG 1: Preparing to create WAV file");
-
-      // Create WAV file with proper header
-      final wavData = createWavFile(
-        audioData,
-        sampleRate: metadata['sampleRate'] ?? 4000, // Default to 4kHz
-        bitsPerSample: metadata['bitsPerSample'] ?? 16,
-        channels: metadata['channels'] ?? 1,
-      );
-
-      // Add debug point 2
-      _logger.info("DEBUG 2: WAV file created with ${wavData.length} bytes");
-
-      // Generate filename
-      String filename =
-          'users/$uid/patients/$sanitizedMedicalCard/recordings/${timestamp.millisecondsSinceEpoch}.wav';
-      _logger.info("DEBUG 3: Saving to path: $filename");
-
-      // Add debug point 3
-      try {
-        // Upload to Firebase Storage with additional metadata
-        await _storage.ref(filename).putData(
-              Uint8List.fromList(wavData),
-              SettableMetadata(
-                contentType: 'audio/wav',
-                customMetadata: {
-                  'sampleRate': (metadata['sampleRate'] ?? 4000).toString(),
-                  'duration': metadata['duration'].toString(),
-                  'bitsPerSample': (metadata['bitsPerSample'] ?? 16).toString(),
-                  'channels': (metadata['channels'] ?? 1).toString(),
-                  'processingApplied': 'true',
-                  'processingDetails':
-                      'bandpass,median,adaptiveGain,noiseReduction,normalization',
-                },
-              ),
-            );
-        _logger.info("DEBUG 4: Successfully uploaded audio to storage");
-      } catch (e) {
-        _logger.severe("DEBUG ERROR STORAGE: Error in storage upload: $e");
-        rethrow;
-      }
-
-      // Add debug point 4
-      try {
-        // Save metadata to Realtime Database
-        await _database
-            .child('users')
-            .child(uid)
-            .child('patients')
-            .child(sanitizedMedicalCard)
-            .child('recordings')
-            .push()
-            .set({
-          'timestamp': timestamp.toIso8601String(),
-          'filename': filename,
-          'duration': metadata['duration'],
-          'sampleRate': metadata['sampleRate'] ?? 4000,
-          'bitsPerSample': metadata['bitsPerSample'] ?? 16,
-          'channels': metadata['channels'] ?? 1,
-          'peakAmplitude': metadata['peakAmplitude'],
-          'processingApplied': true,
-          'processingDetails':
-              'bandpass,median,adaptiveGain,noiseReduction,normalization',
-        });
-        _logger.info("DEBUG 5: Recording metadata saved to database");
-      } catch (e) {
-        _logger.severe("DEBUG ERROR DATABASE: Error in database save: $e");
-        rethrow;
-      }
-    } catch (e) {
-      _logger.severe('Error saving recording: $e');
-      rethrow;
-    }
-  }
-
-  List<int> createWavFile(
-    List<int> audioData, {
-    int sampleRate = 4000, // Updated default to 16kHz
-    int bitsPerSample = 16,
-    int channels = 1,
-  }) {
-    final int byteRate = sampleRate * channels * (bitsPerSample ~/ 8);
-    final int blockAlign = channels * (bitsPerSample ~/ 8);
+  String uid,
+  String medicalCardNumber,
+  DateTime timestamp,
+  List<int> audioData,
+  Map<String, dynamic> metadata,
+) async {
+  try {
+    String sanitizedMedicalCard = medicalCardNumber.replaceAll('/', '_');
 
     _logger.info(
-        "Creating WAV with: Sample rate: $sampleRate Hz, Bits: $bitsPerSample, Channels: $channels");
+        "Starting saveRecording with ${audioData.length} bytes of audio");
+    _logger.info("Metadata: $metadata");
 
-    ByteData header = ByteData(44);
+    // Add debug point 1
+    _logger.info("DEBUG 1: Preparing to create WAV file");
 
-    // RIFF header
-    header.setUint32(0, 0x52494646, Endian.big); // "RIFF"
-    header.setUint32(4, 36 + audioData.length, Endian.little); // File size
-    header.setUint32(8, 0x57415645, Endian.big); // "WAVE"
+    // Create WAV file with proper header
+    final wavData = createWavFile(
+      audioData,
+      sampleRate: metadata['sampleRate'] ?? 2000, // Default to 2kHz for heart sounds
+      bitsPerSample: metadata['bitsPerSample'] ?? 16,
+      channels: metadata['channels'] ?? 1,
+    );
 
-    // Format chunk
-    header.setUint32(12, 0x666D7420, Endian.big); // "fmt "
-    header.setUint32(16, 16, Endian.little); // Format chunk size
-    header.setUint16(20, 1, Endian.little); // PCM format
-    header.setUint16(22, channels, Endian.little); // Channels
-    header.setUint32(24, sampleRate, Endian.little); // Sample rate
-    header.setUint32(28, byteRate, Endian.little); // Byte rate
-    header.setUint16(32, blockAlign, Endian.little); // Block align
-    header.setUint16(34, bitsPerSample, Endian.little); // Bits per sample
+    // Add debug point 2
+    _logger.info("DEBUG 2: WAV file created with ${wavData.length} bytes");
 
-    // Data chunk
-    header.setUint32(36, 0x64617461, Endian.big); // "data"
-    header.setUint32(40, audioData.length, Endian.little); // Data size
+    // Generate filename
+    String filename =
+        'users/$uid/patients/$sanitizedMedicalCard/recordings/${timestamp.millisecondsSinceEpoch}.wav';
+    _logger.info("DEBUG 3: Saving to path: $filename");
 
-    _logger
-        .info("WAV header created for ${audioData.length} bytes of audio data");
-
-    return [...header.buffer.asUint8List(), ...audioData];
-  }
-
-  Future<List<Recording>> getRecordingsForPatient(
-      String uid, String medicalCardNumber) async {
+    // Add debug point 3
     try {
-      String sanitizedMedicalCard = medicalCardNumber.replaceAll('/', '_');
+      // Extract murmur-related metadata
+      Map<String, String> customMetadata = {
+        'sampleRate': (metadata['sampleRate'] ?? 2000).toString(),
+        'duration': metadata['duration'].toString(),
+        'bitsPerSample': (metadata['bitsPerSample'] ?? 16).toString(),
+        'channels': (metadata['channels'] ?? 1).toString(),
+        'processingApplied': 'true',
+        'processingDetails': 'bandpass,heartSoundOptimized',
+      };
+      
+      // Add heart murmur metadata if available
+      if (metadata.containsKey('murmurProbability')) {
+        customMetadata['murmurProbability'] = metadata['murmurProbability'].toString();
+      }
+      if (metadata.containsKey('murmurType')) {
+        customMetadata['murmurType'] = metadata['murmurType'];
+      }
+      if (metadata.containsKey('dominantFrequency')) {
+        customMetadata['dominantFrequency'] = metadata['dominantFrequency'].toString();
+      }
+      if (metadata.containsKey('isSystolicMurmur')) {
+        customMetadata['isSystolicMurmur'] = metadata['isSystolicMurmur'].toString();
+      }
+      if (metadata.containsKey('isDiastolicMurmur')) {
+        customMetadata['isDiastolicMurmur'] = metadata['isDiastolicMurmur'].toString();
+      }
+      if (metadata.containsKey('murmurGrade')) {
+        customMetadata['murmurGrade'] = metadata['murmurGrade'];
+      }
+      
+      // Upload to Firebase Storage with murmur-related metadata
+      await _storage.ref(filename).putData(
+            Uint8List.fromList(wavData),
+            SettableMetadata(
+              contentType: 'audio/wav',
+              customMetadata: customMetadata,
+            ),
+          );
+      _logger.info("DEBUG 4: Successfully uploaded audio to storage");
+    } catch (e) {
+      _logger.severe("DEBUG ERROR STORAGE: Error in storage upload: $e");
+      rethrow;
+    }
 
-      DataSnapshot snapshot = await _database
+    // Add debug point 4
+    try {
+      // Create base recording data
+      Map<String, dynamic> recordingData = {
+        'timestamp': timestamp.toIso8601String(),
+        'filename': filename,
+        'duration': metadata['duration'],
+        'sampleRate': metadata['sampleRate'] ?? 2000,
+        'bitsPerSample': metadata['bitsPerSample'] ?? 16,
+        'channels': metadata['channels'] ?? 1,
+        'peakAmplitude': metadata['peakAmplitude'],
+        'processingApplied': true,
+        'processingDetails': 'bandpass,heartSoundOptimized',
+      };
+      
+      // Add heart murmur data if available
+      if (metadata.containsKey('murmurProbability')) {
+        recordingData['murmurProbability'] = metadata['murmurProbability'];
+      }
+      if (metadata.containsKey('murmurType')) {
+        recordingData['murmurType'] = metadata['murmurType'];
+      }
+      if (metadata.containsKey('dominantFrequency')) {
+        recordingData['dominantFrequency'] = metadata['dominantFrequency'];
+      }
+      if (metadata.containsKey('isSystolicMurmur')) {
+        recordingData['isSystolicMurmur'] = metadata['isSystolicMurmur'];
+      }
+      if (metadata.containsKey('isDiastolicMurmur')) {
+        recordingData['isDiastolicMurmur'] = metadata['isDiastolicMurmur'];
+      }
+      if (metadata.containsKey('murmurGrade')) {
+        recordingData['murmurGrade'] = metadata['murmurGrade'];
+      }
+      if (metadata.containsKey('signalToNoiseRatio')) {
+        recordingData['signalToNoiseRatio'] = metadata['signalToNoiseRatio'];
+      }
+      
+      // Save metadata including murmur data to Realtime Database
+      await _database
           .child('users')
           .child(uid)
           .child('patients')
           .child(sanitizedMedicalCard)
           .child('recordings')
-          .get();
-
-      if (!snapshot.exists || snapshot.value == null) {
-        return [];
-      }
-
-      Map<dynamic, dynamic> recordingsMap =
-          snapshot.value as Map<dynamic, dynamic>;
-      List<Recording> recordings = [];
-
-      for (var entry in recordingsMap.entries) {
-        Map<dynamic, dynamic> recordingData =
-            entry.value as Map<dynamic, dynamic>;
-        Recording recording = Recording.fromMap(recordingData);
-
-        try {
-          String downloadUrl =
-              await _storage.ref(recording.filename).getDownloadURL();
-          recording.downloadUrl = downloadUrl;
-          recordings.add(recording);
-        } catch (e) {
-          _logger.warning(
-              'Error getting download URL for recording ${recording.filename}: $e');
-          continue;
-        }
-      }
-
-      recordings.sort((a, b) => b.timestamp.compareTo(a.timestamp));
-      return recordings;
+          .push()
+          .set(recordingData);
+      _logger.info("DEBUG 5: Recording metadata saved to database");
     } catch (e) {
-      _logger.severe('Error fetching recordings: $e');
+      _logger.severe("DEBUG ERROR DATABASE: Error in database save: $e");
       rethrow;
     }
+  } catch (e) {
+    _logger.severe('Error saving recording: $e');
+    rethrow;
   }
+}
+
+  List<int> createWavFile(
+  List<int> audioData, {
+  int sampleRate = 2000, // Updated default to 2kHz for heart sounds
+  int bitsPerSample = 16,
+  int channels = 1,
+}) {
+  final int byteRate = sampleRate * channels * (bitsPerSample ~/ 8);
+  final int blockAlign = channels * (bitsPerSample ~/ 8);
+
+  _logger.info(
+      "Creating WAV with: Sample rate: $sampleRate Hz, Bits: $bitsPerSample, Channels: $channels");
+
+  ByteData header = ByteData(44);
+
+  // RIFF header
+  header.setUint32(0, 0x52494646, Endian.big); // "RIFF"
+  header.setUint32(4, 36 + audioData.length, Endian.little); // File size
+  header.setUint32(8, 0x57415645, Endian.big); // "WAVE"
+
+  // Format chunk
+  header.setUint32(12, 0x666D7420, Endian.big); // "fmt "
+  header.setUint32(16, 16, Endian.little); // Format chunk size
+  header.setUint16(20, 1, Endian.little); // PCM format
+  header.setUint16(22, channels, Endian.little); // Channels
+  header.setUint32(24, sampleRate, Endian.little); // Sample rate
+  header.setUint32(28, byteRate, Endian.little); // Byte rate
+  header.setUint16(32, blockAlign, Endian.little); // Block align
+  header.setUint16(34, bitsPerSample, Endian.little); // Bits per sample
+
+  // Data chunk
+  header.setUint32(36, 0x64617461, Endian.big); // "data"
+  header.setUint32(40, audioData.length, Endian.little); // Data size
+
+  _logger
+      .info("WAV header created for ${audioData.length} bytes of audio data");
+
+  return [...header.buffer.asUint8List(), ...audioData];
+}
+
+  Future<List<Recording>> getRecordingsForPatient(
+    String uid, String medicalCardNumber) async {
+  try {
+    String sanitizedMedicalCard = medicalCardNumber.replaceAll('/', '_');
+
+    DataSnapshot snapshot = await _database
+        .child('users')
+        .child(uid)
+        .child('patients')
+        .child(sanitizedMedicalCard)
+        .child('recordings')
+        .get();
+
+    if (!snapshot.exists || snapshot.value == null) {
+      return [];
+    }
+
+    Map<dynamic, dynamic> recordingsMap =
+        snapshot.value as Map<dynamic, dynamic>;
+    List<Recording> recordings = [];
+
+    for (var entry in recordingsMap.entries) {
+      Map<dynamic, dynamic> recordingData =
+          entry.value as Map<dynamic, dynamic>;
+      
+      // Create recording with base data
+      Recording recording = Recording.fromMap(recordingData);
+      
+      // Add heart murmur data if available
+      if (recordingData.containsKey('murmurProbability')) {
+        recording.murmurProbability = recordingData['murmurProbability'] as double;
+      }
+      if (recordingData.containsKey('murmurType')) {
+        recording.murmurType = recordingData['murmurType'] as String;
+      }
+      if (recordingData.containsKey('murmurGrade')) {
+        recording.murmurGrade = recordingData['murmurGrade'] as String;
+      }
+      if (recordingData.containsKey('isSystolicMurmur')) {
+        recording.isSystolicMurmur = recordingData['isSystolicMurmur'] as bool;
+      }
+      if (recordingData.containsKey('isDiastolicMurmur')) {
+        recording.isDiastolicMurmur = recordingData['isDiastolicMurmur'] as bool;
+      }
+      if (recordingData.containsKey('dominantFrequency')) {
+        recording.dominantFrequency = recordingData['dominantFrequency'] as double;
+      }
+
+      try {
+        String downloadUrl =
+            await _storage.ref(recording.filename).getDownloadURL();
+        recording.downloadUrl = downloadUrl;
+        recordings.add(recording);
+      } catch (e) {
+        _logger.warning(
+            'Error getting download URL for recording ${recording.filename}: $e');
+        continue;
+      }
+    }
+
+    recordings.sort((a, b) => b.timestamp.compareTo(a.timestamp));
+    return recordings;
+  } catch (e) {
+    _logger.severe('Error fetching recordings: $e');
+    rethrow;
+  }
+}
 
   Future<void> savePulseOxSession(
     String uid,
