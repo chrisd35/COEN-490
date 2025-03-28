@@ -417,7 +417,7 @@ class FirebaseService {
 
   List<int> createWavFile(
     List<int> audioData, {
-    int sampleRate = 16000, // Updated default to 16kHz
+    int sampleRate = 4000, // Updated default to 16kHz
     int bitsPerSample = 16,
     int channels = 1,
   }) {

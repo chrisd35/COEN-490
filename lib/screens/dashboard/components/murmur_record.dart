@@ -147,7 +147,7 @@ class MurmurRecordState extends State<MurmurRecord> {
     });
   }
 
- void _stopRecording() async {
+void _stopRecording() async {
   final bleManager = Provider.of<BLEManager>(context, listen: false);
   try {
     _recordingTimer?.cancel();
@@ -162,11 +162,11 @@ class MurmurRecordState extends State<MurmurRecord> {
       );
     }
 
-    // Get recording result (CHANGED FROM ORIGINAL)
+    // Get recording result
     var result = await bleManager.stopRecording();
-    List<int> processedAudio = result['audioData']; // Extract audio data from map
+    List<int> rawAudio = result['audioData']; // Extract audio data from map
 
-    if (processedAudio.isEmpty) {
+    if (rawAudio.isEmpty) {
       if (mounted) {
         _showErrorSnackBar("No audio data recorded");
       }
@@ -180,13 +180,13 @@ class MurmurRecordState extends State<MurmurRecord> {
       setState(() {
         _isRecording = false;
         _hasRecordingCompleted = true;
-        _recordedAudioData = processedAudio;
+        _recordedAudioData = rawAudio;
       });
       
       // Show success message
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(
-          content: Text("Recording processed successfully"),
+          content: Text("Recording complete"),
           backgroundColor: Colors.green,
           duration: Duration(seconds: 2),
         ),
@@ -441,7 +441,7 @@ class MurmurRecordState extends State<MurmurRecord> {
         'peakAmplitude': bleManager.peakAmplitude,
         'processingApplied': true,
         'signalToNoiseRatio': bleManager.signalToNoiseRatio,
-        'recordingQuality': bleManager.recordingQuality,
+  
       },
     );
 
