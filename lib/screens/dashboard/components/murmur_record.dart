@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'dart:math' as math;
 import 'dart:typed_data';
 import 'package:coen_490/screens/registration/auth_service.dart';
 import 'package:flutter/material.dart';
@@ -11,6 +12,9 @@ import '/utils/models.dart';
 import '../../../utils/navigation_service.dart';
 import '../../../utils/app_routes.dart';
 import '../../../widgets/back_button.dart';
+import 'package:logging/logging.dart' as logging;
+
+final _logger = logging.Logger('AccountProfilePage');
 
 class MurmurRecord extends StatefulWidget {
   final String? preselectedPatientId;
@@ -34,6 +38,7 @@ class MurmurRecordState extends State<MurmurRecord> {
   List<int>? _recordedAudioData;
   Duration _recordingDuration = Duration.zero;
   Timer? _recordingTimer;
+  double _playbackVolume = 1.0; // Add this line
   
   // Heart murmur analysis state
   double _murmurProbability = 0.0;
@@ -45,6 +50,9 @@ class MurmurRecordState extends State<MurmurRecord> {
   
   // UI display settings
   bool _showAdvancedAnalysis = false;
+
+  bool _debugModeEnabled = false;
+bool _playingRawAudio = false;
 
   @override
   void initState() {
@@ -100,6 +108,24 @@ class MurmurRecordState extends State<MurmurRecord> {
       NavigationService.goBack();
     }
   }
+
+ 
+
+
+
+// Add this helper method to show info snackbars
+void _showInfoSnackBar(String message) {
+  if (!mounted) return;
+  
+  ScaffoldMessenger.of(context).showSnackBar(
+    SnackBar(
+      content: Text(message),
+      backgroundColor: Colors.blue,
+      behavior: SnackBarBehavior.fixed,
+      duration: const Duration(seconds: 2),
+    ),
+  );
+}
   
   void _startRecording() async {
     if (!mounted) return;
@@ -261,36 +287,61 @@ class MurmurRecordState extends State<MurmurRecord> {
     }
   }
   
-  Future<void> _playPreviewRecording() async {
-    if (_recordedAudioData == null) return;
+Future<void> _playPreviewRecording() async {
+  if (_recordedAudioData == null) return;
 
-    try {
-      if (_isPlaying) {
-        await _audioPlayer.pause();
-        setState(() {
-          _isPlaying = false;
-        });
-      } else {
-        // Convert the processed audio data to WAV format 
-        final wavData = _firebaseService.createWavFile(
-          _recordedAudioData!,
-          sampleRate: BLEManager.sampleRate, // Using updated sample rate (2000 Hz)
-          bitsPerSample: 16,
-          channels: 1,
-        );
+  try {
+    if (_isPlaying) {
+      await _audioPlayer.pause();
+      setState(() {
+        _isPlaying = false;
+      });
+    } else {
+      // Get a copy of the audio data
+      List<int> audioDataCopy = List.from(_recordedAudioData!);
+      
+      // Apply enhanced amplification that targets heartbeats
+      List<int> enhancedAudio = _firebaseService.enhanceHeartbeatWithAmplification(
+        audioDataCopy,
+        sampleRate: BLEManager.sampleRate,
+        threshold: 0.07,         // Make this lower to catch fainter beats
+        beatGain: 15.0,           // Strong emphasis on beats
+        overallGain: 7.0,        // Overall amplification
+        noiseSuppression: 0.1    // Suppress quieter parts more (lower = more suppression)
+      );
+      
+      // Create WAV with enhanced audio
+      final wavData = _firebaseService.createRawWavFile(
+        enhancedAudio,
+        sampleRate: BLEManager.sampleRate,
+        bitsPerSample: 16,
+        channels: 1
+      );
 
-        // Create a temporary file or use in-memory playback
-        await _audioPlayer.play(
-          BytesSource(Uint8List.fromList(wavData)),
-        );
-        setState(() {
-          _isPlaying = true;
-        });
-      }
-    } catch (e) {
-      _showErrorSnackBar("Failed to play recording: $e");
+      // Play the enhanced audio
+      await _audioPlayer.play(
+        BytesSource(Uint8List.fromList(wavData)),
+      );
+      
+      // Set volume to maximum for best effect
+      await _audioPlayer.setVolume(1.0);
+      
+      setState(() {
+        _isPlaying = true;
+        _playbackVolume = 1.0;  // Update the UI slider
+      });
+      
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text("Playing amplified heart sounds"),
+          duration: Duration(seconds: 3),
+        ),
+      );
     }
+  } catch (e) {
+    _showErrorSnackBar("Failed to play recording: $e");
   }
+}
 
   void _showSaveRecordingDialog() async {
     if (!mounted) return;
@@ -475,13 +526,15 @@ class MurmurRecordState extends State<MurmurRecord> {
     );
   }
 
- Future<void> _saveRecordingToPatient(String uid, String patientId) async {
+Future<void> _saveRecordingToPatient(String uid, String patientId) async {
   if (_recordedAudioData == null || !mounted) return;
   
   // Get data before showing dialog
   final bleManager = Provider.of<BLEManager>(context, listen: false);
   final roundedDuration = ((_recordingDuration.inMilliseconds + 500) / 1000).floor();
-  final audioData = List<int>.from(_recordedAudioData!);
+  
+  // Get a copy of the audio data - use raw data without processing
+  List<int> audioDataCopy = List.from(_recordedAudioData!);
   
   if (!mounted) return;
   
@@ -496,14 +549,14 @@ class MurmurRecordState extends State<MurmurRecord> {
       uid,
       patientId,
       DateTime.now(),
-      audioData,
+      audioDataCopy, // Use the raw audio data
       {
         'duration': roundedDuration,
         'sampleRate': BLEManager.sampleRate, 
         'bitsPerSample': BLEManager.bitsPerSample,
         'channels': BLEManager.channels,
         'peakAmplitude': bleManager.peakAmplitude,
-        'processingApplied': true,
+        'processingApplied': false, // Set to false for raw audio
         'signalToNoiseRatio': bleManager.signalToNoiseRatio,
         'murmurProbability': _murmurProbability,
         'murmurType': _murmurType,
@@ -511,46 +564,157 @@ class MurmurRecordState extends State<MurmurRecord> {
         'isSystolicMurmur': _isSystolic,
         'isDiastolicMurmur': _isDiastolic,
         'murmurGrade': _murmurGrade,
+        'audioProcessing': {
+          'isRawAudio': true,
+          'noProcessingApplied': true,
+        },
       },
     );
 
-      // Check if still mounted before proceeding
-      if (!mounted) return;
+    // Check if still mounted before proceeding
+    if (!mounted) return;
+    
+    // Close loading dialog
+    try {
+      Navigator.of(context).pop();
+    } catch (_) {
+      // Dialog may have been dismissed already, ignore errors
+    }
+    
+    if (!mounted) return;
+    
+    _showSuccessSnackBar("Raw heart sound recording saved successfully");
+    
+    if (!mounted) return;
+    
+    setState(() {
+      _hasRecordingCompleted = false;
+      _recordedAudioData = null;
+      _murmurProbability = 0.0;
+      _murmurType = 'None';
+    });
+  } catch (e) {
+    // Check if still mounted before using context
+    if (!mounted) return;
+    
+    // Try to dismiss the dialog
+    try {
+      Navigator.of(context).pop();
+    } catch (_) {
+      // Dialog may have been dismissed already, ignore errors
+    }
+    
+    if (!mounted) return;
+    _showErrorSnackBar("Failed to save recording: $e");
+  }
+}
+
+// Add this debugging function to your MurmurRecordState class
+void _debugAudioData() {
+  if (_recordedAudioData == null || _recordedAudioData!.isEmpty) {
+    _logger.info("No audio data to debug");
+    return;
+  }
+  
+  _logger.info("Debugging audio data:");
+  _logger.info("Total bytes: ${_recordedAudioData!.length}");
+  
+  // Check if data is all zeros or very small values
+  bool allZeros = true;
+  bool allSmall = true;
+  int nonZeroCount = 0;
+  
+  for (int i = 0; i < math.min(1000, _recordedAudioData!.length); i++) {
+    if (_recordedAudioData![i] != 0) {
+      allZeros = false;
+      nonZeroCount++;
       
-      // Close loading dialog
-      try {
-        Navigator.of(context).pop();
-      } catch (_) {
-        // Dialog may have been dismissed already, ignore errors
+      if (_recordedAudioData![i] > 10 || _recordedAudioData![i] < -10) {
+        allSmall = false;
       }
-      
-      if (!mounted) return;
-      
-      _showSuccessSnackBar("Heart sound recording saved successfully");
-      
-      if (!mounted) return;
-      
-      setState(() {
-        _hasRecordingCompleted = false;
-        _recordedAudioData = null;
-        _murmurProbability = 0.0;
-        _murmurType = 'None';
-      });
-    } catch (e) {
-      // Check if still mounted before using context
-      if (!mounted) return;
-      
-      // Try to dismiss the dialog
-      try {
-        Navigator.of(context).pop();
-      } catch (_) {
-        // Dialog may have been dismissed already, ignore errors
-      }
-      
-      if (!mounted) return;
-      _showErrorSnackBar("Failed to save recording: $e");
     }
   }
+  
+  _logger.info("First 1000 bytes check - All zeros: $allZeros, All small values: $allSmall, Non-zero count: $nonZeroCount");
+  
+  // Check sample distribution if we have enough samples
+  if (_recordedAudioData!.length >= 100) {
+    ByteData byteData = ByteData(_recordedAudioData!.length);
+    for (int i = 0; i < _recordedAudioData!.length; i++) {
+      byteData.setUint8(i, _recordedAudioData![i]);
+    }
+    
+    List<int> sampleValues = [];
+    for (int i = 0; i < math.min(100, _recordedAudioData!.length ~/ 2); i++) {
+      if (2*i + 1 < _recordedAudioData!.length) {
+        int sample = byteData.getInt16(2*i, Endian.little);
+        sampleValues.add(sample);
+      }
+    }
+    
+    _logger.info("First 50 samples (16-bit): $sampleValues");
+    
+    // Calculate distribution metrics
+    if (sampleValues.isNotEmpty) {
+      sampleValues.sort();
+      int minValue = sampleValues.first;
+      int maxValue = sampleValues.last;
+      int medianValue = sampleValues[sampleValues.length ~/ 2];
+      
+      _logger.info("Sample distribution - Min: $minValue, Max: $maxValue, Median: $medianValue");
+      
+      // Check for flatlined audio
+      if (maxValue - minValue < 100) {
+        _logger.warning("POSSIBLE ISSUE: Audio has very little variation (nearly flat)");
+      }
+      
+      // Check for DC offset
+      double avgValue = sampleValues.reduce((a, b) => a + b) / sampleValues.length;
+      _logger.info("Average sample value: $avgValue");
+      
+      if (avgValue.abs() > 5000) {
+        _logger.warning("POSSIBLE ISSUE: Audio has significant DC offset");
+      }
+    }
+  }
+  
+  // Check for obvious patterns that might indicate data corruption
+  int patternRepeatCount = 0;
+  if (_recordedAudioData!.length >= 20) {
+    List<int> pattern = _recordedAudioData!.sublist(0, 10);
+    for (int i = 10; i < _recordedAudioData!.length - 10; i += 10) {
+      bool matches = true;
+      for (int j = 0; j < 10; j++) {
+        if (i + j < _recordedAudioData!.length && pattern[j] != _recordedAudioData![i + j]) {
+          matches = false;
+          break;
+        }
+      }
+      if (matches) patternRepeatCount++;
+    }
+    
+    if (patternRepeatCount > 5) {
+      _logger.warning("POSSIBLE ISSUE: Audio data shows repeating patterns, might be corrupted");
+      _logger.info("Repeating pattern count: $patternRepeatCount");
+    }
+  }
+}
+
+// Call this in _playPreviewRecording() before playing audio
+void _addDebugButton() {
+  ScaffoldMessenger.of(context).showSnackBar(
+    SnackBar(
+      content: const Text("Having audio issues? Try debugging"),
+      action: SnackBarAction(
+        label: "Debug Audio",
+        onPressed: () {
+          _debugAudioData();
+        },
+      ),
+      duration: const Duration(seconds: 5),
+    ),
+  );
+}
 
   void _showLoginPrompt() {
     if (!mounted) return;
@@ -682,6 +846,8 @@ class MurmurRecordState extends State<MurmurRecord> {
     super.dispose();
   }
 
+
+
   Widget _buildWaveform(BuildContext context, BLEManager bleManager) {
     return SizedBox(
       height: 120,
@@ -722,6 +888,309 @@ class MurmurRecordState extends State<MurmurRecord> {
       return Colors.red;
     }
   }
+Widget _buildMurmurVisualization() {
+  if (!_hasRecordingCompleted || _recordedAudioData == null || _recordedAudioData!.isEmpty) {
+    return const SizedBox.shrink();
+  }
+  
+  // Extract raw audio samples for visualization
+  List<int> rawSamples = [];
+  ByteData byteData = ByteData(_recordedAudioData!.length);
+  for (int i = 0; i < _recordedAudioData!.length; i++) {
+    byteData.setUint8(i, _recordedAudioData![i]);
+  }
+  
+  // Start at 100 samples in to avoid any header data
+  int startOffset = 100;
+  
+  // Take samples for visualization (max 2000 points)
+  int samplesCount = (_recordedAudioData!.length - startOffset) ~/ 2;
+  int step = samplesCount > 2000 ? samplesCount ~/ 2000 : 1;  // Manual max function
+  
+  // Debug the sample range to see actual values
+  List<int> sampleMinMax = [32767, -32768]; // [min, max]
+  
+  for (int i = 0; i < samplesCount; i++) {
+    int offset = startOffset + (i * 2);
+    if (offset + 1 < _recordedAudioData!.length) {
+      int sampleInt = byteData.getInt16(offset, Endian.little);
+      rawSamples.add(sampleInt);
+      
+      // Track min/max for debug
+      if (sampleInt < sampleMinMax[0]) sampleMinMax[0] = sampleInt;
+      if (sampleInt > sampleMinMax[1]) sampleMinMax[1] = sampleInt;
+    }
+  }
+  
+  // Print debug info
+  _logger.info("Waveform debug: Sample range [${sampleMinMax[0]}, ${sampleMinMax[1]}]");
+  _logger.info("Waveform debug: First 10 raw samples: ${rawSamples.take(10).toList()}");
+  
+  // Calculate DC offset (average value)
+  double sum = 0;
+  for (int sample in rawSamples) {
+    sum += sample;
+  }
+  double dcOffset = sum / rawSamples.length;
+  
+  // Build raw, DC corrected, and heart sound emphasized waveforms
+  List<FlSpot> rawWaveformSpots = [];
+  List<FlSpot> correctedWaveformSpots = [];
+  List<FlSpot> emphasizedWaveformSpots = [];
+  
+  // Sampling for display
+  int displayStep = rawSamples.length > 300 ? rawSamples.length ~/ 300 : 1;  // Manual max function
+  
+  // Calculate min/max after DC removal for proper scaling
+  double minCentered = 0;
+  double maxCentered = 0;
+  
+  List<double> centeredSamples = [];
+  for (int i = 0; i < rawSamples.length; i++) {
+    double centered = rawSamples[i] - dcOffset;
+    centeredSamples.add(centered);
+    
+    if (centered < minCentered) minCentered = centered;
+    if (centered > maxCentered) maxCentered = centered;
+  }
+  
+  // Apply a simple bandpass filter to emphasize heart sounds (can be improved with FFT)
+  List<double> emphasizedSamples = List.from(centeredSamples);
+  for (int i = 2; i < emphasizedSamples.length - 2; i++) {
+    // Simple 5-point weighted average acts like a band-pass filter
+    emphasizedSamples[i] = 
+        (centeredSamples[i-2] * -0.05 +
+         centeredSamples[i-1] * 0.1 + 
+         centeredSamples[i] * 0.7 + 
+         centeredSamples[i+1] * 0.1 + 
+         centeredSamples[i+2] * -0.05) * 2.0; // Amplify by 2x
+  }
+  
+  // Manual abs function
+  double absMin = minCentered < 0 ? -minCentered : minCentered;
+  double absMax = maxCentered < 0 ? -maxCentered : maxCentered;
+  // Manual max function
+  double maxAbsValue = absMin > absMax ? absMin : absMax;
+  
+  // Create display spots
+  for (int i = 0; i < rawSamples.length; i += displayStep) {
+    // Original raw samples
+    double normalizedRaw = rawSamples[i] / 32768.0;
+    rawWaveformSpots.add(FlSpot(i.toDouble(), normalizedRaw));
+    
+    // DC offset corrected samples
+    double yVal = centeredSamples[i] / maxAbsValue;
+    yVal = yVal.clamp(-1.0, 1.0);
+    correctedWaveformSpots.add(FlSpot(i.toDouble(), yVal));
+    
+    // Emphasized heart sound samples
+    double emphasizedY = emphasizedSamples[i] / maxAbsValue;
+    emphasizedY = emphasizedY.clamp(-1.0, 1.0);
+    emphasizedWaveformSpots.add(FlSpot(i.toDouble(), emphasizedY));
+  }
+  
+  return Column(
+    children: [
+      Padding(
+        padding: const EdgeInsets.symmetric(horizontal: 16.0),
+        child: Text(
+          "Raw Waveform",
+          style: TextStyle(
+            fontSize: 16, 
+            fontWeight: FontWeight.bold,
+            color: Colors.grey[800],
+          ),
+        ),
+      ),
+      Text(
+        "Sample range: ${sampleMinMax[0]} to ${sampleMinMax[1]}, DC offset: ${dcOffset.toStringAsFixed(1)}",
+        style: TextStyle(
+          fontSize: 12,
+          color: Colors.grey[600],
+        ),
+      ),
+      const SizedBox(height: 8),
+      Container(
+        height: 120,
+        padding: const EdgeInsets.symmetric(horizontal: 8.0),
+        child: LineChart(
+          LineChartData(
+            gridData: FlGridData(show: true),
+            titlesData: FlTitlesData(
+              bottomTitles: AxisTitles(
+                sideTitles: SideTitles(
+                  showTitles: false,
+                ),
+              ),
+              leftTitles: AxisTitles(
+                sideTitles: SideTitles(
+                  showTitles: false,
+                ),
+              ),
+              topTitles: AxisTitles(
+                sideTitles: SideTitles(
+                  showTitles: false,
+                ),
+              ),
+              rightTitles: AxisTitles(
+                sideTitles: SideTitles(
+                  showTitles: false,
+                ),
+              ),
+            ),
+            borderData: FlBorderData(show: true),
+            lineBarsData: [
+              LineChartBarData(
+                spots: rawWaveformSpots,
+                isCurved: false,
+                color: Colors.grey,
+                barWidth: 1,
+                dotData: const FlDotData(show: false),
+              ),
+            ],
+            minY: -1,
+            maxY: 1,
+          ),
+        ),
+      ),
+      const SizedBox(height: 16),
+      Padding(
+        padding: const EdgeInsets.symmetric(horizontal: 16.0),
+        child: Text(
+          "DC Offset Corrected Waveform",
+          style: TextStyle(
+            fontSize: 16, 
+            fontWeight: FontWeight.bold,
+            color: Colors.grey[800],
+          ),
+        ),
+      ),
+      Text(
+        "Shows heart sound patterns after removing DC offset",
+        style: TextStyle(
+          fontSize: 12,
+          color: Colors.grey[600],
+        ),
+      ),
+      const SizedBox(height: 8),
+      Container(
+        height: 120,
+        padding: const EdgeInsets.symmetric(horizontal: 8.0),
+        child: LineChart(
+          LineChartData(
+            gridData: FlGridData(show: true),
+            titlesData: FlTitlesData(
+              bottomTitles: AxisTitles(
+                sideTitles: SideTitles(
+                  showTitles: false,
+                ),
+              ),
+              leftTitles: AxisTitles(
+                sideTitles: SideTitles(
+                  showTitles: false,
+                ),
+              ),
+              topTitles: AxisTitles(
+                sideTitles: SideTitles(
+                  showTitles: false,
+                ),
+              ),
+              rightTitles: AxisTitles(
+                sideTitles: SideTitles(
+                  showTitles: false,
+                ),
+              ),
+            ),
+            borderData: FlBorderData(show: true),
+            lineBarsData: [
+              LineChartBarData(
+                spots: correctedWaveformSpots,
+                isCurved: false,
+                color: Colors.blue[700],
+                barWidth: 1,
+                dotData: const FlDotData(show: false),
+              ),
+            ],
+            minY: -1,
+            maxY: 1,
+          ),
+        ),
+      ),
+      const SizedBox(height: 16),
+      Padding(
+        padding: const EdgeInsets.symmetric(horizontal: 16.0),
+        child: Text(
+          "Heart Sound Enhanced",
+          style: TextStyle(
+            fontSize: 16, 
+            fontWeight: FontWeight.bold,
+            color: Colors.grey[800],
+          ),
+        ),
+      ),
+      Text(
+        "Filtered for more prominent heart sounds",
+        style: TextStyle(
+          fontSize: 12,
+          color: Colors.grey[600],
+        ),
+      ),
+      const SizedBox(height: 8),
+      Container(
+        height: 120,
+        padding: const EdgeInsets.symmetric(horizontal: 8.0),
+        child: LineChart(
+          LineChartData(
+            gridData: FlGridData(show: true),
+            titlesData: FlTitlesData(
+              bottomTitles: AxisTitles(
+                sideTitles: SideTitles(
+                  showTitles: false,
+                ),
+              ),
+              leftTitles: AxisTitles(
+                sideTitles: SideTitles(
+                  showTitles: false,
+                ),
+              ),
+              topTitles: AxisTitles(
+                sideTitles: SideTitles(
+                  showTitles: false,
+                ),
+              ),
+              rightTitles: AxisTitles(
+                sideTitles: SideTitles(
+                  showTitles: false,
+                ),
+              ),
+            ),
+            borderData: FlBorderData(show: true),
+            lineBarsData: [
+              LineChartBarData(
+                spots: emphasizedWaveformSpots,
+                isCurved: false,
+                color: Colors.red[700],
+                barWidth: 1,
+                dotData: const FlDotData(show: false),
+              ),
+            ],
+            minY: -1,
+            maxY: 1,
+          ),
+        ),
+      ),
+      const SizedBox(height: 16),
+      Text(
+        "The sine wave pattern you see is your heartbeat! Look for repeating patterns in the middle graph.",
+        textAlign: TextAlign.center,
+        style: TextStyle(
+          fontSize: 14,
+          color: Colors.grey[700],
+        ),
+      ),
+    ],
+  );
+}
 
   Widget _buildRecordingStatus() {
     return Column(
@@ -948,6 +1417,7 @@ class MurmurRecordState extends State<MurmurRecord> {
               _handleBackButton();
             },
           ),
+           // Add the debug toggle in the actions area of the AppBar
         ),
         body: SafeArea(
           child: Column(
@@ -1060,11 +1530,12 @@ class MurmurRecordState extends State<MurmurRecord> {
     );
   }
 
-  Widget _buildRecordingCompleteContent() {
-    Color statusColor = _murmurProbability > 0.3 ? Colors.orange : Colors.green;
-    IconData statusIcon = _murmurProbability > 0.3 ? Icons.warning_amber_rounded : Icons.check_circle_outline;
-    
-    return Column(
+Widget _buildRecordingCompleteContent() {
+  Color statusColor = _murmurProbability > 0.3 ? Colors.orange : Colors.green;
+  IconData statusIcon = _murmurProbability > 0.3 ? Icons.warning_amber_rounded : Icons.check_circle_outline;
+  
+  return SingleChildScrollView(
+    child: Column(
       mainAxisSize: MainAxisSize.min,
       children: [
         Container(
@@ -1080,7 +1551,7 @@ class MurmurRecordState extends State<MurmurRecord> {
             size: 60,
           ),
         ),
-        const SizedBox(height: 24),
+        const SizedBox(height: 16),
         Text(
           _murmurProbability > 0.3 
               ? "Potential murmur detected"
@@ -1100,17 +1571,203 @@ class MurmurRecordState extends State<MurmurRecord> {
           ),
         ),
         const SizedBox(height: 16),
-        IconButton(
-          icon: Icon(
-            _isPlaying ? Icons.pause_circle : Icons.play_circle,
-            size: 48,
-            color: Colors.blue[700],
-          ),
-          onPressed: () => _playPreviewRecording(),
+        Row(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            Icon(Icons.volume_down, color: Colors.blue[700]),
+            Slider(
+              value: _playbackVolume,
+              min: 0.1,
+              max: 1.0,
+              divisions: 9,
+              onChanged: (value) {
+                setState(() {
+                  _playbackVolume = value;
+                });
+                if (_isPlaying) {
+                  _audioPlayer.setVolume(_playbackVolume);
+                }
+              },
+              activeColor: Colors.blue[700],
+            ),
+            Icon(Icons.volume_up, color: Colors.blue[700]),
+          ],
         ),
+        const SizedBox(height: 8),
+        // Regular playback button for processed audio
+        if (!_debugModeEnabled)
+          IconButton(
+            icon: Icon(
+              _isPlaying ? Icons.pause_circle : Icons.play_circle,
+              size: 48,
+              color: Colors.blue[700],
+            ),
+            onPressed: () => _playPreviewRecording(),
+          ),
+        
+        // Debug mode UI with both processed and raw audio options
+        if (_debugModeEnabled)
+          Row(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              Column(
+                children: [
+                  IconButton(
+                    icon: Icon(
+                      _isPlaying ? Icons.pause_circle : Icons.play_circle,
+                      size: 48,
+                      color: Colors.blue[700],
+                    ),
+                    onPressed: () => _playPreviewRecording(),
+                  ),
+                  Text(
+                    "Processed",
+                    style: TextStyle(fontSize: 12, color: Colors.grey[600]),
+                  ),
+                ],
+              ),
+              const SizedBox(width: 24),
+              Column(
+                children: [
+                  IconButton(
+  icon: Icon(
+    _isPlaying ? Icons.pause_circle : Icons.play_circle,
+    size: 48,
+    color: Colors.blue[700],
+  ),
+  onPressed: () => _playPreviewRecording(),
+),
+                  Text(
+                    "Raw Audio",
+                    style: TextStyle(fontSize: 12, color: Colors.grey[600]),
+                  ),
+                ],
+              ),
+            ],
+          ),
+          
+        // Debug Info Section
+        if (_debugModeEnabled)
+          Container(
+            margin: const EdgeInsets.symmetric(vertical: 16, horizontal: 8),
+            padding: const EdgeInsets.all(12),
+            decoration: BoxDecoration(
+              color: Colors.grey[100],
+              borderRadius: BorderRadius.circular(8),
+              border: Border.all(color: Colors.grey[400]!),
+            ),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  "Debug Information",
+                  style: TextStyle(
+                    fontWeight: FontWeight.bold,
+                    color: Colors.grey[800],
+                  ),
+                ),
+                const SizedBox(height: 8),
+                Text("Sample Range: ${_recordedAudioData != null ? _getSampleRange() : 'N/A'}"),
+                Text("Mean Value: ${_recordedAudioData != null ? _calculateMean().toStringAsFixed(1) : 'N/A'}"),
+                Text("DC Offset: ${_recordedAudioData != null ? _calculateDCOffset().toStringAsFixed(1) : 'N/A'}"),
+                Text("Signal Variation: ${_recordedAudioData != null ? _calculateSignalVariation().toStringAsFixed(1) : 'N/A'}"),
+                const SizedBox(height: 8),
+                Text(
+                  "Raw audio is the unprocessed signal directly from the MEMS microphone. "
+                  "It may contain DC offset and background noise.",
+                  style: TextStyle(
+                    fontSize: 12,
+                    fontStyle: FontStyle.italic,
+                    color: Colors.grey[600],
+                  ),
+                ),
+              ],
+            ),
+          ),
+        
+        const SizedBox(height: 16),
+        // Add visualization
+        _buildMurmurVisualization(),
       ],
-    );
+    ),
+  );
+}
+
+String _getSampleRange() {
+  if (_recordedAudioData == null || _recordedAudioData!.isEmpty) return "N/A";
+  
+  ByteData byteData = ByteData(_recordedAudioData!.length);
+  for (int i = 0; i < _recordedAudioData!.length; i++) {
+    byteData.setUint8(i, _recordedAudioData![i]);
   }
+  
+  int min = 32767;
+  int max = -32768;
+  
+  for (int i = 0; i < _recordedAudioData!.length; i += 2) {
+    if (i + 1 < _recordedAudioData!.length) {
+      int sample = byteData.getInt16(i, Endian.little);
+      if (sample < min) min = sample;
+      if (sample > max) max = sample;
+    }
+  }
+  
+  return "$min to $max";
+}
+
+double _calculateMean() {
+  if (_recordedAudioData == null || _recordedAudioData!.isEmpty) return 0.0;
+  
+  ByteData byteData = ByteData(_recordedAudioData!.length);
+  for (int i = 0; i < _recordedAudioData!.length; i++) {
+    byteData.setUint8(i, _recordedAudioData![i]);
+  }
+  
+  double sum = 0.0;
+  int count = 0;
+  
+  for (int i = 0; i < _recordedAudioData!.length; i += 2) {
+    if (i + 1 < _recordedAudioData!.length) {
+      int sample = byteData.getInt16(i, Endian.little);
+      sum += sample;
+      count++;
+    }
+  }
+  
+  return count > 0 ? sum / count : 0.0;
+}
+
+double _calculateDCOffset() {
+  return _calculateMean(); // DC offset is the mean value
+}
+
+double _calculateSignalVariation() {
+  if (_recordedAudioData == null || _recordedAudioData!.isEmpty) return 0.0;
+  
+  ByteData byteData = ByteData(_recordedAudioData!.length);
+  for (int i = 0; i < _recordedAudioData!.length; i++) {
+    byteData.setUint8(i, _recordedAudioData![i]);
+  }
+  
+  double mean = _calculateMean();
+  double sumSquaredDiffs = 0.0;
+  int count = 0;
+  
+  for (int i = 0; i < _recordedAudioData!.length; i += 2) {
+    if (i + 1 < _recordedAudioData!.length) {
+      int sample = byteData.getInt16(i, Endian.little);
+      double diff = sample - mean;
+      sumSquaredDiffs += diff * diff;
+      count++;
+    }
+  }
+  
+  return count > 0 ? math.sqrt(sumSquaredDiffs / count) : 0.0;
+}
+
+// Add this method to the MurmurRecordState to add a Debug Mode toggle
+
+
 
   Widget _buildInitialContent() {
     return Column(
