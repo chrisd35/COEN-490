@@ -304,9 +304,9 @@ Future<void> _playPreviewRecording() async {
       List<int> enhancedAudio = _firebaseService.enhanceHeartbeatWithAmplification(
         audioDataCopy,
         sampleRate: BLEManager.sampleRate,
-        threshold: 0.07,         // Make this lower to catch fainter beats
-        beatGain: 15.0,           // Strong emphasis on beats
-        overallGain: 7.0,        // Overall amplification
+        threshold: 0.06,         // Make this lower to catch fainter beats
+        beatGain: 300.0,           // Strong emphasis on beats
+        overallGain: 400.0,        // Overall amplification
         noiseSuppression: 0.1    // Suppress quieter parts more (lower = more suppression)
       );
       

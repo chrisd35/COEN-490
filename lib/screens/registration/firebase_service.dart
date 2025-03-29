@@ -315,10 +315,10 @@ class FirebaseService {
   int sampleRate = 1000,
   double attackTime = 0.01,       // 10ms attack
   double releaseTime = 0.2,       // 200ms release
-  double threshold = 0.07,        // Lower threshold to catch fainter beats
+  double threshold = 0.06,        // Lower threshold to catch fainter beats
   double noiseFloor = 0.02,       // Lower noise floor
-  double beatGain = 15.0,          // Higher gain for beats
-  double overallGain = 7.0,       // Overall amplification for everything
+  double beatGain = 300.0,          // Higher gain for beats
+  double overallGain = 400.0,       // Overall amplification for everything
   double noiseSuppression = 0.1   // How much to suppress noise (0-1, where 0 is no suppression)
 }) {
   if (audioData.isEmpty || audioData.length < 4) {
