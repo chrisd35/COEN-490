@@ -311,15 +311,14 @@ class FirebaseService {
     }
   }
 
-  List<int> enhanceHeartbeatWithAmplification(List<int> audioData, {
+ List<int> enhanceHeartbeatWithAmplification(List<int> audioData, {
   int sampleRate = 1000,
-  double attackTime = 0.01,       // 10ms attack
-  double releaseTime = 0.2,       // 200ms release
-  double threshold = 0.06,        // Lower threshold to catch fainter beats
-  double noiseFloor = 0.02,       // Lower noise floor
-  double beatGain = 300.0,          // Higher gain for beats
-  double overallGain = 400.0,       // Overall amplification for everything
-  double noiseSuppression = 0.1   // How much to suppress noise (0-1, where 0 is no suppression)
+  double threshold = 0.03,           // Lower to detect more potential heartbeats
+  double beatGain = 3000.0,          // Much higher to amplify detected heartbeats
+  double overallGain = 5.0,          // Lower to reduce overall volume (white noise)
+  double noiseSuppression = 0.001,   // More aggressive noise suppression
+  bool shiftFrequencies = false,     
+  double frequencyShift = 1.5       
 }) {
   if (audioData.isEmpty || audioData.length < 4) {
     return audioData;
@@ -335,110 +334,70 @@ class FirebaseService {
   for (int i = 0; i < audioData.length; i += 2) {
     if (i + 1 < audioData.length) {
       int sampleInt = byteData.getInt16(i, Endian.little);
-      // Normalize to -1.0 to 1.0
       double sample = sampleInt / 32768.0;
       samples.add(sample);
     }
   }
   
-  // Calculate DC offset
-  double sum = 0;
-  for (double sample in samples) {
-    sum += sample;
-  }
-  double dcOffset = sum / samples.length;
-  
-  // Remove DC offset
-  List<double> centeredSamples = [];
-  for (double sample in samples) {
-    centeredSamples.add(sample - dcOffset);
+  // Apply frequency shifting if enabled
+  List<double> processedSamples = List.from(samples);
+  if (shiftFrequencies) {
+    processedSamples = _shiftFrequencies(samples, frequencyShift, sampleRate);
   }
   
-  // Calculate envelope with different attack/release times
-  List<double> envelope = List.filled(centeredSamples.length, 0.0);
-  double attackCoef = math.exp(-1.0 / (sampleRate * attackTime));
-  double releaseCoef = math.exp(-1.0 / (sampleRate * releaseTime));
+  // Calculate envelope to detect beats
+  List<double> envelope = _calculateEnvelope(processedSamples, sampleRate);
   
-  for (int i = 0; i < centeredSamples.length; i++) {
-    double absValue = centeredSamples[i].abs();
-    
-    if (i > 0) {
-      if (absValue > envelope[i-1]) {
-        // Attack phase - quick rise
-        envelope[i] = attackCoef * envelope[i-1] + (1 - attackCoef) * absValue;
-      } else {
-        // Release phase - slow fall
-        envelope[i] = releaseCoef * envelope[i-1] + (1 - releaseCoef) * absValue;
-      }
-    } else {
-      envelope[i] = absValue;
-    }
-  }
-  
-  // Find the average envelope level and peak
-  double envelopeSum = 0;
-  double peakEnvelope = 0;
+  // Find the average and peak envelope
+  double avgEnvelope = 0.0;
+  double peakEnvelope = 0.0;
   for (double value in envelope) {
-    envelopeSum += value;
+    avgEnvelope += value;
     if (value > peakEnvelope) peakEnvelope = value;
   }
-  double avgEnvelope = envelopeSum / envelope.length;
+  avgEnvelope /= envelope.length;
   
-  // Set dynamic threshold based on average level
-  double dynamicThreshold = avgEnvelope * threshold;
-  if (dynamicThreshold < noiseFloor) dynamicThreshold = noiseFloor;
+  // Set dynamic threshold
+  double dynamicThreshold = math.max(avgEnvelope * threshold, 0.003); // Lower floor
   
-  // Apply two-stage amplification:
-  // 1. First apply overall gain to everything
-  // 2. Then apply additional gain to detected heartbeats
-  List<double> enhancedSamples = List.filled(centeredSamples.length, 0.0);
+  // First apply overall gain - REDUCED to lower white noise
+  List<double> amplifiedSamples = [];
+  for (double sample in processedSamples) {
+    amplifiedSamples.add(sample * overallGain);
+  }
   
-  for (int i = 0; i < centeredSamples.length; i++) {
-    // Start with overall amplification
-    double amplifiedSample = centeredSamples[i] * overallGain;
-    
-    // Calculate additional gain factor for heart beats
+  // Then apply beat-specific gain on top - INCREASED for heartbeats
+  List<double> enhancedSamples = List.filled(amplifiedSamples.length, 0.0);
+  for (int i = 0; i < amplifiedSamples.length; i++) {
     double beatFactor = 1.0;
     
     if (envelope[i] > dynamicThreshold) {
-      // Progressive gain - more gain for stronger signals (heartbeats)
-      double strength = (envelope[i] - dynamicThreshold) / (peakEnvelope - dynamicThreshold);
-      beatFactor = 1.0 + strength * beatGain;
+      // Calculate how much this exceeds the threshold
+      double beatStrength = (envelope[i] - dynamicThreshold) / dynamicThreshold;
+      beatStrength = math.min(beatStrength, 8.0); // Higher cap to allow stronger emphasis
+      
+      // Apply much stronger beat emphasis
+      beatFactor = 1.0 + (beatStrength * beatGain);
     } else {
-      // Apply noise suppression to quieter parts
+      // Apply even more aggressive noise suppression
       beatFactor = noiseSuppression;
     }
     
-    // Apply the combined effect
-    enhancedSamples[i] = amplifiedSample * beatFactor;
+    enhancedSamples[i] = amplifiedSamples[i] * beatFactor;
   }
   
-  // Find maximum amplitude for normalization
-  double maxAmplitude = 0.0;
-  for (double sample in enhancedSamples) {
-    double absValue = sample.abs();
-    if (absValue > maxAmplitude) maxAmplitude = absValue;
-  }
+  // Add hard limiting to prevent digital clipping
+  enhancedSamples = _applyHardLimiting(enhancedSamples);
   
-  // Normalize to avoid clipping if needed
-  double normalizationFactor = 1.0;
-  if (maxAmplitude > 0.95) {
-    normalizationFactor = 0.95 / maxAmplitude;
-  }
-  
-  // Convert back to 16-bit PCM
+  // Convert back to 16-bit PCM with maximum volume
   List<int> enhancedData = [];
   for (double sample in enhancedSamples) {
-    // Apply normalization
-    sample *= normalizationFactor;
-    
-    // Clamp to -1.0 to 1.0 range
+    // Clamp to -1.0 to 1.0
     sample = sample.clamp(-1.0, 1.0);
     
-    // Convert to 16-bit PCM
+    // Convert to 16-bit PCM at maximum volume
     int sampleInt = (sample * 32767).round().clamp(-32768, 32767);
     
-    // Convert to bytes
     ByteData newSample = ByteData(2);
     newSample.setInt16(0, sampleInt, Endian.little);
     enhancedData.add(newSample.getUint8(0));
@@ -446,6 +405,91 @@ class FirebaseService {
   }
   
   return enhancedData;
+}
+
+// Helper method to shift frequencies higher
+List<double> _shiftFrequencies(List<double> samples, double shiftFactor, int sampleRate) {
+  // Simple implementation using linear interpolation
+  List<double> shiftedSamples = List.filled(samples.length, 0.0);
+  
+  for (int i = 0; i < samples.length; i++) {
+    double origPos = i / shiftFactor;
+    int lowIndex = origPos.floor();
+    int highIndex = origPos.ceil();
+    
+    if (lowIndex >= 0 && highIndex < samples.length) {
+      double fraction = origPos - lowIndex;
+      shiftedSamples[i] = samples[lowIndex] * (1-fraction) + samples[highIndex] * fraction;
+    } else if (lowIndex >= 0 && lowIndex < samples.length) {
+      shiftedSamples[i] = samples[lowIndex];
+    }
+  }
+  
+  return shiftedSamples;
+}
+
+// Helper method to calculate envelope
+List<double> _calculateEnvelope(List<double> samples, int sampleRate) {
+  double attackTime = 0.01; // Fast attack
+  double releaseTime = 0.3; // Slower release
+  
+  List<double> envelope = List.filled(samples.length, 0.0);
+  double attackCoef = math.exp(-1.0 / (sampleRate * attackTime));
+  double releaseCoef = math.exp(-1.0 / (sampleRate * releaseTime));
+  
+  for (int i = 0; i < samples.length; i++) {
+    double absValue = samples[i].abs();
+    
+    if (i > 0) {
+      if (absValue > envelope[i-1]) {
+        envelope[i] = attackCoef * envelope[i-1] + (1 - attackCoef) * absValue;
+      } else {
+        envelope[i] = releaseCoef * envelope[i-1] + (1 - releaseCoef) * absValue;
+      }
+    } else {
+      envelope[i] = absValue;
+    }
+  }
+  
+  return envelope;
+}
+
+// Apply hard limiting to prevent digital clipping
+List<double> _applyHardLimiting(List<double> samples) {
+  List<double> limited = List.filled(samples.length, 0.0);
+  
+  // First find the maximum absolute value
+  double maxAbs = 0.0;
+  for (double sample in samples) {
+    double absValue = sample.abs();
+    if (absValue > maxAbs) maxAbs = absValue;
+  }
+  
+  // Calculate a normalization factor that brings the peak to just below clipping
+  double normalizationFactor = 1.0;
+  if (maxAbs > 0.95) {
+    normalizationFactor = 0.95 / maxAbs;
+  }
+  
+  // Apply the normalization and soft clipping
+  for (int i = 0; i < samples.length; i++) {
+    double normalized = samples[i] * normalizationFactor;
+    
+    // Apply soft clipping for more natural sound
+    if (normalized > 0.7) {
+      // Gradually compress the upper range
+      double excess = normalized - 0.7;
+      normalized = 0.7 + (excess * 0.5);
+    } else if (normalized < -0.7) {
+      // Gradually compress the lower range
+      double excess = -normalized - 0.7;
+      normalized = -0.7 - (excess * 0.5);
+    }
+    
+    limited[i] = normalized;
+  }
+  
+  return limited;
 }
 
   List<int> enhanceHeartbeatWithEnvelope(List<int> audioData, {

@@ -997,6 +997,8 @@ List<int> _upsampleIfNeeded(List<int> originalData, int actualSamples, int targe
   return upsampled;
 }
 
+
+
 // Setup PulseOx notifications
 void _setupPulseOxNotifications() async {
   if (_pulseOxCharacteristic == null) return;

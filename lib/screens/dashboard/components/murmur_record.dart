@@ -61,20 +61,27 @@ bool _playingRawAudio = false;
     _setupAudioPlayer();
   }
 
-  void _setupAudioPlayer() {
-    _audioPlayer.onPlayerStateChanged.listen((PlayerState state) {
-      setState(() {
-        _isPlaying = state == PlayerState.playing;
-      });
-    });
+void _setupAudioPlayer() {
+  _audioPlayer.onPlayerStateChanged.listen(_onPlayerStateChanged);
+  _audioPlayer.onPlayerComplete.listen(_onPlayerCompleteListener);
+}
 
-    _audioPlayer.onPlayerComplete.listen((_) {
-      setState(() {
-        _isPlaying = false;
-      });
+// Define these helper methods at class level
+void _onPlayerStateChanged(PlayerState state) {
+  if (mounted) {
+    setState(() {
+      _isPlaying = state == PlayerState.playing;
     });
   }
+}
 
+void _onPlayerCompleteListener(_) {
+  if (mounted) {
+    setState(() {
+      _isPlaying = false;
+    });
+  }
+}
   // Add a new method to handle the back button press
   Future<void> _handleBackButton() async {
     if (_isPlaying) {
@@ -111,7 +118,32 @@ bool _playingRawAudio = false;
 
  
 
-
+Future<void> _showLoadingDialog(String message) async {
+  if (!mounted) return;
+  
+  // Use a barrierDismissible: false to prevent accidental dismissal
+  return showDialog(
+    context: context,
+    barrierDismissible: false,
+    builder: (BuildContext dialogContext) {
+      return WillPopScope(
+        onWillPop: () async => false, // Prevent back button from dismissing
+        child: AlertDialog(
+          content: Row(
+            children: [
+              const CircularProgressIndicator(),
+              const SizedBox(width: 20),
+              Text(message),
+            ],
+          ),
+        ),
+      );
+    },
+  ).catchError((error) {
+    _logger.warning("Error in _showLoadingDialog: $error");
+    return null;
+  });
+}
 
 // Add this helper method to show info snackbars
 void _showInfoSnackBar(String message) {
@@ -293,9 +325,11 @@ Future<void> _playPreviewRecording() async {
   try {
     if (_isPlaying) {
       await _audioPlayer.pause();
-      setState(() {
-        _isPlaying = false;
-      });
+      if (mounted) {
+        setState(() {
+          _isPlaying = false;
+        });
+      }
     } else {
       // Get a copy of the audio data
       List<int> audioDataCopy = List.from(_recordedAudioData!);
@@ -304,10 +338,13 @@ Future<void> _playPreviewRecording() async {
       List<int> enhancedAudio = _firebaseService.enhanceHeartbeatWithAmplification(
         audioDataCopy,
         sampleRate: BLEManager.sampleRate,
-        threshold: 0.06,         // Make this lower to catch fainter beats
-        beatGain: 300.0,           // Strong emphasis on beats
-        overallGain: 400.0,        // Overall amplification
-        noiseSuppression: 0.1    // Suppress quieter parts more (lower = more suppression)
+        threshold: 0.03,
+        beatGain: 3000.0,
+        overallGain: 5.0,
+        noiseSuppression: 0.001,
+        shiftFrequencies: false,
+        frequencyShift: 1.5
+        
       );
       
       // Create WAV with enhanced audio
@@ -326,122 +363,185 @@ Future<void> _playPreviewRecording() async {
       // Set volume to maximum for best effect
       await _audioPlayer.setVolume(1.0);
       
-      setState(() {
-        _isPlaying = true;
-        _playbackVolume = 1.0;  // Update the UI slider
-      });
-      
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text("Playing amplified heart sounds"),
-          duration: Duration(seconds: 3),
-        ),
-      );
+      if (mounted) {
+        setState(() {
+          _isPlaying = true;
+          _playbackVolume = 1.0;  // Update the UI slider
+        });
+        
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text("Playing amplified heart sounds"),
+            duration: Duration(seconds: 3),
+          ),
+        );
+      }
     }
   } catch (e) {
-    _showErrorSnackBar("Failed to play recording: $e");
+    if (mounted) {
+      _showErrorSnackBar("Failed to play recording: $e");
+    }
   }
 }
 
-  void _showSaveRecordingDialog() async {
-    if (!mounted) return;
-    
-    final authService = Provider.of<AuthService>(context, listen: false);
-    if (authService.getCurrentUser() == null) {
-      _showLoginPrompt();
-      return;
-    }
+ // Replace the entire _showSaveRecordingDialog method with this version
+void _showSaveRecordingDialog() async {
+  _logger.info("Starting save recording dialog flow");
+  if (!mounted) return;
+  
+  final authService = Provider.of<AuthService>(context, listen: false);
+  if (authService.getCurrentUser() == null) {
+    _showLoginPrompt();
+    return;
+  }
 
-    final String uid = authService.getCurrentUser()!.uid;
-    
-    // If we have a preselected patient, save directly to that patient
-    if (widget.preselectedPatientId != null) {
-      _saveRecordingToPatient(uid, widget.preselectedPatientId!);
-      return;
-    }
+  final String uid = authService.getCurrentUser()!.uid;
+  
+  // If we have a preselected patient, save directly to that patient
+  if (widget.preselectedPatientId != null) {
+    _saveRecordingToPatient(uid, widget.preselectedPatientId!);
+    return;
+  }
 
+  // Use a flag to track if loading dialog is shown
+  bool isLoadingDialogShown = false;
+  BuildContext? dialogContext;
+  
+  try {
     // Show loading while fetching patients
     if (!mounted) return;
     
-    await showDialog(
+    _logger.info("Showing loading dialog before fetching patients");
+    
+    // Show a loading indicator directly in the current context
+    // This avoids navigation issues with showDialog
+    showDialog(
       context: context,
       barrierDismissible: false,
-      builder: (context) => const Center(child: CircularProgressIndicator()),
-    );
-
-    // Early return if widget is unmounted after dialog
-    if (!mounted) return;
-
-    try {
-      // Fetch patients list
-      List<Patient> patients = await _firebaseService.getPatientsForUser(uid);
-      
-      // Check if widget is still mounted before proceeding
-      if (!mounted) return;
-      
-      // Close the loading dialog
-      Navigator.of(context).pop();
-      
-      // Check if widget is still mounted after closing dialog
-      if (!mounted) return;
-
-      if (patients.isEmpty) {
-        _showNoPatientDialog();
-        return;
-      }
-      
-      if (!mounted) return;
-      
-      showDialog(
-        context: context,
-        builder: (dialogContext) { // Use dialogContext to avoid context references
-          return AlertDialog(
-            title: const Text('Save Heart Sound Recording'),
-            content: Column(
-              mainAxisSize: MainAxisSize.min,
+      builder: (context) {
+        dialogContext = context; // Store the dialog context for later use
+        return WillPopScope(
+          onWillPop: () async => false,
+          child: const AlertDialog(
+            content: Row(
               children: [
-                ListTile(
-                  leading: const Icon(Icons.person_add),
-                  title: const Text('Create New Patient'),
-                  onTap: () {
-                    Navigator.pop(dialogContext);
-                    _navigateToCreatePatient();
-                  },
-                ),
-                ListTile(
-                  leading: const Icon(Icons.people),
-                  title: const Text('Select Existing Patient'),
-                  onTap: () {
-                    Navigator.pop(dialogContext);
-                    _showPatientSelectionDialog(uid, patients);
-                  },
-                ),
+                CircularProgressIndicator(),
+                SizedBox(width: 20),
+                Text("Loading patients..."),
               ],
             ),
-            actions: [
-              TextButton(
-                child: const Text('Cancel'),
-                onPressed: () => Navigator.pop(dialogContext),
-              ),
-            ],
-          );
-        },
-      );
+          ),
+        );
+      },
+    );
+    isLoadingDialogShown = true;
+
+    // Fetch patients list
+    _logger.info("Fetching patients for user: $uid");
+    List<Patient> patients = [];
+    
+    try {
+      patients = await _firebaseService.getPatientsForUser(uid);
     } catch (e) {
-      // Check if widget is still mounted before using context
-      if (!mounted) return;
+      _logger.severe("Error fetching patients: $e");
       
-      // Try to dismiss the loading dialog if it's still showing
-      try {
-        Navigator.of(context).pop();
-      } catch (_) {
-        // Dialog may have been dismissed already, ignore errors
+      // Dismiss loading dialog if shown and we've stored the context
+      if (isLoadingDialogShown && dialogContext != null && mounted) {
+        Navigator.of(dialogContext!).pop();
+        isLoadingDialogShown = false;
       }
       
-      if (!mounted) return;
-      _showErrorSnackBar("Failed to load patients: $e");
+      if (mounted) {
+        _showErrorSnackBar("Failed to load patients: $e");
+      }
+      return;
     }
+    
+    // Check if widget is still mounted before proceeding
+    if (!mounted) {
+      _logger.warning("Widget unmounted after fetching patients");
+      return;
+    }
+    
+    // Dismiss loading dialog using the stored context
+    if (isLoadingDialogShown && dialogContext != null && mounted) {
+      _logger.info("Dismissing loading dialog after fetching patients");
+      Navigator.of(dialogContext!).pop();
+      isLoadingDialogShown = false;
+    }
+    
+    // Early return if unmounted after dialog dismissal
+    if (!mounted) {
+      _logger.warning("Widget unmounted after dismissing loading dialog");
+      return;
+    }
+
+    // Handle empty patients list
+    if (patients.isEmpty) {
+      _logger.info("No patients found, showing create patient dialog");
+      _showNoPatientDialog();
+      return;
+    }
+    
+    if (!mounted) return;
+    
+    // Show the patient selection dialog
+    _logger.info("Showing patient selection options dialog");
+    showDialog(
+      context: context,
+      builder: (context) {
+        return AlertDialog(
+          title: const Text('Save Heart Sound Recording'),
+          content: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              ListTile(
+                leading: const Icon(Icons.person_add),
+                title: const Text('Create New Patient'),
+                onTap: () {
+                  Navigator.pop(context);
+                  _navigateToCreatePatient();
+                },
+              ),
+              ListTile(
+                leading: const Icon(Icons.people),
+                title: const Text('Select Existing Patient'),
+                onTap: () {
+                  Navigator.pop(context);
+                  _showPatientSelectionDialog(uid, patients);
+                },
+              ),
+            ],
+          ),
+          actions: [
+            TextButton(
+              child: const Text('Cancel'),
+              onPressed: () => Navigator.pop(context),
+            ),
+          ],
+        );
+      },
+    );
+  } catch (e) {
+    // Log the error
+    _logger.severe("Error in _showSaveRecordingDialog: $e");
+    
+    // Make sure to dismiss loading dialog if it's showing
+    if (isLoadingDialogShown && dialogContext != null && mounted) {
+      try {
+        _logger.info("Dismissing loading dialog after error");
+        Navigator.of(dialogContext!).pop();
+      } catch (dialogError) {
+        _logger.warning("Error dismissing loading dialog: $dialogError");
+      }
+    }
+    
+    // Check if still mounted before showing error
+    if (!mounted) return;
+    
+    _showErrorSnackBar("Failed to load patients: $e");
   }
+}
 
   void _navigateToCreatePatient() {
     if (!mounted) return;
@@ -526,37 +626,134 @@ Future<void> _playPreviewRecording() async {
     );
   }
 
+
+// Replace the _saveRecordingToPatient method with this version
 Future<void> _saveRecordingToPatient(String uid, String patientId) async {
-  if (_recordedAudioData == null || !mounted) return;
+  if (_recordedAudioData == null || !mounted) {
+    _logger.warning("Save aborted: recordedAudioData is null or widget not mounted");
+    return;
+  }
+  
+  _logger.info("--- START SAVE RECORDING PROCESS ---");
+  _logger.info("UID: $uid, Patient ID: $patientId");
+  _logger.info("Raw audio data size: ${_recordedAudioData!.length} bytes");
   
   // Get data before showing dialog
   final bleManager = Provider.of<BLEManager>(context, listen: false);
   final roundedDuration = ((_recordingDuration.inMilliseconds + 500) / 1000).floor();
+  _logger.info("Recording duration: $roundedDuration seconds");
   
-  // Get a copy of the audio data - use raw data without processing
+  // Get a copy of the audio data
+  _logger.info("Creating copy of audio data...");
   List<int> audioDataCopy = List.from(_recordedAudioData!);
+  _logger.info("Audio data copied successfully, size: ${audioDataCopy.length} bytes");
   
-  if (!mounted) return;
+  // Apply the same enhancement that's used for playback
+  _logger.info("Starting audio enhancement with beatGain=1000...");
+  List<int> enhancedAudio;
+  try {
+    enhancedAudio = _firebaseService.enhanceHeartbeatWithAmplification(
+      audioDataCopy,
+      sampleRate: BLEManager.sampleRate,
+       threshold: 0.03,
+        beatGain: 3000.0,
+        overallGain: 5.0,
+        noiseSuppression: 0.001,
+        shiftFrequencies: false,
+      frequencyShift: 1.5
+    );
+    _logger.info("Enhancement complete, enhanced size: ${enhancedAudio.length} bytes");
+    
+    // Log a small sample of the audio
+    if (enhancedAudio.length >= 20) {
+      _logger.info("First 10 enhanced samples: ${enhancedAudio.sublist(0, 10)}");
+      _logger.info("Last 10 enhanced samples: ${enhancedAudio.sublist(enhancedAudio.length - 10)}");
+    }
+  } catch (e) {
+    _logger.severe("Audio enhancement failed: $e");
+    if (mounted) {
+      _showErrorSnackBar("Failed to enhance audio: $e");
+    }
+    return;
+  }
   
-  // Show loading dialog
-  await _showLoadingDialog("Saving heart sound recording...");
+  if (enhancedAudio.isEmpty) {
+    _logger.severe("Enhanced audio is empty!");
+    if (mounted) {
+      _showErrorSnackBar("Error: Enhanced audio processing failed");
+    }
+    return;
+  }
+  
+  if (!mounted) {
+    _logger.warning("Widget unmounted after enhancement");
+    return;
+  }
+  
+  // Flag to track loading dialog state
+  bool isLoadingDialogShown = false;
+  BuildContext? dialogContext;
+  
+  try {
+    // Show loading dialog
+    _logger.info("Showing loading dialog...");
+    if (mounted) {
+      showDialog(
+        context: context,
+        barrierDismissible: false,
+        builder: (context) {
+          dialogContext = context; // Store dialog context
+          return WillPopScope(
+            onWillPop: () async => false, // Prevent back button from dismissing
+            child: const AlertDialog(
+              content: Row(
+                children: [
+                  CircularProgressIndicator(),
+                  SizedBox(width: 20),
+                  Text("Saving heart sound recording..."),
+                ],
+              ),
+            ),
+          );
+        },
+      );
+      isLoadingDialogShown = true;
+      _logger.info("Loading dialog shown successfully");
+    }
+  } catch (e) {
+    _logger.severe("Failed to show loading dialog: $e");
+    // Continue anyway
+  }
   
   // Check if still mounted after dialog is shown
-  if (!mounted) return;
+  if (!mounted) {
+    _logger.warning("Widget unmounted after showing dialog");
+    return;
+  }
 
   try {
+    _logger.info("Calling FirebaseService.saveRecording...");
     await _firebaseService.saveRecording(
       uid,
       patientId,
       DateTime.now(),
-      audioDataCopy, // Use the raw audio data
+      enhancedAudio,
       {
         'duration': roundedDuration,
         'sampleRate': BLEManager.sampleRate, 
         'bitsPerSample': BLEManager.bitsPerSample,
         'channels': BLEManager.channels,
         'peakAmplitude': bleManager.peakAmplitude,
-        'processingApplied': false, // Set to false for raw audio
+        'processingApplied': true,
+        'processingDetails': 'heartbeat-amplification',
+        'amplificationSettings': {
+          'threshold': 0.03,
+          'beatGain': 3000.0,
+          'overallGain': 5.0,
+          'noiseSuppression': 0.001,
+          'frequencyShift': 1.5
+           
+        },
         'signalToNoiseRatio': bleManager.signalToNoiseRatio,
         'murmurProbability': _murmurProbability,
         'murmurType': _murmurType,
@@ -564,26 +761,32 @@ Future<void> _saveRecordingToPatient(String uid, String patientId) async {
         'isSystolicMurmur': _isSystolic,
         'isDiastolicMurmur': _isDiastolic,
         'murmurGrade': _murmurGrade,
-        'audioProcessing': {
-          'isRawAudio': true,
-          'noProcessingApplied': true,
-        },
       },
     );
+    _logger.info("saveRecording completed successfully");
 
     // Check if still mounted before proceeding
-    if (!mounted) return;
+    if (!mounted) {
+      _logger.warning("Widget unmounted after saving recording");
+      return;
+    }
     
-    // Close loading dialog
-    try {
-      Navigator.of(context).pop();
-    } catch (_) {
-      // Dialog may have been dismissed already, ignore errors
+    // Close loading dialog using the stored context
+    if (isLoadingDialogShown && dialogContext != null && mounted) {
+      _logger.info("Attempting to close loading dialog...");
+      try {
+        Navigator.of(dialogContext!).pop();
+        _logger.info("Loading dialog closed successfully");
+      } catch (e) {
+        _logger.warning("Failed to close dialog: $e");
+      }
+      isLoadingDialogShown = false;
     }
     
     if (!mounted) return;
     
-    _showSuccessSnackBar("Raw heart sound recording saved successfully");
+    _showSuccessSnackBar("Enhanced heart sound recording saved successfully");
+    _logger.info("Success message shown, resetting state...");
     
     if (!mounted) return;
     
@@ -593,22 +796,38 @@ Future<void> _saveRecordingToPatient(String uid, String patientId) async {
       _murmurProbability = 0.0;
       _murmurType = 'None';
     });
+    _logger.info("--- SAVE RECORDING COMPLETED SUCCESSFULLY ---");
   } catch (e) {
-    // Check if still mounted before using context
-    if (!mounted) return;
+    // Log the error for debugging
+    _logger.severe("❌ Save recording error: $e");
+    _logger.severe(e.toString());
+    if (e is Error) {
+      _logger.severe("Stack trace: ${e.stackTrace}");
+    }
     
-    // Try to dismiss the dialog
-    try {
-      Navigator.of(context).pop();
-    } catch (_) {
-      // Dialog may have been dismissed already, ignore errors
+    // Check if still mounted before using context
+    if (!mounted) {
+      _logger.warning("Widget unmounted during error handling");
+      return;
+    }
+    
+    // Always try to dismiss the dialog using the stored context
+    if (isLoadingDialogShown && dialogContext != null && mounted) {
+      _logger.info("Attempting to close loading dialog after error...");
+      try {
+        Navigator.of(dialogContext!).pop();
+        _logger.info("Loading dialog closed after error");
+      } catch (dialogError) {
+        _logger.warning("Failed to close dialog after error: $dialogError");
+      }
+      isLoadingDialogShown = false;
     }
     
     if (!mounted) return;
     _showErrorSnackBar("Failed to save recording: $e");
+    _logger.info("--- SAVE RECORDING FAILED ---");
   }
 }
-
 // Add this debugging function to your MurmurRecordState class
 void _debugAudioData() {
   if (_recordedAudioData == null || _recordedAudioData!.isEmpty) {
@@ -700,21 +919,7 @@ void _debugAudioData() {
   }
 }
 
-// Call this in _playPreviewRecording() before playing audio
-void _addDebugButton() {
-  ScaffoldMessenger.of(context).showSnackBar(
-    SnackBar(
-      content: const Text("Having audio issues? Try debugging"),
-      action: SnackBarAction(
-        label: "Debug Audio",
-        onPressed: () {
-          _debugAudioData();
-        },
-      ),
-      duration: const Duration(seconds: 5),
-    ),
-  );
-}
+
 
   void _showLoginPrompt() {
     if (!mounted) return;
@@ -789,26 +994,7 @@ void _addDebugButton() {
     );
   }
 
-  Future<void> _showLoadingDialog(String message) async {
-    if (!mounted) return;
-    
-    await showDialog(
-      context: context,
-      barrierDismissible: false,
-      builder: (dialogContext) {
-        return AlertDialog(
-          content: Row(
-            children: [
-              const CircularProgressIndicator(),
-              const SizedBox(width: 20),
-              Text(message),
-            ],
-          ),
-        );
-      },
-    );
-  }
-
+ 
   void _showSuccessSnackBar(String message) {
     if (!mounted) return;
     
@@ -836,15 +1022,19 @@ void _addDebugButton() {
   }
 
   @override
-  void dispose() {
-    // Stop audio playback when navigating away
-    if (_isPlaying) {
-      _audioPlayer.stop();
-    }
-    _audioPlayer.dispose();
-    _recordingTimer?.cancel();
-    super.dispose();
+void dispose() {
+  // Cancel timer first
+  _recordingTimer?.cancel();
+  
+  // Stop audio playback when navigating away
+  if (_isPlaying) {
+    _audioPlayer.stop();
   }
+  
+  // Dispose of the audio player
+  _audioPlayer.dispose();
+  super.dispose();
+}
 
 
 
