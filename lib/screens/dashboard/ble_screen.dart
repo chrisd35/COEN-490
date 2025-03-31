@@ -4,6 +4,8 @@ import 'package:provider/provider.dart';
 import 'package:permission_handler/permission_handler.dart';
 import '/utils/ble_manager.dart';
 import 'package:logging/logging.dart' as logging;
+import 'package:google_fonts/google_fonts.dart';
+import 'package:flutter_animate/flutter_animate.dart';
 
 final _logger = logging.Logger('BLEScreen');
 
@@ -77,16 +79,26 @@ class _BLEScreenState extends State<BLEScreen> with SingleTickerProviderStateMix
           children: [
             const Icon(Icons.warning_amber_rounded, color: Colors.amber),
             const SizedBox(width: 8),
-            const Text('Permissions Required'),
+            Text(
+              'Permissions Required',
+              style: GoogleFonts.inter(
+                fontWeight: FontWeight.w600,
+                fontSize: 18,
+              ),
+            ),
           ],
         ),
-        content: const Text(
+        content: Text(
           'Please enable Bluetooth and Location permissions to scan for devices.',
+          style: GoogleFonts.inter(),
         ),
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(context),
-            child: const Text('Cancel'),
+            child: Text(
+              'Cancel',
+              style: GoogleFonts.inter(color: Colors.grey[700]),
+            ),
           ),
           ElevatedButton(
             onPressed: () {
@@ -94,11 +106,15 @@ class _BLEScreenState extends State<BLEScreen> with SingleTickerProviderStateMix
               openAppSettings();
             },
             style: ElevatedButton.styleFrom(
+              backgroundColor: const Color(0xFF1D557E),
               shape: RoundedRectangleBorder(
                 borderRadius: BorderRadius.circular(8),
               ),
             ),
-            child: const Text('Open Settings'),
+            child: Text(
+              'Open Settings',
+              style: GoogleFonts.inter(color: Colors.white),
+            ),
           ),
         ],
       ),
@@ -187,8 +203,11 @@ class _BLEScreenState extends State<BLEScreen> with SingleTickerProviderStateMix
   void _showSuccessSnackBar(String message) {
     ScaffoldMessenger.of(context).showSnackBar(
       SnackBar(
-        content: Text(message),
-        backgroundColor: Colors.green,
+        content: Text(
+          message,
+          style: GoogleFonts.inter(color: Colors.white),
+        ),
+        backgroundColor: const Color(0xFF2E7D32),
         behavior: SnackBarBehavior.floating,
         margin: const EdgeInsets.all(16),
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
@@ -199,8 +218,11 @@ class _BLEScreenState extends State<BLEScreen> with SingleTickerProviderStateMix
   void _showErrorSnackBar(String message) {
     ScaffoldMessenger.of(context).showSnackBar(
       SnackBar(
-        content: Text(message),
-        backgroundColor: Colors.red[400],
+        content: Text(
+          message,
+          style: GoogleFonts.inter(color: Colors.white),
+        ),
+        backgroundColor: const Color(0xFFD32F2F),
         behavior: SnackBarBehavior.floating,
         margin: const EdgeInsets.all(16),
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
@@ -208,15 +230,50 @@ class _BLEScreenState extends State<BLEScreen> with SingleTickerProviderStateMix
     );
   }
 
+  // Custom signal strength icon
+  Widget _buildSignalStrengthIcon(int rssi) {
+    Color color;
+    int signalLevel;
+
+    if (rssi >= -70) {
+      color = Colors.green;
+      signalLevel = 3;
+    } else if (rssi >= -80) {
+      color = Colors.orange;
+      signalLevel = 2;
+    } else {
+      color = Colors.red;
+      signalLevel = 1;
+    }
+
+    return Row(
+      children: List.generate(
+        3, 
+        (index) => Container(
+          width: 6,
+          height: index < signalLevel ? 12 : 6,
+          margin: const EdgeInsets.symmetric(horizontal: 1),
+          decoration: BoxDecoration(
+            color: index < signalLevel 
+              ? color.withAlpha(100 * (index + 1)) 
+              : color.withAlpha(26),
+            borderRadius: BorderRadius.circular(2),
+          ),
+        ),
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: Colors.grey[50],
+      backgroundColor: const Color(0xFFF5F7FA),
       body: SafeArea(
         child: Column(
           children: [
+            // Redesigned App Bar
             Container(
-              padding: const EdgeInsets.symmetric(horizontal: 8.0),
+              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
               decoration: BoxDecoration(
                 color: Colors.white,
                 boxShadow: [
@@ -233,12 +290,13 @@ class _BLEScreenState extends State<BLEScreen> with SingleTickerProviderStateMix
                     icon: const Icon(Icons.arrow_back_ios_new, size: 20),
                     onPressed: () => Navigator.pop(context),
                   ),
-                  const Expanded(
+                  Expanded(
                     child: Text(
                       'Connect Device',
-                      style: TextStyle(
+                      style: GoogleFonts.inter(
                         fontSize: 18,
                         fontWeight: FontWeight.w600,
+                        color: const Color(0xFF263238),
                       ),
                       textAlign: TextAlign.center,
                     ),
@@ -251,6 +309,7 @@ class _BLEScreenState extends State<BLEScreen> with SingleTickerProviderStateMix
               ),
             ),
 
+            // Scanning Animation
             if (_isScanning)
               Container(
                 padding: const EdgeInsets.symmetric(vertical: 24),
@@ -265,13 +324,13 @@ class _BLEScreenState extends State<BLEScreen> with SingleTickerProviderStateMix
                             width: 80,
                             height: 80,
                             decoration: BoxDecoration(
-                              color: Theme.of(context).primaryColor.withAlpha(51),
+                              color: const Color(0xFF1D557E).withAlpha(51),
                               shape: BoxShape.circle,
                             ),
                             child: Icon(
                               Icons.bluetooth_searching_rounded,
                               size: 40,
-                              color: Theme.of(context).primaryColor,
+                              color: const Color(0xFF1D557E),
                             ),
                           ),
                         );
@@ -280,15 +339,16 @@ class _BLEScreenState extends State<BLEScreen> with SingleTickerProviderStateMix
                     const SizedBox(height: 16),
                     Text(
                       'Scanning for devices...',
-                      style: TextStyle(
+                      style: GoogleFonts.inter(
                         fontSize: 16,
-                        color: Colors.grey[600],
+                        color: const Color(0xFF546E7A),
                       ),
                     ),
                   ],
                 ),
               ),
 
+            // Device List
             Expanded(
               child: scanResults.isEmpty
                   ? Center(
@@ -297,9 +357,9 @@ class _BLEScreenState extends State<BLEScreen> with SingleTickerProviderStateMix
                             ? ''
                             : 'No devices found\nPull down to refresh',
                         textAlign: TextAlign.center,
-                        style: TextStyle(
+                        style: GoogleFonts.inter(
                           fontSize: 16,
-                          color: Colors.grey[600],
+                          color: const Color(0xFF546E7A),
                         ),
                       ),
                     )
@@ -328,59 +388,31 @@ class _BLEScreenState extends State<BLEScreen> with SingleTickerProviderStateMix
                                     Container(
                                       padding: const EdgeInsets.all(12),
                                       decoration: BoxDecoration(
-                                        color: Theme.of(context).primaryColor.withAlpha(26),
+                                        color: const Color(0xFF1D557E).withAlpha(26),
                                         shape: BoxShape.circle,
                                       ),
                                       child: Icon(
                                         Icons.bluetooth_rounded,
-                                        color: Theme.of(context).primaryColor,
+                                        color: const Color(0xFF1D557E),
                                       ),
                                     ),
                                     const SizedBox(width: 16),
                                     Expanded(
-                                      child: Column(
-                                        crossAxisAlignment: CrossAxisAlignment.start,
-                                        children: [
-                                          Text(
-                                            device.platformName.isEmpty ? "Unknown Device" : device.platformName,
-                                            style: const TextStyle(
-                                              fontSize: 16,
-                                              fontWeight: FontWeight.w600,
-                                            ),
-                                          ),
-                                          const SizedBox(height: 4),
-                                          Text(
-                                            device.remoteId.toString(),
-                                            style: TextStyle(
-                                              fontSize: 14,
-                                              color: Colors.grey[600],
-                                            ),
-                                          ),
-                                        ],
-                                      ),
-                                    ),
-                                    Container(
-                                      padding: const EdgeInsets.symmetric(
-                                        horizontal: 8,
-                                        vertical: 4,
-                                      ),
-                                      decoration: BoxDecoration(
-                                        color: _getRssiColor(rssi).withAlpha(26),
-                                        borderRadius: BorderRadius.circular(12),
-                                      ),
                                       child: Text(
-                                        '${rssi}dBm',
-                                        style: TextStyle(
-                                          color: _getRssiColor(rssi),
-                                          fontWeight: FontWeight.w500,
+                                        device.platformName.isEmpty ? "Unknown Device" : device.platformName,
+                                        style: GoogleFonts.inter(
+                                          fontSize: 16,
+                                          fontWeight: FontWeight.w600,
+                                          color: const Color(0xFF263238),
                                         ),
                                       ),
                                     ),
+                                    _buildSignalStrengthIcon(rssi),
                                   ],
                                 ),
                               ),
                             ),
-                          );
+                          ).animate().fadeIn(duration: 300.ms);
                         },
                       ),
                     ),
@@ -389,11 +421,5 @@ class _BLEScreenState extends State<BLEScreen> with SingleTickerProviderStateMix
         ),
       ),
     );
-  }
-
-  Color _getRssiColor(int rssi) {
-    if (rssi >= -70) return Colors.green;
-    if (rssi >= -80) return Colors.orange;
-    return Colors.red;
   }
 }
