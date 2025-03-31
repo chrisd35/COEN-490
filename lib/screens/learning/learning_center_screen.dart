@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:google_fonts/google_fonts.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import '../../utils/learning_center_service.dart';
 import '../../utils/learning_center_models.dart';
@@ -18,6 +19,12 @@ class LearningCenterScreen extends StatefulWidget {
 }
 
 class _LearningCenterScreenState extends State<LearningCenterScreen> {
+  // Design Constants aligned with dashboard theme
+  static final Color primaryColor = const Color(0xFF1D557E);
+  static final Color backgroundColor = Colors.white;
+  static final Color textPrimaryColor = const Color(0xFF263238);
+  static final Color textSecondaryColor = const Color(0xFF546E7A);
+
   final LearningCenterService _learningService = LearningCenterService();
   late Future<List<LearningTopic>> _topicsFuture;
   late Future<UserProgress> _userProgressFuture;
@@ -35,90 +42,83 @@ class _LearningCenterScreenState extends State<LearningCenterScreen> {
     );
   }
 
-  @override
-  Widget build(BuildContext context) {
-    return Scaffold(
-      backgroundColor: Colors.grey[50],
-      appBar: AppBar(
-        title: const Text(
-          'Learning Center',
-          style: TextStyle(fontWeight: FontWeight.w600),
+  // Progress Stat Widget
+  Widget _buildProgressStat(String label, String value, IconData icon) {
+    return Expanded(
+      child: Container(
+        padding: const EdgeInsets.symmetric(vertical: 12, horizontal: 16),
+        decoration: BoxDecoration(
+          color: Colors.white.withAlpha(51), // 0.2 * 255 ≈ 51
+          borderRadius: BorderRadius.circular(8),
         ),
-        elevation: 0,
-        actions: [
-          Padding(
-            padding: const EdgeInsets.only(right: 8.0),
-            child: IconButton(
-              icon: const Icon(Icons.person),
-              tooltip: 'My Progress',
-              onPressed: () => _navigateToUserProgress(),
+        child: Row(
+          children: [
+            Icon(
+              icon,
+              color: Colors.white,
+              size: 20,
             ),
-          ),
-        ],
-      ),
-      body: RefreshIndicator(
-        onRefresh: () async {
-          await _refreshData();
-          setState(() {});
-        },
-        child: SingleChildScrollView(
-          physics: const AlwaysScrollableScrollPhysics(),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              _buildWelcomeCard(),
-              
-              const SizedBox(height: 16),
-              
-              // Quick Access Buttons
-              _buildQuickAccessSection(),
-              
-              // Topics Section
-              Padding(
-                padding: const EdgeInsets.symmetric(horizontal: 16.0),
-                child: _buildSectionHeader('Learning Resources', Icons.menu_book),
-              ),
-              const SizedBox(height: 12),
-              _buildTopicsList(),
-            ],
-          ),
+            const SizedBox(width: 8),
+            Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  value,
+                  style: GoogleFonts.inter(
+                    color: Colors.white,
+                    fontWeight: FontWeight.bold,
+                    fontSize: 18,
+                  ),
+                ),
+                Text(
+                  label,
+                  style: GoogleFonts.inter(
+                    color: Colors.white,
+                    fontSize: 12,
+                  ),
+                ),
+              ],
+            ),
+          ],
         ),
       ),
     );
   }
 
+  // Welcome Card Method
   Widget _buildWelcomeCard() {
     return Container(
-      width: double.infinity,
-      padding: const EdgeInsets.all(20),
+      margin: const EdgeInsets.symmetric(horizontal: 16),
       decoration: BoxDecoration(
         gradient: LinearGradient(
           colors: [
-            Theme.of(context).primaryColor,
-            Theme.of(context).primaryColor.withAlpha(200),
+            primaryColor,
+            primaryColor.withAlpha(200),
           ],
           begin: Alignment.topLeft,
           end: Alignment.bottomRight,
         ),
+        borderRadius: BorderRadius.circular(20),
         boxShadow: [
           BoxShadow(
-            color: Colors.black.withAlpha(30),
-            blurRadius: 6,
-            offset: const Offset(0, 3),
+            color: primaryColor.withAlpha(50),
+            blurRadius: 15,
+            offset: const Offset(0, 6),
           ),
         ],
       ),
-      child: SafeArea(
-        bottom: false,
+      child: Padding(
+        padding: const EdgeInsets.all(20),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            const Text(
+            Text(
               'Welcome to the Learning Center',
-              style: TextStyle(
-                fontSize: 20,
+              style: GoogleFonts.inter(
+                fontSize: 22,
                 fontWeight: FontWeight.bold,
                 color: Colors.white,
+                letterSpacing: -0.5,
               ),
             ),
             const SizedBox(height: 12),
@@ -126,19 +126,19 @@ class _LearningCenterScreenState extends State<LearningCenterScreen> {
               future: _userProgressFuture,
               builder: (context, snapshot) {
                 if (snapshot.connectionState == ConnectionState.waiting) {
-                  return const Padding(
-                    padding: EdgeInsets.symmetric(vertical: 8.0),
+                  return Padding(
+                    padding: const EdgeInsets.symmetric(vertical: 8.0),
                     child: Text(
                       'Loading your progress...',
-                      style: TextStyle(color: Colors.white),
+                      style: GoogleFonts.inter(color: Colors.white),
                     ),
                   );
                 }
                 
                 if (snapshot.hasError || !snapshot.hasData) {
-                  return const Text(
+                  return Text(
                     'Explore educational resources, heart murmur sounds, and test your knowledge.',
-                    style: TextStyle(color: Colors.white),
+                    style: GoogleFonts.inter(color: Colors.white),
                   );
                 }
                 
@@ -149,9 +149,9 @@ class _LearningCenterScreenState extends State<LearningCenterScreen> {
                 return Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    const Text(
+                    Text(
                       'Your Learning Progress:',
-                      style: TextStyle(
+                      style: GoogleFonts.inter(
                         fontSize: 16,
                         fontWeight: FontWeight.w500,
                         color: Colors.white,
@@ -179,62 +179,7 @@ class _LearningCenterScreenState extends State<LearningCenterScreen> {
             ),
             const SizedBox(height: 16),
             Center(
-              child: ElevatedButton.icon(
-                onPressed: () => _navigateToUserProgress(),
-                icon: const Icon(Icons.analytics, size: 18),
-                label: const Text('View My Progress'),
-                style: ElevatedButton.styleFrom(
-                  backgroundColor: Colors.white,
-                  foregroundColor: Theme.of(context).primaryColor,
-                  elevation: 0,
-                  padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
-                  shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(8),
-                  ),
-                ),
-              ),
-            ),
-          ],
-        ),
-      ),
-    );
-  }
-  
-  Widget _buildProgressStat(String label, String value, IconData icon) {
-    return Expanded(
-      child: Container(
-        padding: const EdgeInsets.symmetric(vertical: 12, horizontal: 16),
-        decoration: BoxDecoration(
-          color: Colors.white.withAlpha(51), // 0.2 * 255 ≈ 51
-          borderRadius: BorderRadius.circular(8),
-        ),
-        child: Row(
-          children: [
-            Icon(
-              icon,
-              color: Colors.white,
-              size: 20,
-            ),
-            const SizedBox(width: 8),
-            Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  value,
-                  style: const TextStyle(
-                    color: Colors.white,
-                    fontWeight: FontWeight.bold,
-                    fontSize: 18,
-                  ),
-                ),
-                Text(
-                  label,
-                  style: const TextStyle(
-                    color: Colors.white,
-                    fontSize: 12,
-                  ),
-                ),
-              ],
+              
             ),
           ],
         ),
@@ -242,6 +187,7 @@ class _LearningCenterScreenState extends State<LearningCenterScreen> {
     );
   }
 
+  // Quick Access Section
   Widget _buildQuickAccessSection() {
     return Padding(
       padding: const EdgeInsets.symmetric(horizontal: 16.0, vertical: 8.0),
@@ -252,10 +198,10 @@ class _LearningCenterScreenState extends State<LearningCenterScreen> {
             padding: const EdgeInsets.only(left: 4.0, top: 8.0, bottom: 12.0),
             child: Text(
               'Quick Access',
-              style: TextStyle(
+              style: GoogleFonts.inter(
                 fontSize: 16,
                 fontWeight: FontWeight.w600,
-                color: Colors.grey[800],
+                color: textSecondaryColor,
               ),
             ),
           ),
@@ -285,6 +231,7 @@ class _LearningCenterScreenState extends State<LearningCenterScreen> {
     );
   }
 
+  // Quick Access Button
   Widget _buildQuickAccessButton(
     String title,
     IconData icon,
@@ -293,12 +240,12 @@ class _LearningCenterScreenState extends State<LearningCenterScreen> {
   ) {
     return Material(
       color: Colors.white,
-      borderRadius: BorderRadius.circular(12),
-      elevation: 1,
-      shadowColor: Colors.black.withAlpha(26), // 0.1 * 255 ≈ 26
+      borderRadius: BorderRadius.circular(16),
+      elevation: 3,
+      shadowColor: primaryColor.withAlpha(26),
       child: InkWell(
+        borderRadius: BorderRadius.circular(16),
         onTap: onTap,
-        borderRadius: BorderRadius.circular(12),
         child: Padding(
           padding: const EdgeInsets.symmetric(vertical: 16.0),
           child: Column(
@@ -307,7 +254,7 @@ class _LearningCenterScreenState extends State<LearningCenterScreen> {
               Container(
                 padding: const EdgeInsets.all(12),
                 decoration: BoxDecoration(
-                  color: color.withAlpha(26), // 0.1 * 255 ≈ 26
+                  color: color.withAlpha(26),
                   shape: BoxShape.circle,
                 ),
                 child: Icon(
@@ -319,7 +266,7 @@ class _LearningCenterScreenState extends State<LearningCenterScreen> {
               const SizedBox(height: 12),
               Text(
                 title,
-                style: const TextStyle(
+                style: GoogleFonts.inter(
                   fontWeight: FontWeight.w600,
                   fontSize: 15,
                 ),
@@ -332,22 +279,24 @@ class _LearningCenterScreenState extends State<LearningCenterScreen> {
     );
   }
 
+  // Section Header Method
   Widget _buildSectionHeader(String title, IconData icon) {
     return Padding(
-      padding: const EdgeInsets.only(top: 16.0, bottom: 4.0),
+      padding: const EdgeInsets.symmetric(horizontal: 16.0, vertical: 8.0),
       child: Row(
         children: [
           Icon(
             icon,
-            color: Theme.of(context).primaryColor,
-            size: 22,
+            color: primaryColor,
+            size: 24,
           ),
-          const SizedBox(width: 8),
+          const SizedBox(width: 12),
           Text(
             title,
-            style: const TextStyle(
-              fontSize: 18,
+            style: GoogleFonts.inter(
+              fontSize: 20,
               fontWeight: FontWeight.bold,
+              color: textPrimaryColor,
             ),
           ),
         ],
@@ -355,15 +304,18 @@ class _LearningCenterScreenState extends State<LearningCenterScreen> {
     );
   }
 
+  // Topics List Builder
   Widget _buildTopicsList() {
     return FutureBuilder<List<LearningTopic>>(
       future: _topicsFuture,
       builder: (context, snapshot) {
         if (snapshot.connectionState == ConnectionState.waiting) {
-          return const Center(
+          return Center(
             child: Padding(
-              padding: EdgeInsets.all(32.0),
-              child: CircularProgressIndicator(),
+              padding: const EdgeInsets.all(32.0),
+              child: CircularProgressIndicator(
+                color: primaryColor,
+              ),
             ),
           );
         }
@@ -381,9 +333,9 @@ class _LearningCenterScreenState extends State<LearningCenterScreen> {
                     color: Colors.red[300],
                   ),
                   const SizedBox(height: 16),
-                  const Text(
+                  Text(
                     'Error loading topics',
-                    style: TextStyle(
+                    style: GoogleFonts.inter(
                       fontWeight: FontWeight.bold,
                       fontSize: 16,
                     ),
@@ -391,7 +343,7 @@ class _LearningCenterScreenState extends State<LearningCenterScreen> {
                   const SizedBox(height: 8),
                   Text(
                     snapshot.error.toString(),
-                    style: TextStyle(
+                    style: GoogleFonts.inter(
                       color: Colors.red[700],
                       fontSize: 14,
                     ),
@@ -414,10 +366,13 @@ class _LearningCenterScreenState extends State<LearningCenterScreen> {
         }
         
         if (!snapshot.hasData || snapshot.data!.isEmpty) {
-          return const Center(
+          return Center(
             child: Padding(
-              padding: EdgeInsets.all(32.0),
-              child: Text('No topics available'),
+              padding: const EdgeInsets.all(32.0),
+              child: Text(
+                'No topics available',
+                style: GoogleFonts.inter(),
+              ),
             ),
           );
         }
@@ -438,16 +393,18 @@ class _LearningCenterScreenState extends State<LearningCenterScreen> {
     );
   }
 
+  // Topic Card
   Widget _buildTopicCard(LearningTopic topic) {
     return Card(
       margin: const EdgeInsets.only(bottom: 12),
       shape: RoundedRectangleBorder(
-        borderRadius: BorderRadius.circular(12),
+        borderRadius: BorderRadius.circular(16),
         side: BorderSide(color: Colors.grey.withAlpha(30), width: 0.5),
       ),
-      elevation: 0.5,
+      elevation: 3,
+      shadowColor: primaryColor.withAlpha(26),
       child: InkWell(
-        borderRadius: BorderRadius.circular(12),
+        borderRadius: BorderRadius.circular(16),
         onTap: () => _navigateToTopic(topic),
         child: Padding(
           padding: const EdgeInsets.all(16.0),
@@ -462,12 +419,12 @@ class _LearningCenterScreenState extends State<LearningCenterScreen> {
                     width: 44,
                     height: 44,
                     decoration: BoxDecoration(
-                      color: Theme.of(context).primaryColor.withAlpha(26), // 0.1 * 255 ≈ 26
+                      color: primaryColor.withAlpha(26),
                       shape: BoxShape.circle,
                     ),
                     child: Icon(
                       _getTopicIcon(topic.title),
-                      color: Theme.of(context).primaryColor,
+                      color: primaryColor,
                       size: 24,
                     ),
                   ),
@@ -480,17 +437,18 @@ class _LearningCenterScreenState extends State<LearningCenterScreen> {
                       children: [
                         Text(
                           topic.title,
-                          style: const TextStyle(
+                          style: GoogleFonts.inter(
                             fontWeight: FontWeight.w600,
                             fontSize: 16,
+                            color: textPrimaryColor,
                           ),
                         ),
                         const SizedBox(height: 4),
                         Text(
                           topic.description,
-                          style: TextStyle(
+                         style: GoogleFonts.inter(
                             fontSize: 14,
-                            color: Colors.grey[700],
+                            color: textSecondaryColor,
                             height: 1.3,
                           ),
                           maxLines: 2,
@@ -511,9 +469,9 @@ class _LearningCenterScreenState extends State<LearningCenterScreen> {
                     // Resources count
                     Text(
                       '${topic.resources.length} resource${topic.resources.length != 1 ? 's' : ''}',
-                      style: TextStyle(
+                      style: GoogleFonts.inter(
                         fontSize: 13,
-                        color: Colors.grey[600],
+                        color: textSecondaryColor,
                       ),
                     ),
                     
@@ -523,9 +481,9 @@ class _LearningCenterScreenState extends State<LearningCenterScreen> {
                       children: [
                         Text(
                           'View',
-                          style: TextStyle(
+                          style: GoogleFonts.inter(
                             fontSize: 14,
-                            color: Theme.of(context).primaryColor,
+                            color: primaryColor,
                             fontWeight: FontWeight.w500,
                           ),
                         ),
@@ -533,7 +491,7 @@ class _LearningCenterScreenState extends State<LearningCenterScreen> {
                         Icon(
                           Icons.arrow_forward_ios,
                           size: 14,
-                          color: Theme.of(context).primaryColor,
+                          color: primaryColor,
                         ),
                       ],
                     ),
@@ -547,6 +505,7 @@ class _LearningCenterScreenState extends State<LearningCenterScreen> {
     );
   }
 
+  // Icon selection method
   IconData _getTopicIcon(String topicTitle) {
     final title = topicTitle.toLowerCase();
     
@@ -559,6 +518,7 @@ class _LearningCenterScreenState extends State<LearningCenterScreen> {
     return Icons.school;
   }
 
+  // Navigation methods
   void _navigateToTopic(LearningTopic topic) {
     _logger.info('Navigating to topic: ${topic.title}');
     Navigator.push(
@@ -602,5 +562,69 @@ class _LearningCenterScreenState extends State<LearningCenterScreen> {
         _refreshData();
       });
     });
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Scaffold(
+      backgroundColor: backgroundColor,
+      appBar: AppBar(
+        title: Text(
+          'Learning Center',
+          style: GoogleFonts.inter(
+            fontWeight: FontWeight.w600,
+            color: textPrimaryColor,
+            fontSize: 20,
+          ),
+        ),
+        backgroundColor: Colors.white,
+        elevation: 0,
+        foregroundColor: textPrimaryColor,
+        actions: [
+          Padding(
+            padding: const EdgeInsets.only(right: 8.0),
+            child: IconButton(
+              icon: Icon(Icons.person_outline, color: primaryColor, size: 28),
+              tooltip: 'My Progress',
+              onPressed: () => _navigateToUserProgress(),
+            ),
+          ),
+        ],
+      ),
+      body: RefreshIndicator(
+        color: primaryColor,
+        onRefresh: () async {
+          await _refreshData();
+          setState(() {});
+        },
+        child: SingleChildScrollView(
+          physics: const AlwaysScrollableScrollPhysics(),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              const SizedBox(height: 16),
+              
+              // Welcome Card
+              _buildWelcomeCard(),
+              
+              const SizedBox(height: 24),
+              
+              // Quick Access Buttons
+              _buildQuickAccessSection(),
+              
+              const SizedBox(height: 24),
+
+              // Topics Section
+              _buildSectionHeader('Learning Resources', Icons.menu_book),
+              const SizedBox(height: 12),
+              _buildTopicsList(),
+
+              // Bottom padding
+              const SizedBox(height: 24),
+            ],
+          ),
+        ),
+      ),
+    );
   }
 }
