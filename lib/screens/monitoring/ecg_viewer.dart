@@ -5,7 +5,7 @@ import 'package:intl/intl.dart';
 import 'dart:math';
 import '../../utils/models.dart';
 import '../registration/firebase_service.dart';
-import '../monitoring/ecg_monitoring_screen.dart';
+
 import '../../utils/navigation_service.dart';
 import '../../widgets/back_button.dart';
 import 'dart:async';

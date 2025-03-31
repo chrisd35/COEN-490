@@ -401,51 +401,51 @@ class Recording {
     };
   }
 
-  factory Recording.fromMap(Map<dynamic, dynamic> data) {
-    // Handle peak amplitude
-    var amplitude = data['peakAmplitude'];
-    double peakAmplitude = 0.0;
-    if (amplitude is int) {
-      peakAmplitude = amplitude.toDouble();
-    } else if (amplitude is double) {
-      peakAmplitude = amplitude;
-    }
-    
-    // Helper function to safely extract numeric values
-    double safeDouble(dynamic value) {
-      if (value == null) return 0.0;
-      if (value is int) return value.toDouble();
-      if (value is double) return value;
-      return 0.0;
-    }
-    
-    // Helper function to safely extract boolean values
-    bool safeBool(dynamic value) {
-      if (value == null) return false;
-      if (value is bool) return value;
-      if (value is String) return value.toLowerCase() == 'true';
-      return false;
-    }
-    
-    return Recording(
-      timestamp: DateTime.parse(data['timestamp']),
-      filename: data['filename'],
-      duration: data['duration'] ?? 0,
-      sampleRate: data['sampleRate'] ?? 2000,
-      bitsPerSample: data['bitsPerSample'] ?? 16,
-      channels: data['channels'] ?? 1,
-      peakAmplitude: peakAmplitude,
-      downloadUrl: data['downloadUrl'],
-      // Heart murmur properties with safe type handling
-      murmurProbability: safeDouble(data['murmurProbability']),
-      murmurType: data['murmurType'] as String? ?? 'None',
-      murmurGrade: data['murmurGrade'] as String? ?? 'N/A',
-      isSystolicMurmur: safeBool(data['isSystolicMurmur']),
-      isDiastolicMurmur: safeBool(data['isDiastolicMurmur']),
-      dominantFrequency: safeDouble(data['dominantFrequency']),
-      signalToNoiseRatio: safeDouble(data['signalToNoiseRatio']),
-    );
+ factory Recording.fromMap(Map<dynamic, dynamic> data) {
+  // Handle peak amplitude
+  var amplitude = data['peakAmplitude'];
+  double peakAmplitude = 0.0;
+  if (amplitude is int) {
+    peakAmplitude = amplitude.toDouble();
+  } else if (amplitude is double) {
+    peakAmplitude = amplitude;
   }
+  
+  // Helper function to safely extract numeric values
+  double safeDouble(dynamic value) {
+    if (value == null) return 0.0;
+    if (value is int) return value.toDouble();
+    if (value is double) return value;
+    return 0.0;
+  }
+  
+  // Helper function to safely extract boolean values
+  bool safeBool(dynamic value) {
+    if (value == null) return false;
+    if (value is bool) return value;
+    if (value is String) return value.toLowerCase() == 'true';
+    return false;
+  }
+  
+  return Recording(
+    timestamp: DateTime.parse(data['timestamp']),
+    filename: data['filename'],
+    duration: data['duration'] ?? 0,
+    sampleRate: data['sampleRate'] ?? 2000,
+    bitsPerSample: data['bitsPerSample'] ?? 16,
+    channels: data['channels'] ?? 1,
+    peakAmplitude: peakAmplitude,
+    downloadUrl: data['downloadUrl'],
+    // Heart murmur properties with safe type handling
+    murmurProbability: safeDouble(data['murmurProbability']),
+    murmurType: data['murmurType'] as String? ?? 'None',
+    murmurGrade: data['murmurGrade'] as String? ?? 'N/A',
+    isSystolicMurmur: safeBool(data['isSystolicMurmur']),
+    isDiastolicMurmur: safeBool(data['isDiastolicMurmur']),
+    dominantFrequency: safeDouble(data['dominantFrequency']),
+    signalToNoiseRatio: safeDouble(data['signalToNoiseRatio']),
+  );
+}
   
   // Helper for displaying murmur info
   String getMurmurDescription() {

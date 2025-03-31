@@ -1781,7 +1781,7 @@ List<int> enhanceHeartSounds(List<int> audioData, {
 }
 
   Future<List<Recording>> getRecordingsForPatient(
-    String uid, String medicalCardNumber) async {
+  String uid, String medicalCardNumber) async {
   try {
     String sanitizedMedicalCard = medicalCardNumber.replaceAll('/', '_');
 
@@ -1802,41 +1802,27 @@ List<int> enhanceHeartSounds(List<int> audioData, {
     List<Recording> recordings = [];
 
     for (var entry in recordingsMap.entries) {
-      Map<dynamic, dynamic> recordingData =
-          entry.value as Map<dynamic, dynamic>;
-      
-      // Create recording with base data
-      Recording recording = Recording.fromMap(recordingData);
-      
-      // Add heart murmur data if available
-      if (recordingData.containsKey('murmurProbability')) {
-        recording.murmurProbability = recordingData['murmurProbability'] as double;
-      }
-      if (recordingData.containsKey('murmurType')) {
-        recording.murmurType = recordingData['murmurType'] as String;
-      }
-      if (recordingData.containsKey('murmurGrade')) {
-        recording.murmurGrade = recordingData['murmurGrade'] as String;
-      }
-      if (recordingData.containsKey('isSystolicMurmur')) {
-        recording.isSystolicMurmur = recordingData['isSystolicMurmur'] as bool;
-      }
-      if (recordingData.containsKey('isDiastolicMurmur')) {
-        recording.isDiastolicMurmur = recordingData['isDiastolicMurmur'] as bool;
-      }
-      if (recordingData.containsKey('dominantFrequency')) {
-        recording.dominantFrequency = recordingData['dominantFrequency'] as double;
-      }
-
       try {
-        String downloadUrl =
-            await _storage.ref(recording.filename).getDownloadURL();
-        recording.downloadUrl = downloadUrl;
-        recordings.add(recording);
+        Map<dynamic, dynamic> recordingData =
+            entry.value as Map<dynamic, dynamic>;
+        
+        // Create recording with base data
+        Recording recording = Recording.fromMap(recordingData);
+        
+        try {
+          String downloadUrl =
+              await _storage.ref(recording.filename).getDownloadURL();
+          recording.downloadUrl = downloadUrl;
+          recordings.add(recording);
+        } catch (e) {
+          _logger.warning(
+              'Error getting download URL for recording ${recording.filename}: $e');
+          // Still add the recording even without download URL
+          recordings.add(recording);
+        }
       } catch (e) {
-        _logger.warning(
-            'Error getting download URL for recording ${recording.filename}: $e');
-        continue;
+        _logger.warning('Error parsing recording data: $e');
+        // Continue with next recording
       }
     }
 
