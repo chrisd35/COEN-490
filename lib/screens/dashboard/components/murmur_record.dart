@@ -6,6 +6,8 @@ import 'package:flutter/material.dart';
 import 'package:audioplayers/audioplayers.dart';
 import 'package:provider/provider.dart';
 import 'package:fl_chart/fl_chart.dart';
+import 'package:google_fonts/google_fonts.dart';
+import 'package:flutter_animate/flutter_animate.dart';
 import '/utils/ble_manager.dart';
 import '../../registration/firebase_service.dart';
 import '/utils/models.dart';
@@ -14,7 +16,44 @@ import '../../../utils/app_routes.dart';
 import '../../../widgets/back_button.dart';
 import 'package:logging/logging.dart' as logging;
 
-final _logger = logging.Logger('AccountProfilePage');
+final _logger = logging.Logger('MurmurRecord');
+
+// Design constants to maintain consistency throughout the app
+class AppTheme {
+  // Main color palette - refining the blue scheme
+  static const Color primaryColor = Color(0xFF1D557E);  // Main blue
+  static const Color secondaryColor = Color(0xFFE6EDF7); // Light blue background
+  static const Color accentColor = Color(0xFF2E86C1);   // Medium blue for accents
+  
+  // Status colors - refined for better contrast
+  static const Color successColor = Color(0xFF2E7D32); // Darker green
+  static const Color warningColor = Color(0xFFF57F17); // Amber shade
+  static const Color errorColor = Color(0xFFD32F2F);   // Dark red
+  
+  // Text colors - improved for readability
+  static const Color textPrimary = Color(0xFF263238);   // Darker for better contrast
+  static const Color textSecondary = Color(0xFF546E7A); // Medium dark for subtext
+  static const Color textLight = Color(0xFF78909C);     // Light text for tertiary info
+  
+  // Shadows - refined for better depth perception
+  static final cardShadow = BoxShadow(
+    color: Colors.black.withAlpha(18),  
+    blurRadius: 12,
+    spreadRadius: 0,
+    offset: const Offset(0, 3),
+  );
+  
+  static final subtleShadow = BoxShadow(
+    color: Colors.black.withAlpha(10), 
+    blurRadius: 6,
+    spreadRadius: 0,
+    offset: const Offset(0, 2),
+  );
+  
+  // Border radius
+  static final BorderRadius borderRadius = BorderRadius.circular(16);
+  static final BorderRadius buttonRadius = BorderRadius.circular(12);
+}
 
 class MurmurRecord extends StatefulWidget {
   final String? preselectedPatientId;
@@ -27,8 +66,10 @@ class MurmurRecord extends StatefulWidget {
   @override
   State<MurmurRecord> createState() => MurmurRecordState();
 }
-
-class MurmurRecordState extends State<MurmurRecord> {
+class MurmurRecordState extends State<MurmurRecord> with SingleTickerProviderStateMixin {
+  // Animation controller for recording indicator
+  late AnimationController _animationController;
+  
   final AudioPlayer _audioPlayer = AudioPlayer();
   final FirebaseService _firebaseService = FirebaseService();
   bool _isRecording = false;
@@ -38,52 +79,65 @@ class MurmurRecordState extends State<MurmurRecord> {
   List<int>? _recordedAudioData;
   Duration _recordingDuration = Duration.zero;
   Timer? _recordingTimer;
-  double _playbackVolume = 1.0; // Add this line
-  
-  // Heart murmur analysis state
-  double _murmurProbability = 0.0;
-  String _murmurType = 'None';
-  double _dominantFrequency = 0.0;
-  bool _isSystolic = false;
-  bool _isDiastolic = false;
-  String _murmurGrade = 'N/A';
+  double _playbackVolume = 1.0;
   
   // UI display settings
-  bool _showAdvancedAnalysis = false;
-
-  bool _debugModeEnabled = false;
-bool _playingRawAudio = false;
+  bool _isProcessing = false;
 
   @override
   void initState() {
     super.initState();
     _cameFromPatientDetails = widget.preselectedPatientId != null;
     _setupAudioPlayer();
+    
+    // Initialize animation controller
+    _animationController = AnimationController(
+      vsync: this,
+      duration: const Duration(milliseconds: 500),
+    );
   }
 
-void _setupAudioPlayer() {
-  _audioPlayer.onPlayerStateChanged.listen(_onPlayerStateChanged);
-  _audioPlayer.onPlayerComplete.listen(_onPlayerCompleteListener);
-}
-
-// Define these helper methods at class level
-void _onPlayerStateChanged(PlayerState state) {
-  if (mounted) {
-    setState(() {
-      _isPlaying = state == PlayerState.playing;
-    });
+  void _setupAudioPlayer() {
+    _audioPlayer.onPlayerStateChanged.listen(_onPlayerStateChanged);
+    _audioPlayer.onPlayerComplete.listen(_onPlayerCompleteListener);
   }
-}
 
-void _onPlayerCompleteListener(_) {
-  if (mounted) {
-    setState(() {
-      _isPlaying = false;
-    });
+  // Define these helper methods at class level
+  void _onPlayerStateChanged(PlayerState state) {
+    if (mounted) {
+      setState(() {
+        _isPlaying = state == PlayerState.playing;
+      });
+    }
   }
-}
+
+  void _onPlayerCompleteListener(_) {
+    if (mounted) {
+      setState(() {
+        _isPlaying = false;
+      });
+    }
+  }
+  
+  @override
+  void dispose() {
+    // Cancel timer first
+    _recordingTimer?.cancel();
+    
+    // Stop audio playback when navigating away
+    if (_isPlaying) {
+      _audioPlayer.stop();
+    }
+    
+    // Dispose of animation controller
+    _animationController.dispose();
+    
+    // Dispose of the audio player
+    _audioPlayer.dispose();
+    super.dispose();
+  }
   // Add a new method to handle the back button press
-  Future<void> _handleBackButton() async {
+ Future<void> _handleBackButton() async {
     if (_isPlaying) {
       await _audioPlayer.stop();
       if (mounted) {
@@ -115,51 +169,216 @@ void _onPlayerCompleteListener(_) {
       NavigationService.goBack();
     }
   }
-
  
+  Future<void> _showLoadingDialog(String message) async {
+    if (!mounted) return;
+    
+    // Use a barrierDismissible: false to prevent accidental dismissal
+    return showDialog(
+      context: context,
+      barrierDismissible: false,
+      builder: (BuildContext dialogContext) {
+        return WillPopScope(
+          onWillPop: () async => false, // Prevent back button from dismissing
+          child: AlertDialog(
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(16),
+            ),
+            content: Row(
+              children: [
+                CircularProgressIndicator(
+                  valueColor: AlwaysStoppedAnimation<Color>(AppTheme.primaryColor),
+                ),
+                const SizedBox(width: 20),
+                Text(
+                  message,
+                  style: GoogleFonts.inter(
+                    fontSize: 16,
+                    color: AppTheme.textPrimary,
+                  ),
+                ),
+              ],
+            ),
+          ),
+        );
+      },
+    ).catchError((error) {
+      _logger.warning("Error in _showLoadingDialog: $error");
+      return null;
+    });
+  }
 
-Future<void> _showLoadingDialog(String message) async {
-  if (!mounted) return;
-  
-  // Use a barrierDismissible: false to prevent accidental dismissal
-  return showDialog(
-    context: context,
-    barrierDismissible: false,
-    builder: (BuildContext dialogContext) {
-      return WillPopScope(
-        onWillPop: () async => false, // Prevent back button from dismissing
-        child: AlertDialog(
-          content: Row(
-            children: [
-              const CircularProgressIndicator(),
-              const SizedBox(width: 20),
-              Text(message),
-            ],
+  // Add this helper method to show info snackbars
+  void _showInfoSnackBar(String message) {
+    if (!mounted) return;
+    
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Text(
+          message,
+          style: GoogleFonts.inter(
+            fontSize: 14,
+            color: Colors.white,
           ),
         ),
-      );
-    },
-  ).catchError((error) {
-    _logger.warning("Error in _showLoadingDialog: $error");
-    return null;
-  });
-}
+        backgroundColor: AppTheme.primaryColor,
+        behavior: SnackBarBehavior.floating,
+        margin: const EdgeInsets.all(16),
+        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(12),
+        ),
+        duration: const Duration(seconds: 2),
+      ),
+    );
+  }
+  
+  void _showSuccessSnackBar(String message) {
+    if (!mounted) return;
+    
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Text(
+          message,
+          style: GoogleFonts.inter(
+            fontSize: 14,
+            color: Colors.white,
+          ),
+        ),
+        backgroundColor: AppTheme.successColor,
+        behavior: SnackBarBehavior.floating,
+        margin: const EdgeInsets.all(16),
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(12),
+        ),
+        duration: const Duration(seconds: 2),
+      ),
+    );
+  }
 
-// Add this helper method to show info snackbars
-void _showInfoSnackBar(String message) {
-  if (!mounted) return;
+  void _showErrorSnackBar(String message) {
+    if (!mounted) return;
+    
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Text(
+          message,
+          style: GoogleFonts.inter(
+            fontSize: 14,
+            color: Colors.white,
+          ),
+        ),
+        backgroundColor: AppTheme.errorColor,
+        behavior: SnackBarBehavior.floating,
+        margin: const EdgeInsets.all(16),
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(12),
+        ),
+        duration: const Duration(seconds: 2),
+      ),
+    );
+  }
   
-  ScaffoldMessenger.of(context).showSnackBar(
-    SnackBar(
-      content: Text(message),
-      backgroundColor: Colors.blue,
-      behavior: SnackBarBehavior.fixed,
-      duration: const Duration(seconds: 2),
-    ),
-  );
-}
-  
-  void _startRecording() async {
+  void _showLoginPrompt() {
+    if (!mounted) return;
+    
+    showDialog(
+      context: context,
+      builder: (BuildContext context) {
+        return AlertDialog(
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(16),
+          ),
+          title: Text(
+            'Login Required',
+            style: GoogleFonts.inter(
+              fontSize: 20,
+              fontWeight: FontWeight.bold,
+              color: AppTheme.textPrimary,
+              height: 1.3,
+            ),
+            textAlign: TextAlign.center,
+          ),
+          content: Text(
+            'You need to be logged in to save recordings. Do you have an account?',
+            style: GoogleFonts.inter(
+              fontSize: 16,
+              color: AppTheme.textPrimary,
+              height: 1.5,
+            ),
+            textAlign: TextAlign.center,
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(context),
+              child: Text(
+                'Cancel',
+                style: GoogleFonts.inter(
+                  fontSize: 16,
+                  color: AppTheme.textSecondary,
+                  fontWeight: FontWeight.w500,
+                ),
+                textAlign: TextAlign.center,
+              ),
+            ),
+            TextButton(
+              onPressed: () {
+                Navigator.pop(context);
+                NavigationService.navigateTo(
+                  AppRoutes.login,
+                  arguments: {
+                    'returnRoute': 'murmur_record',
+                    'pendingAction': 'save_recording',
+                  },
+                ).then((value) {
+                  if (value == true && mounted) {
+                    // User has successfully logged in, show save dialog again
+                    _showSaveRecordingDialog();
+                  }
+                });
+              },
+              child: Text(
+                'Yes, I have an account',
+                style: GoogleFonts.inter(
+                  fontSize: 16,
+                  color: AppTheme.primaryColor,
+                  fontWeight: FontWeight.w500,
+                ),
+                textAlign: TextAlign.center,
+              ),
+            ),
+            TextButton(
+              onPressed: () {
+                Navigator.pop(context);
+                NavigationService.navigateTo(
+                  AppRoutes.register,
+                  arguments: {
+                    'returnRoute': 'murmur_record',
+                    'pendingAction': 'save_recording',
+                  },
+                ).then((value) {
+                  if (value == true && mounted) {
+                    // User has successfully registered, show save dialog again
+                    _showSaveRecordingDialog();
+                  }
+                });
+              },
+              child: Text(
+                'Create New Account',
+                style: GoogleFonts.inter(
+                  fontSize: 16,
+                  color: AppTheme.primaryColor,
+                  fontWeight: FontWeight.w600,
+                ),
+                textAlign: TextAlign.center,
+              ),
+            ),
+          ],
+        );
+      },
+    );
+  }
+ void _startRecording() async {
     if (!mounted) return;
     
     final bleManager = Provider.of<BLEManager>(context, listen: false);
@@ -173,15 +392,10 @@ void _showInfoSnackBar(String message) {
           _isRecording = true;
           _hasRecordingCompleted = false;
           _recordingDuration = Duration.zero;
-          _murmurProbability = 0.0;
-          _murmurType = 'None';
-          _dominantFrequency = 0.0;
-          _murmurGrade = 'N/A';
-          _isSystolic = false;
-          _isDiastolic = false;
         });
 
-        _startBufferSizeMonitoring();
+        // Animate the recording button
+        _animationController.repeat(reverse: true);
         
         // Use a more precise timer
         _recordingTimer = Timer.periodic(const Duration(milliseconds: 100), (timer) {
@@ -208,340 +422,301 @@ void _showInfoSnackBar(String message) {
     }
   }
 
-  void _startBufferSizeMonitoring() {
-    Stream.periodic(const Duration(milliseconds: 100)).listen((_) {
-      if (_isRecording && mounted) {
-        final bleManager = Provider.of<BLEManager>(context, listen: false);
-        // Update murmur probability in real-time if available
-        if (bleManager.murmurProbability > 0) {
-          setState(() {
-            _murmurProbability = bleManager.murmurProbability;
-            _murmurType = bleManager.murmurType;
-            _dominantFrequency = bleManager.dominantFrequency;
-            _isSystolic = bleManager.isSystolicMurmur;
-            _isDiastolic = bleManager.isDiastolicMurmur;
-            
-            // Calculate murmur grade based on probability
-            if (_murmurProbability < 0.3) {
-              _murmurGrade = 'N/A';
-            } else if (_murmurProbability < 0.5) {
-              _murmurGrade = 'Grade I';
-            } else if (_murmurProbability < 0.7) {
-              _murmurGrade = 'Grade II';
-            } else if (_murmurProbability < 0.85) {
-              _murmurGrade = 'Grade III';
-            } else {
-              _murmurGrade = 'Grade IV+';
-            }
-          });
-        }
-      }
-    });
-  }
-
   void _stopRecording() async {
-    final bleManager = Provider.of<BLEManager>(context, listen: false);
-    try {
-      _recordingTimer?.cancel();
-
-      // Show processing indicator
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: Text("Processing heart sound data..."),
-            duration: Duration(seconds: 10),
-          ),
-        );
-      }
-
-      // Get recording result
-      var result = await bleManager.stopRecording();
-      List<int> rawAudio = result['audioData']; // Extract audio data from map
-      Map<String, dynamic> metadata = result['metadata'];
-
-      if (rawAudio.isEmpty) {
-        if (mounted) {
-          _showErrorSnackBar("No audio data recorded");
-        }
-        return;
-      }
-
-      if (mounted) {
-        // Dismiss the processing snackbar
-        ScaffoldMessenger.of(context).hideCurrentSnackBar();
-        
-        setState(() {
-          _isRecording = false;
-          _hasRecordingCompleted = true;
-          _recordedAudioData = rawAudio;
-          
-          // Update murmur analysis from metadata
-          _murmurProbability = metadata['murmurProbability'] ?? 0.0;
-          _murmurType = metadata['murmurType'] ?? 'None';
-          _dominantFrequency = metadata['dominantFrequency'] ?? 0.0;
-          _isSystolic = metadata['isSystolicMurmur'] ?? false;
-          _isDiastolic = metadata['isDiastolicMurmur'] ?? false;
-          
-          // Calculate murmur grade based on probability
-          if (_murmurProbability < 0.3) {
-            _murmurGrade = 'N/A';
-          } else if (_murmurProbability < 0.5) {
-            _murmurGrade = 'Grade I';
-          } else if (_murmurProbability < 0.7) {
-            _murmurGrade = 'Grade II';
-          } else if (_murmurProbability < 0.85) {
-            _murmurGrade = 'Grade III';
-          } else {
-            _murmurGrade = 'Grade IV+';
-          }
-        });
-        
-        // Show success message with murmur information
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text(
-              _murmurProbability > 0.3 
-                ? "Heart sound recording complete. Potential ${_murmurType.toLowerCase()} detected."
-                : "Heart sound recording complete. No significant murmur detected."
-            ),
-            backgroundColor: _murmurProbability > 0.3 ? Colors.orange : Colors.green,
-            duration: const Duration(seconds: 3),
-          ),
-        );
-      }
-    } catch (e) {
-      if (mounted) {
-        _showErrorSnackBar("Error processing recording: $e");
-        setState(() {
-          _isRecording = false;
-        });
-      }
-    }
-  }
-  
-Future<void> _playPreviewRecording() async {
-  if (_recordedAudioData == null) return;
-
   try {
-    if (_isPlaying) {
-      await _audioPlayer.pause();
-      if (mounted) {
-        setState(() {
-          _isPlaying = false;
-        });
-      }
-    } else {
-      // Get a copy of the audio data
-      List<int> audioDataCopy = List.from(_recordedAudioData!);
-      
-      // Apply enhanced amplification that targets heartbeats
-      List<int> enhancedAudio = _firebaseService.enhanceHeartbeatWithAmplification(
-        audioDataCopy,
-        sampleRate: BLEManager.sampleRate,
-        threshold: 0.03,
-        beatGain: 3000.0,
-        overallGain: 5.0,
-        noiseSuppression: 0.001,
-        shiftFrequencies: false,
-        frequencyShift: 1.5
-        
-      );
-      
-      // Create WAV with enhanced audio
-      final wavData = _firebaseService.createRawWavFile(
-        enhancedAudio,
-        sampleRate: BLEManager.sampleRate,
-        bitsPerSample: 16,
-        channels: 1
-      );
+    _recordingTimer?.cancel();
+    _animationController.stop();
 
-      // Play the enhanced audio
-      await _audioPlayer.play(
-        BytesSource(Uint8List.fromList(wavData)),
-      );
+    setState(() {
+      _isProcessing = true;
+    });
+
+    final bleManager = Provider.of<BLEManager>(context, listen: false);
+    final result = await bleManager.stopRecording();
+    List<int> rawAudio = result['audioData'];
+
+    if (mounted) {
+      setState(() {
+        _isRecording = false;
+        _hasRecordingCompleted = true;
+        _recordedAudioData = rawAudio;
+        _isProcessing = false;
+      });
       
-      // Set volume to maximum for best effect
-      await _audioPlayer.setVolume(1.0);
-      
-      if (mounted) {
-        setState(() {
-          _isPlaying = true;
-          _playbackVolume = 1.0;  // Update the UI slider
-        });
-        
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: Text("Playing amplified heart sounds"),
-            duration: Duration(seconds: 3),
-          ),
-        );
-      }
+      _showSuccessSnackBar("Recording completed successfully");
     }
   } catch (e) {
     if (mounted) {
-      _showErrorSnackBar("Failed to play recording: $e");
+      _showErrorSnackBar("Error processing recording: $e");
+      setState(() {
+        _isRecording = false;
+        _isProcessing = false;
+      });
     }
   }
 }
-
- // Replace the entire _showSaveRecordingDialog method with this version
-void _showSaveRecordingDialog() async {
-  _logger.info("Starting save recording dialog flow");
-  if (!mounted) return;
   
-  final authService = Provider.of<AuthService>(context, listen: false);
-  if (authService.getCurrentUser() == null) {
-    _showLoginPrompt();
-    return;
+  Future<void> _playPreviewRecording() async {
+    if (_recordedAudioData == null) return;
+
+    try {
+      if (_isPlaying) {
+        await _audioPlayer.pause();
+        if (mounted) {
+          setState(() {
+            _isPlaying = false;
+          });
+        }
+      } else {
+        // Get a copy of the audio data
+        List<int> audioDataCopy = List.from(_recordedAudioData!);
+        
+        // Apply enhanced amplification that targets heartbeats
+        List<int> enhancedAudio = _firebaseService.enhanceHeartbeatWithAmplification(
+          audioDataCopy,
+          sampleRate: BLEManager.sampleRate,
+          threshold: 0.03,
+          beatGain: 3000.0,
+          overallGain: 5.0,
+          noiseSuppression: 0.001,
+          shiftFrequencies: false,
+          frequencyShift: 1.5
+        );
+        
+        // Create WAV with enhanced audio
+        final wavData = _firebaseService.createRawWavFile(
+          enhancedAudio,
+          sampleRate: BLEManager.sampleRate,
+          bitsPerSample: 16,
+          channels: 1
+        );
+
+        // Play the enhanced audio
+        await _audioPlayer.play(
+          BytesSource(Uint8List.fromList(wavData)),
+        );
+        
+        // Set volume
+        await _audioPlayer.setVolume(_playbackVolume);
+        
+        if (mounted) {
+          setState(() {
+            _isPlaying = true;
+          });
+          
+          _showInfoSnackBar("Playing recording");
+        }
+      }
+    } catch (e) {
+      if (mounted) {
+        _showErrorSnackBar("Failed to play recording: $e");
+      }
+    }
   }
-
-  final String uid = authService.getCurrentUser()!.uid;
-  
-  // If we have a preselected patient, save directly to that patient
-  if (widget.preselectedPatientId != null) {
-    _saveRecordingToPatient(uid, widget.preselectedPatientId!);
-    return;
-  }
-
-  // Use a flag to track if loading dialog is shown
-  bool isLoadingDialogShown = false;
-  BuildContext? dialogContext;
-  
-  try {
-    // Show loading while fetching patients
+  // Simplified save recording dialog
+  void _showSaveRecordingDialog() async {
+    _logger.info("Starting save recording dialog flow");
     if (!mounted) return;
     
-    _logger.info("Showing loading dialog before fetching patients");
-    
-    // Show a loading indicator directly in the current context
-    // This avoids navigation issues with showDialog
-    showDialog(
-      context: context,
-      barrierDismissible: false,
-      builder: (context) {
-        dialogContext = context; // Store the dialog context for later use
-        return WillPopScope(
-          onWillPop: () async => false,
-          child: const AlertDialog(
-            content: Row(
-              children: [
-                CircularProgressIndicator(),
-                SizedBox(width: 20),
-                Text("Loading patients..."),
-              ],
-            ),
-          ),
-        );
-      },
-    );
-    isLoadingDialogShown = true;
+    final authService = Provider.of<AuthService>(context, listen: false);
+    if (authService.getCurrentUser() == null) {
+      _showLoginPrompt();
+      return;
+    }
 
-    // Fetch patients list
-    _logger.info("Fetching patients for user: $uid");
-    List<Patient> patients = [];
+    final String uid = authService.getCurrentUser()!.uid;
+    
+    // If we have a preselected patient, save directly to that patient
+    if (widget.preselectedPatientId != null) {
+      _saveRecordingToPatient(uid, widget.preselectedPatientId!);
+      return;
+    }
+
+    // Use a flag to track if loading dialog is shown
+    bool isLoadingDialogShown = false;
+    BuildContext? dialogContext;
     
     try {
-      patients = await _firebaseService.getPatientsForUser(uid);
-    } catch (e) {
-      _logger.severe("Error fetching patients: $e");
+      // Show loading while fetching patients
+      if (!mounted) return;
       
-      // Dismiss loading dialog if shown and we've stored the context
+      _logger.info("Showing loading dialog before fetching patients");
+      
+      // Show a loading indicator directly in the current context
+      showDialog(
+        context: context,
+        barrierDismissible: false,
+        builder: (context) {
+          dialogContext = context; // Store the dialog context for later use
+          return WillPopScope(
+            onWillPop: () async => false,
+            child: AlertDialog(
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(16),
+              ),
+              content: Row(
+                children: [
+                  CircularProgressIndicator(
+                    valueColor: AlwaysStoppedAnimation<Color>(AppTheme.primaryColor),
+                  ),
+                  const SizedBox(width: 20),
+                  Text(
+                    "Loading patients...",
+                    style: GoogleFonts.inter(
+                      fontSize: 16,
+                      color: AppTheme.textPrimary,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          );
+        },
+      );
+      isLoadingDialogShown = true;
+
+      // Fetch patients list
+      _logger.info("Fetching patients for user: $uid");
+      List<Patient> patients = [];
+      
+      try {
+        patients = await _firebaseService.getPatientsForUser(uid);
+      } catch (e) {
+        _logger.severe("Error fetching patients: $e");
+        
+        // Dismiss loading dialog if shown and we've stored the context
+        if (isLoadingDialogShown && dialogContext != null && mounted) {
+          Navigator.of(dialogContext!).pop();
+          isLoadingDialogShown = false;
+        }
+        
+        if (mounted) {
+          _showErrorSnackBar("Failed to load patients: $e");
+        }
+        return;
+      }
+      
+      // Check if widget is still mounted before proceeding
+      if (!mounted) {
+        _logger.warning("Widget unmounted after fetching patients");
+        return;
+      }
+      
+      // Dismiss loading dialog using the stored context
       if (isLoadingDialogShown && dialogContext != null && mounted) {
+        _logger.info("Dismissing loading dialog after fetching patients");
         Navigator.of(dialogContext!).pop();
         isLoadingDialogShown = false;
       }
       
-      if (mounted) {
-        _showErrorSnackBar("Failed to load patients: $e");
+      // Early return if unmounted after dialog dismissal
+      if (!mounted) {
+        _logger.warning("Widget unmounted after dismissing loading dialog");
+        return;
       }
-      return;
-    }
-    
-    // Check if widget is still mounted before proceeding
-    if (!mounted) {
-      _logger.warning("Widget unmounted after fetching patients");
-      return;
-    }
-    
-    // Dismiss loading dialog using the stored context
-    if (isLoadingDialogShown && dialogContext != null && mounted) {
-      _logger.info("Dismissing loading dialog after fetching patients");
-      Navigator.of(dialogContext!).pop();
-      isLoadingDialogShown = false;
-    }
-    
-    // Early return if unmounted after dialog dismissal
-    if (!mounted) {
-      _logger.warning("Widget unmounted after dismissing loading dialog");
-      return;
-    }
 
-    // Handle empty patients list
-    if (patients.isEmpty) {
-      _logger.info("No patients found, showing create patient dialog");
-      _showNoPatientDialog();
-      return;
-    }
-    
-    if (!mounted) return;
-    
-    // Show the patient selection dialog
-    _logger.info("Showing patient selection options dialog");
-    showDialog(
-      context: context,
-      builder: (context) {
-        return AlertDialog(
-          title: const Text('Save Heart Sound Recording'),
-          content: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              ListTile(
-                leading: const Icon(Icons.person_add),
-                title: const Text('Create New Patient'),
-                onTap: () {
-                  Navigator.pop(context);
-                  _navigateToCreatePatient();
-                },
+      // Handle empty patients list
+      if (patients.isEmpty) {
+        _logger.info("No patients found, showing create patient dialog");
+        _showNoPatientDialog();
+        return;
+      }
+      
+      if (!mounted) return;
+      
+      // Show the patient selection dialog
+      _logger.info("Showing patient selection options dialog");
+      showDialog(
+        context: context,
+        builder: (context) {
+          return AlertDialog(
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(16),
+            ),
+            title: Text(
+              'Save Recording',
+              style: GoogleFonts.inter(
+                fontSize: 20,
+                fontWeight: FontWeight.bold,
+                color: AppTheme.textPrimary,
               ),
-              ListTile(
-                leading: const Icon(Icons.people),
-                title: const Text('Select Existing Patient'),
-                onTap: () {
-                  Navigator.pop(context);
-                  _showPatientSelectionDialog(uid, patients);
-                },
+            ),
+            content: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                ListTile(
+                  leading: Icon(Icons.person_add, color: AppTheme.primaryColor),
+                  title: Text(
+                    'Create New Patient',
+                    style: GoogleFonts.inter(
+                      fontSize: 16,
+                      color: AppTheme.textPrimary,
+                    ),
+                  ),
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(8),
+                  ),
+                  onTap: () {
+                    Navigator.pop(context);
+                    _navigateToCreatePatient();
+                  },
+                ),
+                const SizedBox(height: 8),
+                ListTile(
+                  leading: Icon(Icons.people, color: AppTheme.primaryColor),
+                  title: Text(
+                    'Select Existing Patient',
+                    style: GoogleFonts.inter(
+                      fontSize: 16,
+                      color: AppTheme.textPrimary,
+                    ),
+                  ),
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(8),
+                  ),
+                  onTap: () {
+                    Navigator.pop(context);
+                    _showPatientSelectionDialog(uid, patients);
+                  },
+                ),
+              ],
+            ),
+            actions: [
+              TextButton(
+                child: Text(
+                  'Cancel',
+                  style: GoogleFonts.inter(
+                    fontSize: 16,
+                    color: AppTheme.textSecondary,
+                    fontWeight: FontWeight.w500,
+                  ),
+                ),
+                onPressed: () => Navigator.pop(context),
               ),
             ],
-          ),
-          actions: [
-            TextButton(
-              child: const Text('Cancel'),
-              onPressed: () => Navigator.pop(context),
-            ),
-          ],
-        );
-      },
-    );
-  } catch (e) {
-    // Log the error
-    _logger.severe("Error in _showSaveRecordingDialog: $e");
-    
-    // Make sure to dismiss loading dialog if it's showing
-    if (isLoadingDialogShown && dialogContext != null && mounted) {
-      try {
-        _logger.info("Dismissing loading dialog after error");
-        Navigator.of(dialogContext!).pop();
-      } catch (dialogError) {
-        _logger.warning("Error dismissing loading dialog: $dialogError");
+          );
+        },
+      );
+    } catch (e) {
+      // Log the error
+      _logger.severe("Error in _showSaveRecordingDialog: $e");
+      
+      // Make sure to dismiss loading dialog if it's showing
+      if (isLoadingDialogShown && dialogContext != null && mounted) {
+        try {
+          _logger.info("Dismissing loading dialog after error");
+          Navigator.of(dialogContext!).pop();
+        } catch (dialogError) {
+          _logger.warning("Error dismissing loading dialog: $dialogError");
+        }
       }
+      
+      // Check if still mounted before showing error
+      if (!mounted) return;
+      
+      _showErrorSnackBar("Failed to load patients: $e");
     }
-    
-    // Check if still mounted before showing error
-    if (!mounted) return;
-    
-    _showErrorSnackBar("Failed to load patients: $e");
   }
-}
 
   void _navigateToCreatePatient() {
     if (!mounted) return;
@@ -566,7 +741,17 @@ void _showSaveRecordingDialog() async {
       context: context,
       builder: (BuildContext context) {
         return AlertDialog(
-          title: const Text('Select Patient'),
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(16),
+          ),
+          title: Text(
+            'Select Patient',
+            style: GoogleFonts.inter(
+              fontSize: 20,
+              fontWeight: FontWeight.bold,
+              color: AppTheme.textPrimary,
+            ),
+          ),
           content: SizedBox(
             width: double.maxFinite,
             height: 300, // Fixed height for scrollable list
@@ -575,20 +760,46 @@ void _showSaveRecordingDialog() async {
               itemCount: patients.length,
               itemBuilder: (context, index) {
                 final patient = patients[index];
-                return ListTile(
-                  title: Text(patient.fullName),
-                  subtitle: Text('Medical Card: ${patient.medicalCardNumber}'),
-                  onTap: () {
-                    Navigator.pop(context);
-                    _saveRecordingToPatient(uid, patient.medicalCardNumber);
-                  },
+                return Card(
+                  margin: const EdgeInsets.symmetric(vertical: 4),
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(8),
+                  ),
+                  child: ListTile(
+                    title: Text(
+                      patient.fullName,
+                      style: GoogleFonts.inter(
+                        fontSize: 16,
+                        fontWeight: FontWeight.w500,
+                        color: AppTheme.textPrimary,
+                      ),
+                    ),
+                    subtitle: Text(
+                      'Medical Card: ${patient.medicalCardNumber}',
+                      style: GoogleFonts.inter(
+                        fontSize: 14,
+                        color: AppTheme.textSecondary,
+                      ),
+                    ),
+                    onTap: () {
+                      Navigator.pop(context);
+                      _saveRecordingToPatient(uid, patient.medicalCardNumber);
+                    },
+                  ),
                 );
               },
             ),
           ),
           actions: [
             TextButton(
-              child: const Text('Cancel'),
+              child: Text(
+                'Cancel',
+                style: GoogleFonts.inter(
+                  fontSize: 16,
+                  color: AppTheme.textSecondary,
+                  fontWeight: FontWeight.w500,
+                ),
+              ),
               onPressed: () => Navigator.pop(context),
             ),
           ],
@@ -602,17 +813,47 @@ void _showSaveRecordingDialog() async {
     
     showDialog(
       context: context,
-      builder: (BuildContext dialogContext) { // Use dialogContext instead of context
+      builder: (BuildContext dialogContext) {
         return AlertDialog(
-          title: const Text('No Patients Found'),
-          content: const Text('Would you like to create a new patient?'),
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(16),
+          ),
+          title: Text(
+            'No Patients Found',
+            style: GoogleFonts.inter(
+              fontSize: 20,
+              fontWeight: FontWeight.bold,
+              color: AppTheme.textPrimary,
+            ),
+          ),
+          content: Text(
+            'Would you like to create a new patient?',
+            style: GoogleFonts.inter(
+              fontSize: 16,
+              color: AppTheme.textPrimary,
+            ),
+          ),
           actions: [
             TextButton(
-              child: const Text('Cancel'),
+              child: Text(
+                'Cancel',
+                style: GoogleFonts.inter(
+                  fontSize: 16,
+                  color: AppTheme.textSecondary,
+                  fontWeight: FontWeight.w500,
+                ),
+              ),
               onPressed: () => Navigator.pop(dialogContext),
             ),
             TextButton(
-              child: const Text('Create Patient'),
+              child: Text(
+                'Create Patient',
+                style: GoogleFonts.inter(
+                  fontSize: 16,
+                  color: AppTheme.primaryColor,
+                  fontWeight: FontWeight.w500,
+                ),
+              ),
               onPressed: () {
                 Navigator.pop(dialogContext);
                 if (mounted) { // Check if still mounted
@@ -625,422 +866,283 @@ void _showSaveRecordingDialog() async {
       },
     );
   }
-
-
-// Replace the _saveRecordingToPatient method with this version
-Future<void> _saveRecordingToPatient(String uid, String patientId) async {
-  if (_recordedAudioData == null || !mounted) {
-    _logger.warning("Save aborted: recordedAudioData is null or widget not mounted");
-    return;
-  }
-  
-  _logger.info("--- START SAVE RECORDING PROCESS ---");
-  _logger.info("UID: $uid, Patient ID: $patientId");
-  _logger.info("Raw audio data size: ${_recordedAudioData!.length} bytes");
-  
-  // Get data before showing dialog
-  final bleManager = Provider.of<BLEManager>(context, listen: false);
-  final roundedDuration = ((_recordingDuration.inMilliseconds + 500) / 1000).floor();
-  _logger.info("Recording duration: $roundedDuration seconds");
-  
-  // Get a copy of the audio data
-  _logger.info("Creating copy of audio data...");
-  List<int> audioDataCopy = List.from(_recordedAudioData!);
-  _logger.info("Audio data copied successfully, size: ${audioDataCopy.length} bytes");
-  
-  // Apply the same enhancement that's used for playback
-  _logger.info("Starting audio enhancement with beatGain=1000...");
-  List<int> enhancedAudio;
-  try {
-    enhancedAudio = _firebaseService.enhanceHeartbeatWithAmplification(
-      audioDataCopy,
-      sampleRate: BLEManager.sampleRate,
-       threshold: 0.03,
+  // Simplified save recording to patient method
+  Future<void> _saveRecordingToPatient(String uid, String patientId) async {
+    if (_recordedAudioData == null || !mounted) {
+      _logger.warning("Save aborted: recordedAudioData is null or widget not mounted");
+      return;
+    }
+    
+    _logger.info("--- START SAVE RECORDING PROCESS ---");
+    _logger.info("UID: $uid, Patient ID: $patientId");
+    _logger.info("Raw audio data size: ${_recordedAudioData!.length} bytes");
+    
+    // Get data before showing dialog
+    final bleManager = Provider.of<BLEManager>(context, listen: false);
+    final roundedDuration = ((_recordingDuration.inMilliseconds + 500) / 1000).floor();
+    _logger.info("Recording duration: $roundedDuration seconds");
+    
+    // Get a copy of the audio data
+    _logger.info("Creating copy of audio data...");
+    List<int> audioDataCopy = List.from(_recordedAudioData!);
+    _logger.info("Audio data copied successfully, size: ${audioDataCopy.length} bytes");
+    
+    // Apply the same enhancement that's used for playback
+    _logger.info("Starting audio enhancement...");
+    List<int> enhancedAudio;
+    try {
+      enhancedAudio = _firebaseService.enhanceHeartbeatWithAmplification(
+        audioDataCopy,
+        sampleRate: BLEManager.sampleRate,
+        threshold: 0.03,
         beatGain: 3000.0,
         overallGain: 5.0,
         noiseSuppression: 0.001,
         shiftFrequencies: false,
-      frequencyShift: 1.5
-    );
-    _logger.info("Enhancement complete, enhanced size: ${enhancedAudio.length} bytes");
+        frequencyShift: 1.5
+      );
+      _logger.info("Enhancement complete, enhanced size: ${enhancedAudio.length} bytes");
+    } catch (e) {
+      _logger.severe("Audio enhancement failed: $e");
+      if (mounted) {
+        _showErrorSnackBar("Failed to enhance audio: $e");
+      }
+      return;
+    }
     
-    // Log a small sample of the audio
-    if (enhancedAudio.length >= 20) {
-      _logger.info("First 10 enhanced samples: ${enhancedAudio.sublist(0, 10)}");
-      _logger.info("Last 10 enhanced samples: ${enhancedAudio.sublist(enhancedAudio.length - 10)}");
+    if (enhancedAudio.isEmpty) {
+      _logger.severe("Enhanced audio is empty!");
+      if (mounted) {
+        _showErrorSnackBar("Error: Enhanced audio processing failed");
+      }
+      return;
     }
-  } catch (e) {
-    _logger.severe("Audio enhancement failed: $e");
-    if (mounted) {
-      _showErrorSnackBar("Failed to enhance audio: $e");
+    
+    if (!mounted) {
+      _logger.warning("Widget unmounted after enhancement");
+      return;
     }
-    return;
-  }
-  
-  if (enhancedAudio.isEmpty) {
-    _logger.severe("Enhanced audio is empty!");
-    if (mounted) {
-      _showErrorSnackBar("Error: Enhanced audio processing failed");
-    }
-    return;
-  }
-  
-  if (!mounted) {
-    _logger.warning("Widget unmounted after enhancement");
-    return;
-  }
-  
-  // Flag to track loading dialog state
-  bool isLoadingDialogShown = false;
-  BuildContext? dialogContext;
-  
-  try {
-    // Show loading dialog
-    _logger.info("Showing loading dialog...");
-    if (mounted) {
-      showDialog(
-        context: context,
-        barrierDismissible: false,
-        builder: (context) {
-          dialogContext = context; // Store dialog context
-          return WillPopScope(
-            onWillPop: () async => false, // Prevent back button from dismissing
-            child: const AlertDialog(
-              content: Row(
-                children: [
-                  CircularProgressIndicator(),
-                  SizedBox(width: 20),
-                  Text("Saving heart sound recording..."),
-                ],
+    
+    // Flag to track loading dialog state
+    bool isLoadingDialogShown = false;
+    BuildContext? dialogContext;
+    
+    try {
+      // Show loading dialog
+      _logger.info("Showing loading dialog...");
+      if (mounted) {
+        showDialog(
+          context: context,
+          barrierDismissible: false,
+          builder: (context) {
+            dialogContext = context; // Store dialog context
+            return WillPopScope(
+              onWillPop: () async => false, // Prevent back button from dismissing
+              child: AlertDialog(
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(16),
+                ),
+                content: Row(
+                  children: [
+                    CircularProgressIndicator(
+                      valueColor: AlwaysStoppedAnimation<Color>(AppTheme.primaryColor),
+                    ),
+                    const SizedBox(width: 20),
+                    Text(
+                      "Saving recording...",
+                      style: GoogleFonts.inter(
+                        fontSize: 16,
+                        color: AppTheme.textPrimary,
+                      ),
+                    ),
+                  ],
+                ),
               ),
-            ),
-          );
+            );
+          },
+        );
+        isLoadingDialogShown = true;
+        _logger.info("Loading dialog shown successfully");
+      }
+    } catch (e) {
+      _logger.severe("Failed to show loading dialog: $e");
+      // Continue anyway
+    }
+    
+    // Check if still mounted after dialog is shown
+    if (!mounted) {
+      _logger.warning("Widget unmounted after showing dialog");
+      return;
+    }
+
+    try {
+      _logger.info("Calling FirebaseService.saveRecording...");
+      await _firebaseService.saveRecording(
+        uid,
+        patientId,
+        DateTime.now(),
+        enhancedAudio,
+        {
+          'duration': roundedDuration,
+          'sampleRate': BLEManager.sampleRate, 
+          'bitsPerSample': BLEManager.bitsPerSample,
+          'channels': BLEManager.channels,
+          'peakAmplitude': bleManager.peakAmplitude,
+          'processingApplied': true,
+          'processingDetails': 'heartbeat-amplification',
+          'amplificationSettings': {
+            'threshold': 0.03,
+            'beatGain': 3000.0,
+            'overallGain': 5.0,
+            'noiseSuppression': 0.001,
+            'frequencyShift': 1.5
+          },
+          'signalToNoiseRatio': bleManager.signalToNoiseRatio,
         },
       );
-      isLoadingDialogShown = true;
-      _logger.info("Loading dialog shown successfully");
-    }
-  } catch (e) {
-    _logger.severe("Failed to show loading dialog: $e");
-    // Continue anyway
-  }
-  
-  // Check if still mounted after dialog is shown
-  if (!mounted) {
-    _logger.warning("Widget unmounted after showing dialog");
-    return;
-  }
+      _logger.info("saveRecording completed successfully");
 
-  try {
-    _logger.info("Calling FirebaseService.saveRecording...");
-    await _firebaseService.saveRecording(
-      uid,
-      patientId,
-      DateTime.now(),
-      enhancedAudio,
-      {
-        'duration': roundedDuration,
-        'sampleRate': BLEManager.sampleRate, 
-        'bitsPerSample': BLEManager.bitsPerSample,
-        'channels': BLEManager.channels,
-        'peakAmplitude': bleManager.peakAmplitude,
-        'processingApplied': true,
-        'processingDetails': 'heartbeat-amplification',
-        'amplificationSettings': {
-          'threshold': 0.03,
-          'beatGain': 3000.0,
-          'overallGain': 5.0,
-          'noiseSuppression': 0.001,
-          'frequencyShift': 1.5
-           
-        },
-        'signalToNoiseRatio': bleManager.signalToNoiseRatio,
-        'murmurProbability': _murmurProbability,
-        'murmurType': _murmurType,
-        'dominantFrequency': _dominantFrequency,
-        'isSystolicMurmur': _isSystolic,
-        'isDiastolicMurmur': _isDiastolic,
-        'murmurGrade': _murmurGrade,
-      },
-    );
-    _logger.info("saveRecording completed successfully");
-
-    // Check if still mounted before proceeding
-    if (!mounted) {
-      _logger.warning("Widget unmounted after saving recording");
-      return;
-    }
-    
-    // Close loading dialog using the stored context
-    if (isLoadingDialogShown && dialogContext != null && mounted) {
-      _logger.info("Attempting to close loading dialog...");
-      try {
-        Navigator.of(dialogContext!).pop();
-        _logger.info("Loading dialog closed successfully");
-      } catch (e) {
-        _logger.warning("Failed to close dialog: $e");
+      // Check if still mounted before proceeding
+      if (!mounted) {
+        _logger.warning("Widget unmounted after saving recording");
+        return;
       }
-      isLoadingDialogShown = false;
-    }
-    
-    if (!mounted) return;
-    
-    _showSuccessSnackBar("Enhanced heart sound recording saved successfully");
-    _logger.info("Success message shown, resetting state...");
-    
-    if (!mounted) return;
-    
-    setState(() {
-      _hasRecordingCompleted = false;
-      _recordedAudioData = null;
-      _murmurProbability = 0.0;
-      _murmurType = 'None';
-    });
-    _logger.info("--- SAVE RECORDING COMPLETED SUCCESSFULLY ---");
-  } catch (e) {
-    // Log the error for debugging
-    _logger.severe("❌ Save recording error: $e");
-    _logger.severe(e.toString());
-    if (e is Error) {
-      _logger.severe("Stack trace: ${e.stackTrace}");
-    }
-    
-    // Check if still mounted before using context
-    if (!mounted) {
-      _logger.warning("Widget unmounted during error handling");
-      return;
-    }
-    
-    // Always try to dismiss the dialog using the stored context
-    if (isLoadingDialogShown && dialogContext != null && mounted) {
-      _logger.info("Attempting to close loading dialog after error...");
-      try {
-        Navigator.of(dialogContext!).pop();
-        _logger.info("Loading dialog closed after error");
-      } catch (dialogError) {
-        _logger.warning("Failed to close dialog after error: $dialogError");
-      }
-      isLoadingDialogShown = false;
-    }
-    
-    if (!mounted) return;
-    _showErrorSnackBar("Failed to save recording: $e");
-    _logger.info("--- SAVE RECORDING FAILED ---");
-  }
-}
-// Add this debugging function to your MurmurRecordState class
-void _debugAudioData() {
-  if (_recordedAudioData == null || _recordedAudioData!.isEmpty) {
-    _logger.info("No audio data to debug");
-    return;
-  }
-  
-  _logger.info("Debugging audio data:");
-  _logger.info("Total bytes: ${_recordedAudioData!.length}");
-  
-  // Check if data is all zeros or very small values
-  bool allZeros = true;
-  bool allSmall = true;
-  int nonZeroCount = 0;
-  
-  for (int i = 0; i < math.min(1000, _recordedAudioData!.length); i++) {
-    if (_recordedAudioData![i] != 0) {
-      allZeros = false;
-      nonZeroCount++;
       
-      if (_recordedAudioData![i] > 10 || _recordedAudioData![i] < -10) {
-        allSmall = false;
+      // Close loading dialog using the stored context
+      if (isLoadingDialogShown && dialogContext != null && mounted) {
+        _logger.info("Attempting to close loading dialog...");
+        try {
+          Navigator.of(dialogContext!).pop();
+          _logger.info("Loading dialog closed successfully");
+        } catch (e) {
+          _logger.warning("Failed to close dialog: $e");
+        }
+        isLoadingDialogShown = false;
       }
+      
+      if (!mounted) return;
+      
+      _showSuccessSnackBar("Recording saved successfully");
+      _logger.info("Success message shown, resetting state...");
+      
+      if (!mounted) return;
+      
+      setState(() {
+        _hasRecordingCompleted = false;
+        _recordedAudioData = null;
+      });
+      _logger.info("--- SAVE RECORDING COMPLETED SUCCESSFULLY ---");
+    } catch (e) {
+      // Log the error for debugging
+      _logger.severe("❌ Save recording error: $e");
+      _logger.severe(e.toString());
+      if (e is Error) {
+        _logger.severe("Stack trace: ${e.stackTrace}");
+      }
+      
+      // Check if still mounted before using context
+      if (!mounted) {
+        _logger.warning("Widget unmounted during error handling");
+        return;
+      }
+      
+      // Always try to dismiss the dialog using the stored context
+      if (isLoadingDialogShown && dialogContext != null && mounted) {
+        _logger.info("Attempting to close loading dialog after error...");
+        try {
+          Navigator.of(dialogContext!).pop();
+          _logger.info("Loading dialog closed after error");
+        } catch (dialogError) {
+          _logger.warning("Failed to close dialog after error: $dialogError");
+        }
+        isLoadingDialogShown = false;
+      }
+      
+      if (!mounted) return;
+      _showErrorSnackBar("Failed to save recording: $e");
+      _logger.info("--- SAVE RECORDING FAILED ---");
     }
   }
   
-  _logger.info("First 1000 bytes check - All zeros: $allZeros, All small values: $allSmall, Non-zero count: $nonZeroCount");
-  
-  // Check sample distribution if we have enough samples
-  if (_recordedAudioData!.length >= 100) {
+  // Audio analysis helper functions
+  String _getSampleRange() {
+    if (_recordedAudioData == null || _recordedAudioData!.isEmpty) return "N/A";
+    
     ByteData byteData = ByteData(_recordedAudioData!.length);
     for (int i = 0; i < _recordedAudioData!.length; i++) {
       byteData.setUint8(i, _recordedAudioData![i]);
     }
     
-    List<int> sampleValues = [];
-    for (int i = 0; i < math.min(100, _recordedAudioData!.length ~/ 2); i++) {
-      if (2*i + 1 < _recordedAudioData!.length) {
-        int sample = byteData.getInt16(2*i, Endian.little);
-        sampleValues.add(sample);
+    int min = 32767;
+    int max = -32768;
+    
+    for (int i = 0; i < _recordedAudioData!.length; i += 2) {
+      if (i + 1 < _recordedAudioData!.length) {
+        int sample = byteData.getInt16(i, Endian.little);
+        if (sample < min) min = sample;
+        if (sample > max) max = sample;
       }
     }
     
-    _logger.info("First 50 samples (16-bit): $sampleValues");
-    
-    // Calculate distribution metrics
-    if (sampleValues.isNotEmpty) {
-      sampleValues.sort();
-      int minValue = sampleValues.first;
-      int maxValue = sampleValues.last;
-      int medianValue = sampleValues[sampleValues.length ~/ 2];
-      
-      _logger.info("Sample distribution - Min: $minValue, Max: $maxValue, Median: $medianValue");
-      
-      // Check for flatlined audio
-      if (maxValue - minValue < 100) {
-        _logger.warning("POSSIBLE ISSUE: Audio has very little variation (nearly flat)");
-      }
-      
-      // Check for DC offset
-      double avgValue = sampleValues.reduce((a, b) => a + b) / sampleValues.length;
-      _logger.info("Average sample value: $avgValue");
-      
-      if (avgValue.abs() > 5000) {
-        _logger.warning("POSSIBLE ISSUE: Audio has significant DC offset");
-      }
-    }
-  }
-  
-  // Check for obvious patterns that might indicate data corruption
-  int patternRepeatCount = 0;
-  if (_recordedAudioData!.length >= 20) {
-    List<int> pattern = _recordedAudioData!.sublist(0, 10);
-    for (int i = 10; i < _recordedAudioData!.length - 10; i += 10) {
-      bool matches = true;
-      for (int j = 0; j < 10; j++) {
-        if (i + j < _recordedAudioData!.length && pattern[j] != _recordedAudioData![i + j]) {
-          matches = false;
-          break;
-        }
-      }
-      if (matches) patternRepeatCount++;
-    }
-    
-    if (patternRepeatCount > 5) {
-      _logger.warning("POSSIBLE ISSUE: Audio data shows repeating patterns, might be corrupted");
-      _logger.info("Repeating pattern count: $patternRepeatCount");
-    }
-  }
-}
-
-
-
-  void _showLoginPrompt() {
-    if (!mounted) return;
-    
-    showDialog(
-      context: context,
-      builder: (BuildContext context) {
-        return AlertDialog(
-          shape: RoundedRectangleBorder(
-            borderRadius: BorderRadius.circular(16),
-          ),
-          title: const Text('Login Required'),
-          content: const Text('You need to be logged in to save recordings. Do you have an account?'),
-          actions: [
-            TextButton(
-              onPressed: () => Navigator.pop(context),
-              child: Text(
-                'Cancel',
-                style: TextStyle(color: Colors.grey[700]),
-              ),
-            ),
-            TextButton(
-              onPressed: () {
-                Navigator.pop(context);
-                NavigationService.navigateTo(
-                  AppRoutes.login,
-                  arguments: {
-                    'returnRoute': 'murmur_record',
-                    'pendingAction': 'save_recording',
-                  },
-                ).then((value) {
-                  if (value == true && mounted) {
-                    // User has successfully logged in, show save dialog again
-                    _showSaveRecordingDialog();
-                  }
-                });
-              },
-              child: Text(
-                'Yes, I have an account',
-                style: TextStyle(color: Theme.of(context).primaryColor),
-              ),
-            ),
-            ElevatedButton(
-              onPressed: () {
-                Navigator.pop(context);
-                NavigationService.navigateTo(
-                  AppRoutes.register,
-                  arguments: {
-                    'returnRoute': 'murmur_record',
-                    'pendingAction': 'save_recording',
-                  },
-                ).then((value) {
-                  if (value == true && mounted) {
-                    // User has successfully registered, show save dialog again
-                    _showSaveRecordingDialog();
-                  }
-                });
-              },
-              style: ElevatedButton.styleFrom(
-                backgroundColor: Theme.of(context).primaryColor,
-                foregroundColor: Colors.white,
-                elevation: 0,
-                shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(12),
-                ),
-              ),
-              child: const Text('Create New Account'),
-            ),
-          ],
-        );
-      },
-    );
+    return "$min to $max";
   }
 
- 
-  void _showSuccessSnackBar(String message) {
-    if (!mounted) return;
+  double _calculateMean() {
+    if (_recordedAudioData == null || _recordedAudioData!.isEmpty) return 0.0;
     
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(
-        content: Text(message),
-        backgroundColor: Colors.green,
-        behavior: SnackBarBehavior.fixed,
-        duration: const Duration(seconds: 2),
+    ByteData byteData = ByteData(_recordedAudioData!.length);
+    for (int i = 0; i < _recordedAudioData!.length; i++) {
+      byteData.setUint8(i, _recordedAudioData![i]);
+    }
+    
+    double sum = 0.0;
+    int count = 0;
+    
+    for (int i = 0; i < _recordedAudioData!.length; i += 2) {
+      if (i + 1 < _recordedAudioData!.length) {
+        int sample = byteData.getInt16(i, Endian.little);
+        sum += sample;
+        count++;
+      }
+    }
+    
+    return count > 0 ? sum / count : 0.0;
+  }
+
+  double _calculateDCOffset() {
+    return _calculateMean(); // DC offset is the mean value
+  }
+
+  double _calculateSignalVariation() {
+    if (_recordedAudioData == null || _recordedAudioData!.isEmpty) return 0.0;
+    
+    ByteData byteData = ByteData(_recordedAudioData!.length);
+    for (int i = 0; i < _recordedAudioData!.length; i++) {
+      byteData.setUint8(i, _recordedAudioData![i]);
+    }
+    
+    double mean = _calculateMean();
+    double sumSquaredDiffs = 0.0;
+    int count = 0;
+    
+    for (int i = 0; i < _recordedAudioData!.length; i += 2) {
+      if (i + 1 < _recordedAudioData!.length) {
+        int sample = byteData.getInt16(i, Endian.little);
+        double diff = sample - mean;
+        sumSquaredDiffs += diff * diff;
+        count++;
+      }
+    }
+    
+    return count > 0 ? math.sqrt(sumSquaredDiffs / count) : 0.0;
+  }
+ Widget _buildWaveform(BuildContext context, BLEManager bleManager) {
+    return Container(
+      height: 140,
+      decoration: BoxDecoration(
+        borderRadius: BorderRadius.circular(12),
+        color: AppTheme.secondaryColor,
       ),
-    );
-  }
-
-  void _showErrorSnackBar(String message) {
-    if (!mounted) return;
-    
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(
-        content: Text(message),
-        backgroundColor: Colors.red[400],
-        behavior: SnackBarBehavior.fixed,
-        duration: const Duration(seconds: 2),
-      ),
-    );
-  }
-
-  @override
-void dispose() {
-  // Cancel timer first
-  _recordingTimer?.cancel();
-  
-  // Stop audio playback when navigating away
-  if (_isPlaying) {
-    _audioPlayer.stop();
-  }
-  
-  // Dispose of the audio player
-  _audioPlayer.dispose();
-  super.dispose();
-}
-
-
-
-  Widget _buildWaveform(BuildContext context, BLEManager bleManager) {
-    return SizedBox(
-      height: 120,
       child: LineChart(
         LineChartData(
           gridData: FlGridData(show: false),
@@ -1052,12 +1154,12 @@ void dispose() {
                 return FlSpot(entry.key.toDouble(), entry.value);
               }).toList(),
               isCurved: true,
-              color: _getMurmurColor(),
+              color: AppTheme.primaryColor,
               barWidth: 2,
               dotData: FlDotData(show: false),
               belowBarData: BarAreaData(
                 show: true,
-                color: _getMurmurColor().withAlpha(26),
+                color: AppTheme.primaryColor.withAlpha(26),
               ),
             ),
           ],
@@ -1067,598 +1169,340 @@ void dispose() {
       ),
     );
   }
-  
-  // Get appropriate color based on murmur probability
-  Color _getMurmurColor() {
-    if (_murmurProbability < 0.3) {
-      return Colors.blue[700]!;
-    } else if (_murmurProbability < 0.6) {
-      return Colors.orange;
-    } else {
-      return Colors.red;
-    }
-  }
-Widget _buildMurmurVisualization() {
-  if (!_hasRecordingCompleted || _recordedAudioData == null || _recordedAudioData!.isEmpty) {
-    return const SizedBox.shrink();
-  }
-  
-  // Extract raw audio samples for visualization
-  List<int> rawSamples = [];
-  ByteData byteData = ByteData(_recordedAudioData!.length);
-  for (int i = 0; i < _recordedAudioData!.length; i++) {
-    byteData.setUint8(i, _recordedAudioData![i]);
-  }
-  
-  // Start at 100 samples in to avoid any header data
-  int startOffset = 100;
-  
-  // Take samples for visualization (max 2000 points)
-  int samplesCount = (_recordedAudioData!.length - startOffset) ~/ 2;
-  int step = samplesCount > 2000 ? samplesCount ~/ 2000 : 1;  // Manual max function
-  
-  // Debug the sample range to see actual values
-  List<int> sampleMinMax = [32767, -32768]; // [min, max]
-  
-  for (int i = 0; i < samplesCount; i++) {
-    int offset = startOffset + (i * 2);
-    if (offset + 1 < _recordedAudioData!.length) {
-      int sampleInt = byteData.getInt16(offset, Endian.little);
-      rawSamples.add(sampleInt);
-      
-      // Track min/max for debug
-      if (sampleInt < sampleMinMax[0]) sampleMinMax[0] = sampleInt;
-      if (sampleInt > sampleMinMax[1]) sampleMinMax[1] = sampleInt;
-    }
-  }
-  
-  // Print debug info
-  _logger.info("Waveform debug: Sample range [${sampleMinMax[0]}, ${sampleMinMax[1]}]");
-  _logger.info("Waveform debug: First 10 raw samples: ${rawSamples.take(10).toList()}");
-  
-  // Calculate DC offset (average value)
-  double sum = 0;
-  for (int sample in rawSamples) {
-    sum += sample;
-  }
-  double dcOffset = sum / rawSamples.length;
-  
-  // Build raw, DC corrected, and heart sound emphasized waveforms
-  List<FlSpot> rawWaveformSpots = [];
-  List<FlSpot> correctedWaveformSpots = [];
-  List<FlSpot> emphasizedWaveformSpots = [];
-  
-  // Sampling for display
-  int displayStep = rawSamples.length > 300 ? rawSamples.length ~/ 300 : 1;  // Manual max function
-  
-  // Calculate min/max after DC removal for proper scaling
-  double minCentered = 0;
-  double maxCentered = 0;
-  
-  List<double> centeredSamples = [];
-  for (int i = 0; i < rawSamples.length; i++) {
-    double centered = rawSamples[i] - dcOffset;
-    centeredSamples.add(centered);
-    
-    if (centered < minCentered) minCentered = centered;
-    if (centered > maxCentered) maxCentered = centered;
-  }
-  
-  // Apply a simple bandpass filter to emphasize heart sounds (can be improved with FFT)
-  List<double> emphasizedSamples = List.from(centeredSamples);
-  for (int i = 2; i < emphasizedSamples.length - 2; i++) {
-    // Simple 5-point weighted average acts like a band-pass filter
-    emphasizedSamples[i] = 
-        (centeredSamples[i-2] * -0.05 +
-         centeredSamples[i-1] * 0.1 + 
-         centeredSamples[i] * 0.7 + 
-         centeredSamples[i+1] * 0.1 + 
-         centeredSamples[i+2] * -0.05) * 2.0; // Amplify by 2x
-  }
-  
-  // Manual abs function
-  double absMin = minCentered < 0 ? -minCentered : minCentered;
-  double absMax = maxCentered < 0 ? -maxCentered : maxCentered;
-  // Manual max function
-  double maxAbsValue = absMin > absMax ? absMin : absMax;
-  
-  // Create display spots
-  for (int i = 0; i < rawSamples.length; i += displayStep) {
-    // Original raw samples
-    double normalizedRaw = rawSamples[i] / 32768.0;
-    rawWaveformSpots.add(FlSpot(i.toDouble(), normalizedRaw));
-    
-    // DC offset corrected samples
-    double yVal = centeredSamples[i] / maxAbsValue;
-    yVal = yVal.clamp(-1.0, 1.0);
-    correctedWaveformSpots.add(FlSpot(i.toDouble(), yVal));
-    
-    // Emphasized heart sound samples
-    double emphasizedY = emphasizedSamples[i] / maxAbsValue;
-    emphasizedY = emphasizedY.clamp(-1.0, 1.0);
-    emphasizedWaveformSpots.add(FlSpot(i.toDouble(), emphasizedY));
-  }
-  
-  return Column(
-    children: [
-      Padding(
-        padding: const EdgeInsets.symmetric(horizontal: 16.0),
-        child: Text(
-          "Raw Waveform",
-          style: TextStyle(
-            fontSize: 16, 
-            fontWeight: FontWeight.bold,
-            color: Colors.grey[800],
-          ),
-        ),
-      ),
-      Text(
-        "Sample range: ${sampleMinMax[0]} to ${sampleMinMax[1]}, DC offset: ${dcOffset.toStringAsFixed(1)}",
-        style: TextStyle(
-          fontSize: 12,
-          color: Colors.grey[600],
-        ),
-      ),
-      const SizedBox(height: 8),
-      Container(
-        height: 120,
-        padding: const EdgeInsets.symmetric(horizontal: 8.0),
-        child: LineChart(
-          LineChartData(
-            gridData: FlGridData(show: true),
-            titlesData: FlTitlesData(
-              bottomTitles: AxisTitles(
-                sideTitles: SideTitles(
-                  showTitles: false,
-                ),
-              ),
-              leftTitles: AxisTitles(
-                sideTitles: SideTitles(
-                  showTitles: false,
-                ),
-              ),
-              topTitles: AxisTitles(
-                sideTitles: SideTitles(
-                  showTitles: false,
-                ),
-              ),
-              rightTitles: AxisTitles(
-                sideTitles: SideTitles(
-                  showTitles: false,
-                ),
-              ),
-            ),
-            borderData: FlBorderData(show: true),
-            lineBarsData: [
-              LineChartBarData(
-                spots: rawWaveformSpots,
-                isCurved: false,
-                color: Colors.grey,
-                barWidth: 1,
-                dotData: const FlDotData(show: false),
-              ),
-            ],
-            minY: -1,
-            maxY: 1,
-          ),
-        ),
-      ),
-      const SizedBox(height: 16),
-      Padding(
-        padding: const EdgeInsets.symmetric(horizontal: 16.0),
-        child: Text(
-          "DC Offset Corrected Waveform",
-          style: TextStyle(
-            fontSize: 16, 
-            fontWeight: FontWeight.bold,
-            color: Colors.grey[800],
-          ),
-        ),
-      ),
-      Text(
-        "Shows heart sound patterns after removing DC offset",
-        style: TextStyle(
-          fontSize: 12,
-          color: Colors.grey[600],
-        ),
-      ),
-      const SizedBox(height: 8),
-      Container(
-        height: 120,
-        padding: const EdgeInsets.symmetric(horizontal: 8.0),
-        child: LineChart(
-          LineChartData(
-            gridData: FlGridData(show: true),
-            titlesData: FlTitlesData(
-              bottomTitles: AxisTitles(
-                sideTitles: SideTitles(
-                  showTitles: false,
-                ),
-              ),
-              leftTitles: AxisTitles(
-                sideTitles: SideTitles(
-                  showTitles: false,
-                ),
-              ),
-              topTitles: AxisTitles(
-                sideTitles: SideTitles(
-                  showTitles: false,
-                ),
-              ),
-              rightTitles: AxisTitles(
-                sideTitles: SideTitles(
-                  showTitles: false,
-                ),
-              ),
-            ),
-            borderData: FlBorderData(show: true),
-            lineBarsData: [
-              LineChartBarData(
-                spots: correctedWaveformSpots,
-                isCurved: false,
-                color: Colors.blue[700],
-                barWidth: 1,
-                dotData: const FlDotData(show: false),
-              ),
-            ],
-            minY: -1,
-            maxY: 1,
-          ),
-        ),
-      ),
-      const SizedBox(height: 16),
-      Padding(
-        padding: const EdgeInsets.symmetric(horizontal: 16.0),
-        child: Text(
-          "Heart Sound Enhanced",
-          style: TextStyle(
-            fontSize: 16, 
-            fontWeight: FontWeight.bold,
-            color: Colors.grey[800],
-          ),
-        ),
-      ),
-      Text(
-        "Filtered for more prominent heart sounds",
-        style: TextStyle(
-          fontSize: 12,
-          color: Colors.grey[600],
-        ),
-      ),
-      const SizedBox(height: 8),
-      Container(
-        height: 120,
-        padding: const EdgeInsets.symmetric(horizontal: 8.0),
-        child: LineChart(
-          LineChartData(
-            gridData: FlGridData(show: true),
-            titlesData: FlTitlesData(
-              bottomTitles: AxisTitles(
-                sideTitles: SideTitles(
-                  showTitles: false,
-                ),
-              ),
-              leftTitles: AxisTitles(
-                sideTitles: SideTitles(
-                  showTitles: false,
-                ),
-              ),
-              topTitles: AxisTitles(
-                sideTitles: SideTitles(
-                  showTitles: false,
-                ),
-              ),
-              rightTitles: AxisTitles(
-                sideTitles: SideTitles(
-                  showTitles: false,
-                ),
-              ),
-            ),
-            borderData: FlBorderData(show: true),
-            lineBarsData: [
-              LineChartBarData(
-                spots: emphasizedWaveformSpots,
-                isCurved: false,
-                color: Colors.red[700],
-                barWidth: 1,
-                dotData: const FlDotData(show: false),
-              ),
-            ],
-            minY: -1,
-            maxY: 1,
-          ),
-        ),
-      ),
-      const SizedBox(height: 16),
-      Text(
-        "The sine wave pattern you see is your heartbeat! Look for repeating patterns in the middle graph.",
-        textAlign: TextAlign.center,
-        style: TextStyle(
-          fontSize: 14,
-          color: Colors.grey[700],
-        ),
-      ),
-    ],
-  );
-}
 
   Widget _buildRecordingStatus() {
     return Column(
       children: [
         Text(
           _recordingDuration.toString().split('.').first,
-          style: TextStyle(
+          style: GoogleFonts.inter(
             fontSize: 24,
             fontWeight: FontWeight.bold,
-            color: Colors.grey[800],
+            color: AppTheme.textPrimary,
           ),
-        ),
-        const SizedBox(height: 8),
-        Consumer<BLEManager>(
-          builder: (context, bleManager, child) {
-            // Calculate percentage but clamp it to 100%
-            double amplitudePercentage = (bleManager.peakAmplitude * 100).clamp(0.0, 100.0);
-            return Text(
-              'Peak Amplitude: ${amplitudePercentage.toStringAsFixed(1)}%',
-              style: TextStyle(
-                fontSize: 16,
-                color: Colors.grey[600],
-              ),
-            );
-          },
         ),
       ],
     );
   }
   
-  // Build murmur analysis card (shown after recording)
-  Widget _buildMurmurAnalysisCard() {
-    if (!_hasRecordingCompleted || _murmurProbability < 0.01) {
+  Widget _buildMurmurVisualization() {
+    if (!_hasRecordingCompleted || _recordedAudioData == null || _recordedAudioData!.isEmpty) {
       return const SizedBox.shrink();
     }
     
-    return Card(
-      margin: const EdgeInsets.all(16),
-      elevation: 4,
-      shape: RoundedRectangleBorder(
-        borderRadius: BorderRadius.circular(12),
+    // Extract raw audio samples for visualization
+    List<int> rawSamples = [];
+    ByteData byteData = ByteData(_recordedAudioData!.length);
+    for (int i = 0; i < _recordedAudioData!.length; i++) {
+      byteData.setUint8(i, _recordedAudioData![i]);
+    }
+    
+    // Start at 100 samples in to avoid any header data
+    int startOffset = 100;
+    
+    // Take samples for visualization (max 2000 points)
+    int samplesCount = (_recordedAudioData!.length - startOffset) ~/ 2;
+    int step = samplesCount > 2000 ? samplesCount ~/ 2000 : 1;
+    
+    // Debug the sample range to see actual values
+    List<int> sampleMinMax = [32767, -32768]; // [min, max]
+    
+    for (int i = 0; i < samplesCount; i++) {
+      int offset = startOffset + (i * 2);
+      if (offset + 1 < _recordedAudioData!.length) {
+        int sampleInt = byteData.getInt16(offset, Endian.little);
+        rawSamples.add(sampleInt);
+        
+        // Track min/max for debug
+        if (sampleInt < sampleMinMax[0]) sampleMinMax[0] = sampleInt;
+        if (sampleInt > sampleMinMax[1]) sampleMinMax[1] = sampleInt;
+      }
+    }
+    
+    // Print debug info
+    _logger.info("Waveform debug: Sample range [${sampleMinMax[0]}, ${sampleMinMax[1]}]");
+    _logger.info("Waveform debug: First 10 raw samples: ${rawSamples.take(10).toList()}");
+    
+    // Calculate DC offset (average value)
+    double sum = 0;
+    for (int sample in rawSamples) {
+      sum += sample;
+    }
+    double dcOffset = sum / rawSamples.length;
+    
+    // Build raw, DC corrected, and heart sound emphasized waveforms
+    List<FlSpot> rawWaveformSpots = [];
+    List<FlSpot> correctedWaveformSpots = [];
+    List<FlSpot> emphasizedWaveformSpots = [];
+    
+    // Sampling for display
+    int displayStep = rawSamples.length > 300 ? rawSamples.length ~/ 300 : 1;
+    
+    // Calculate min/max after DC removal for proper scaling
+    double minCentered = 0;
+    double maxCentered = 0;
+    
+    List<double> centeredSamples = [];
+    for (int i = 0; i < rawSamples.length; i++) {
+      double centered = rawSamples[i] - dcOffset;
+      centeredSamples.add(centered);
+      
+      if (centered < minCentered) minCentered = centered;
+      if (centered > maxCentered) maxCentered = centered;
+    }
+    
+    // Apply a simple bandpass filter to emphasize heart sounds (can be improved with FFT)
+    List<double> emphasizedSamples = List.from(centeredSamples);
+    for (int i = 2; i < emphasizedSamples.length - 2; i++) {
+      // Simple 5-point weighted average acts like a band-pass filter
+      emphasizedSamples[i] = 
+          (centeredSamples[i-2] * -0.05 +
+           centeredSamples[i-1] * 0.1 + 
+           centeredSamples[i] * 0.7 + 
+           centeredSamples[i+1] * 0.1 + 
+           centeredSamples[i+2] * -0.05) * 2.0; // Amplify by 2x
+    }
+    
+    // Manual abs function
+    double absMin = minCentered < 0 ? -minCentered : minCentered;
+    double absMax = maxCentered < 0 ? -maxCentered : maxCentered;
+    // Manual max function
+    double maxAbsValue = absMin > absMax ? absMin : absMax;
+    
+    // Create display spots
+    for (int i = 0; i < rawSamples.length; i += displayStep) {
+      // Original raw samples
+      double normalizedRaw = rawSamples[i] / 32768.0;
+      rawWaveformSpots.add(FlSpot(i.toDouble(), normalizedRaw));
+      
+      // DC offset corrected samples
+      double yVal = centeredSamples[i] / maxAbsValue;
+      yVal = yVal.clamp(-1.0, 1.0);
+      correctedWaveformSpots.add(FlSpot(i.toDouble(), yVal));
+      
+      // Emphasized heart sound samples
+      double emphasizedY = emphasizedSamples[i] / maxAbsValue;
+      emphasizedY = emphasizedY.clamp(-1.0, 1.0);
+      emphasizedWaveformSpots.add(FlSpot(i.toDouble(), emphasizedY));
+    }
+    
+    return Container(
+      margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(16),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withAlpha(12),
+            blurRadius: 8,
+            offset: const Offset(0, 2),
+          ),
+        ],
       ),
-      child: Padding(
-        padding: const EdgeInsets.all(16),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Row(
-              mainAxisAlignment: MainAxisAlignment.spaceBetween,
-              children: [
-                Text(
-                  'Heart Sound Analysis',
-                  style: TextStyle(
-                    fontSize: 18,
-                    fontWeight: FontWeight.bold,
-                    color: Colors.grey[800],
-                  ),
-                ),
-                IconButton(
-                  icon: Icon(_showAdvancedAnalysis ? Icons.expand_less : Icons.expand_more),
-                  onPressed: () {
-                    setState(() {
-                      _showAdvancedAnalysis = !_showAdvancedAnalysis;
-                    });
-                  },
-                ),
-              ],
+      child: Column(
+        children: [
+          Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 8.0),
+            child: Text(
+              "Raw Waveform",
+              style: GoogleFonts.inter(
+                fontSize: 16, 
+                fontWeight: FontWeight.bold,
+                color: AppTheme.textPrimary,
+              ),
             ),
-            const SizedBox(height: 8),
-            Row(
-              children: [
-                Text(
-                  'Murmur detected: ',
-                  style: TextStyle(
-                    fontSize: 16,
-                    color: Colors.grey[800],
-                  ),
-                ),
-                Text(
-                  _murmurProbability > 0.3 ? 'Yes' : 'No',
-                  style: TextStyle(
-                    fontSize: 16,
-                    fontWeight: FontWeight.bold,
-                    color: _murmurProbability > 0.3 ? Colors.red : Colors.green,
-                  ),
-                ),
-              ],
+          ),
+          Text(
+            "Sample range: ${sampleMinMax[0]} to ${sampleMinMax[1]}, DC offset: ${dcOffset.toStringAsFixed(1)}",
+            style: GoogleFonts.inter(
+              fontSize: 12,
+              color: AppTheme.textSecondary,
             ),
-            if (_murmurProbability > 0.3) ... [
-              const SizedBox(height: 8),
-              Row(
-                children: [
-                  Text(
-                    'Type: ',
-                    style: TextStyle(
-                      fontSize: 16,
-                      color: Colors.grey[800],
+          ),
+          const SizedBox(height: 8),
+          Container(
+            height: 120,
+            padding: const EdgeInsets.symmetric(horizontal: 8.0),
+            child: LineChart(
+              LineChartData(
+                gridData: FlGridData(show: true),
+                titlesData: FlTitlesData(
+                  bottomTitles: AxisTitles(
+                    sideTitles: SideTitles(
+                      showTitles: false,
                     ),
                   ),
-                  Text(
-                    _murmurType,
-                    style: const TextStyle(
-                      fontSize: 16,
-                      fontWeight: FontWeight.bold,
+                  leftTitles: AxisTitles(
+                    sideTitles: SideTitles(
+                      showTitles: false,
                     ),
+                  ),
+                  topTitles: AxisTitles(
+                    sideTitles: SideTitles(
+                      showTitles: false,
+                    ),
+                  ),
+                  rightTitles: AxisTitles(
+                    sideTitles: SideTitles(
+                      showTitles: false,
+                    ),
+                  ),
+                ),
+                borderData: FlBorderData(show: true),
+                lineBarsData: [
+                  LineChartBarData(
+                    spots: rawWaveformSpots,
+                    isCurved: false,
+                    color: Colors.grey[700],
+                    barWidth: 1,
+                    dotData: const FlDotData(show: false),
                   ),
                 ],
+                minY: -1,
+                maxY: 1,
               ),
-              const SizedBox(height: 8),
-              Row(
-                children: [
-                  Text(
-                    'Grade: ',
-                    style: TextStyle(
-                      fontSize: 16,
-                      color: Colors.grey[800],
+            ),
+          ),
+          const SizedBox(height: 16),
+          Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 8.0),
+            child: Text(
+              "DC Offset Corrected Waveform",
+              style: GoogleFonts.inter(
+                fontSize: 16, 
+                fontWeight: FontWeight.bold,
+                color: AppTheme.textPrimary,
+              ),
+            ),
+          ),
+          Text(
+            "Shows heart sound patterns after removing DC offset",
+            style: GoogleFonts.inter(
+              fontSize: 12,
+              color: AppTheme.textSecondary,
+            ),
+          ),
+          const SizedBox(height: 8),
+          Container(
+            height: 120,
+            padding: const EdgeInsets.symmetric(horizontal: 8.0),
+            child: LineChart(
+              LineChartData(
+                gridData: FlGridData(show: true),
+                titlesData: FlTitlesData(
+                  bottomTitles: AxisTitles(
+                    sideTitles: SideTitles(
+                      showTitles: false,
                     ),
                   ),
-                  Text(
-                    _murmurGrade,
-                    style: TextStyle(
-                      fontSize: 16,
-                      fontWeight: FontWeight.bold,
-                      color: _murmurGrade.contains('III') || _murmurGrade.contains('IV') 
-                          ? Colors.red 
-                          : Colors.orange,
+                  leftTitles: AxisTitles(
+                    sideTitles: SideTitles(
+                      showTitles: false,
                     ),
+                  ),
+                  topTitles: AxisTitles(
+                    sideTitles: SideTitles(
+                      showTitles: false,
+                    ),
+                  ),
+                  rightTitles: AxisTitles(
+                    sideTitles: SideTitles(
+                      showTitles: false,
+                    ),
+                  ),
+                ),
+                borderData: FlBorderData(show: true),
+                lineBarsData: [
+                  LineChartBarData(
+                    spots: correctedWaveformSpots,
+                    isCurved: false,
+                    color: AppTheme.primaryColor,
+                    barWidth: 1,
+                    dotData: const FlDotData(show: false),
                   ),
                 ],
+                minY: -1,
+                maxY: 1,
               ),
-              if (_showAdvancedAnalysis) ... [
-                const SizedBox(height: 8),
-                Row(
-                  children: [
-                    Text(
-                      'Systolic: ',
-                      style: TextStyle(
-                        fontSize: 16,
-                        color: Colors.grey[800],
-                      ),
+            ),
+          ),
+          const SizedBox(height: 16),
+          Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 8.0),
+            child: Text(
+              "Heart Sound Enhanced",
+              style: GoogleFonts.inter(
+                fontSize: 16, 
+                fontWeight: FontWeight.bold,
+                color: AppTheme.textPrimary,
+              ),
+            ),
+          ),
+          Text(
+            "Filtered for more prominent heart sounds",
+            style: GoogleFonts.inter(
+              fontSize: 12,
+              color: AppTheme.textSecondary,
+            ),
+          ),
+          const SizedBox(height: 8),
+          Container(
+            height: 120,
+            padding: const EdgeInsets.symmetric(horizontal: 8.0),
+            child: LineChart(
+              LineChartData(
+                gridData: FlGridData(show: true),
+                titlesData: FlTitlesData(
+                  bottomTitles: AxisTitles(
+                    sideTitles: SideTitles(
+                      showTitles: false,
                     ),
-                    Icon(
-                      _isSystolic ? Icons.check_circle : Icons.cancel,
-                      color: _isSystolic ? Colors.green : Colors.grey,
-                      size: 20,
+                  ),
+                  leftTitles: AxisTitles(
+                    sideTitles: SideTitles(
+                      showTitles: false,
                     ),
-                    const SizedBox(width: 16),
-                    Text(
-                      'Diastolic: ',
-                      style: TextStyle(
-                        fontSize: 16,
-                        color: Colors.grey[800],
-                      ),
+                  ),
+                  topTitles: AxisTitles(
+                    sideTitles: SideTitles(
+                      showTitles: false,
                     ),
-                    Icon(
-                      _isDiastolic ? Icons.check_circle : Icons.cancel,
-                      color: _isDiastolic ? Colors.green : Colors.grey,
-                      size: 20,
+                  ),
+                  rightTitles: AxisTitles(
+                    sideTitles: SideTitles(
+                      showTitles: false,
                     ),
-                  ],
-                ),
-                const SizedBox(height: 8),
-                Row(
-                  children: [
-                    Text(
-                      'Dominant Frequency: ',
-                      style: TextStyle(
-                        fontSize: 16,
-                        color: Colors.grey[800],
-                      ),
-                    ),
-                    Text(
-                      '${_dominantFrequency.toStringAsFixed(1)} Hz',
-                      style: const TextStyle(
-                        fontSize: 16,
-                        fontWeight: FontWeight.bold,
-                      ),
-                    ),
-                  ],
-                ),
-                const SizedBox(height: 8),
-                LinearProgressIndicator(
-                  value: _murmurProbability,
-                  backgroundColor: Colors.grey[200],
-                  valueColor: AlwaysStoppedAnimation<Color>(_getMurmurColor()),
-                ),
-                const SizedBox(height: 4),
-                Text(
-                  'Confidence: ${(_murmurProbability * 100).toStringAsFixed(1)}%',
-                  style: TextStyle(
-                    fontSize: 14,
-                    color: Colors.grey[600],
                   ),
                 ),
-              ],
-            ],
-          ],
-        ),
+                borderData: FlBorderData(show: true),
+                lineBarsData: [
+                  LineChartBarData(
+                    spots: emphasizedWaveformSpots,
+                    isCurved: false,
+                    color: Colors.red[700],
+                    barWidth: 1,
+                    dotData: const FlDotData(show: false),
+                  ),
+                ],
+                minY: -1,
+                maxY: 1,
+              ),
+            ),
+          ),
+          const SizedBox(height: 16),
+          Text(
+            "The sine wave pattern shows your heartbeat.",
+            textAlign: TextAlign.center,
+            style: GoogleFonts.inter(
+              fontSize: 14,
+              color: AppTheme.textSecondary,
+            ),
+          ),
+        ],
       ),
     );
   }
-
-  @override
-  Widget build(BuildContext context) {
-    return BackButtonHandler(
-      strategy: BackButtonHandlingStrategy.normal,
-      child: Scaffold(
-        appBar: AppBar(
-          title: Text(
-            widget.preselectedPatientId != null 
-                ? "Record Heart Sounds"
-                : "Heart Murmur Analysis",
-            style: const TextStyle(
-              fontWeight: FontWeight.w600,
-              color: Colors.black87,
-            ),
-          ),
-          elevation: 0,
-          backgroundColor: Colors.white,
-          foregroundColor: Colors.black87,
-          leading: IconButton(
-            icon: const Icon(Icons.arrow_back_ios, size: 20),
-            onPressed: () {
-              _handleBackButton();
-            },
-          ),
-           // Add the debug toggle in the actions area of the AppBar
-        ),
-        body: SafeArea(
-          child: Column(
-            children: [
-              Container(
-                width: double.infinity,
-                padding: const EdgeInsets.all(24),
-                decoration: BoxDecoration(
-                  color: Colors.white,
-                  borderRadius: const BorderRadius.only(
-                    bottomLeft: Radius.circular(24),
-                    bottomRight: Radius.circular(24),
-                  ),
-                  boxShadow: [
-                    BoxShadow(
-                      color: Colors.black.withAlpha(13),
-                      blurRadius: 10,
-                      offset: const Offset(0, 5),
-                    ),
-                  ],
-                ),
-                child: Consumer<BLEManager>(
-                  builder: (context, bleManager, child) {
-                    return Column(
-                      children: [
-                        _buildWaveform(context, bleManager),
-                        const SizedBox(height: 16),
-                        _buildRecordingStatus(),
-                      ],
-                    );
-                  },
-                ),
-              ),
-              if (_hasRecordingCompleted) _buildMurmurAnalysisCard(),
-              Expanded(
-                child: Center(
-                  child: AnimatedSwitcher(
-                    duration: const Duration(milliseconds: 300),
-                    child: _buildMainContent(),
-                  ),
-                ),
-              ),
-            ],
-          ),
-        ),
-        floatingActionButton: _buildFloatingActionButton(),
-        floatingActionButtonLocation: FloatingActionButtonLocation.centerFloat,
-      ),
-    );
-  }
-
   Widget _buildMainContent() {
     if (_isRecording) {
       return _buildRecordingContent();
@@ -1670,329 +1514,319 @@ Widget _buildMurmurVisualization() {
   }
 
   Widget _buildRecordingContent() {
-    return Column(
-      mainAxisSize: MainAxisSize.min,
-      children: [
-        Container(
-          width: 120,
-          height: 120,
-          decoration: BoxDecoration(
-            shape: BoxShape.circle,
-            color: Colors.red.withAlpha(26),
-          ),
-          child: Center(
-            child: Container(
-              width: 80,
-              height: 80,
-              decoration: const BoxDecoration(
-                shape: BoxShape.circle,
-                color: Colors.red,
-              ),
-              child: const Icon(
-                Icons.mic,
-                color: Colors.white,
-                size: 40,
+    return Container(
+      margin: const EdgeInsets.symmetric(vertical: 40),
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Container(
+            width: 120,
+            height: 120,
+            decoration: BoxDecoration(
+              shape: BoxShape.circle,
+              color: AppTheme.errorColor.withAlpha(26),
+            ),
+            child: Center(
+              child: AnimatedBuilder(
+                animation: _animationController,
+                builder: (context, child) {
+                  return Container(
+                    width: 80,
+                    height: 80,
+                    decoration: BoxDecoration(
+                      shape: BoxShape.circle,
+                      color: AppTheme.errorColor.withAlpha(
+                        (_animationController.value * 150 + 105).toInt()
+                      ),
+                    ),
+                    child: const Icon(
+                      Icons.mic,
+                      color: Colors.white,
+                      size: 40,
+                    ),
+                  );
+                },
               ),
             ),
-          ),
-        ),
-        const SizedBox(height: 24),
-        Text(
-          "Recording heart sounds...",
-          style: TextStyle(
-            fontSize: 18,
-            color: Colors.grey[800],
-            fontWeight: FontWeight.w500,
-          ),
-        ),
-        if (_murmurProbability > 0.3) ... [
-          const SizedBox(height: 12),
+          ).animate().fadeIn(duration: 500.ms),
+          const SizedBox(height: 24),
           Text(
-            "Potential murmur detected: ${_murmurType}",
-            style: TextStyle(
-              fontSize: 16,
-              color: _getMurmurColor(),
+            "Recording heart sounds...",
+            style: GoogleFonts.inter(
+              fontSize: 18,
+              color: AppTheme.textPrimary,
               fontWeight: FontWeight.w500,
             ),
           ),
         ],
-      ],
+      ),
     );
   }
 
-Widget _buildRecordingCompleteContent() {
-  Color statusColor = _murmurProbability > 0.3 ? Colors.orange : Colors.green;
-  IconData statusIcon = _murmurProbability > 0.3 ? Icons.warning_amber_rounded : Icons.check_circle_outline;
-  
-  return SingleChildScrollView(
-    child: Column(
-      mainAxisSize: MainAxisSize.min,
-      children: [
-        Container(
-          width: 120,
-          height: 120,
-          decoration: BoxDecoration(
-            shape: BoxShape.circle,
-            color: statusColor.withAlpha(26),
-          ),
-          child: Icon(
-            statusIcon,
-            color: statusColor,
-            size: 60,
-          ),
-        ),
-        const SizedBox(height: 16),
-        Text(
-          _murmurProbability > 0.3 
-              ? "Potential murmur detected"
-              : "Recording completed!",
-          style: TextStyle(
-            fontSize: 18,
-            color: Colors.grey[800],
-            fontWeight: FontWeight.w500,
-          ),
-        ),
-        const SizedBox(height: 8),
-        Text(
-          "Would you like to save this recording?",
-          style: TextStyle(
-            fontSize: 16,
-            color: Colors.grey[600],
-          ),
-        ),
-        const SizedBox(height: 16),
-        Row(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            Icon(Icons.volume_down, color: Colors.blue[700]),
-            Slider(
-              value: _playbackVolume,
-              min: 0.1,
-              max: 1.0,
-              divisions: 9,
-              onChanged: (value) {
-                setState(() {
-                  _playbackVolume = value;
-                });
-                if (_isPlaying) {
-                  _audioPlayer.setVolume(_playbackVolume);
-                }
-              },
-              activeColor: Colors.blue[700],
-            ),
-            Icon(Icons.volume_up, color: Colors.blue[700]),
-          ],
-        ),
-        const SizedBox(height: 8),
-        // Regular playback button for processed audio
-        if (!_debugModeEnabled)
-          IconButton(
-            icon: Icon(
-              _isPlaying ? Icons.pause_circle : Icons.play_circle,
-              size: 48,
-              color: Colors.blue[700],
-            ),
-            onPressed: () => _playPreviewRecording(),
-          ),
-        
-        // Debug mode UI with both processed and raw audio options
-        if (_debugModeEnabled)
-          Row(
-            mainAxisAlignment: MainAxisAlignment.center,
-            children: [
-              Column(
-                children: [
-                  IconButton(
-                    icon: Icon(
-                      _isPlaying ? Icons.pause_circle : Icons.play_circle,
-                      size: 48,
-                      color: Colors.blue[700],
-                    ),
-                    onPressed: () => _playPreviewRecording(),
-                  ),
-                  Text(
-                    "Processed",
-                    style: TextStyle(fontSize: 12, color: Colors.grey[600]),
-                  ),
-                ],
-              ),
-              const SizedBox(width: 24),
-              Column(
-                children: [
-                  IconButton(
-  icon: Icon(
-    _isPlaying ? Icons.pause_circle : Icons.play_circle,
-    size: 48,
-    color: Colors.blue[700],
-  ),
-  onPressed: () => _playPreviewRecording(),
-),
-                  Text(
-                    "Raw Audio",
-                    style: TextStyle(fontSize: 12, color: Colors.grey[600]),
-                  ),
-                ],
-              ),
-            ],
-          ),
-          
-        // Debug Info Section
-        if (_debugModeEnabled)
+  Widget _buildRecordingCompleteContent() {
+    return SingleChildScrollView(
+      padding: const EdgeInsets.symmetric(vertical: 24, horizontal: 16),
+      physics: const BouncingScrollPhysics(),
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
           Container(
-            margin: const EdgeInsets.symmetric(vertical: 16, horizontal: 8),
-            padding: const EdgeInsets.all(12),
+            width: 120,
+            height: 120,
             decoration: BoxDecoration(
-              color: Colors.grey[100],
-              borderRadius: BorderRadius.circular(8),
-              border: Border.all(color: Colors.grey[400]!),
+              shape: BoxShape.circle,
+              color: AppTheme.successColor.withAlpha(26),
             ),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  "Debug Information",
-                  style: TextStyle(
-                    fontWeight: FontWeight.bold,
-                    color: Colors.grey[800],
-                  ),
-                ),
-                const SizedBox(height: 8),
-                Text("Sample Range: ${_recordedAudioData != null ? _getSampleRange() : 'N/A'}"),
-                Text("Mean Value: ${_recordedAudioData != null ? _calculateMean().toStringAsFixed(1) : 'N/A'}"),
-                Text("DC Offset: ${_recordedAudioData != null ? _calculateDCOffset().toStringAsFixed(1) : 'N/A'}"),
-                Text("Signal Variation: ${_recordedAudioData != null ? _calculateSignalVariation().toStringAsFixed(1) : 'N/A'}"),
-                const SizedBox(height: 8),
-                Text(
-                  "Raw audio is the unprocessed signal directly from the MEMS microphone. "
-                  "It may contain DC offset and background noise.",
-                  style: TextStyle(
-                    fontSize: 12,
-                    fontStyle: FontStyle.italic,
-                    color: Colors.grey[600],
-                  ),
+            child: Icon(
+              Icons.check_circle_outline,
+              color: AppTheme.successColor,
+              size: 60,
+            ),
+          ).animate().fadeIn(duration: 500.ms),
+          const SizedBox(height: 16),
+          Text(
+            "Recording completed!",
+            style: GoogleFonts.inter(
+              fontSize: 18,
+              color: AppTheme.textPrimary,
+              fontWeight: FontWeight.w500,
+            ),
+          ),
+          const SizedBox(height: 8),
+          Text(
+            "Would you like to save this recording?",
+            style: GoogleFonts.inter(
+              fontSize: 16,
+              color: AppTheme.textSecondary,
+            ),
+          ),
+          const SizedBox(height: 24),
+          Container(
+            padding: const EdgeInsets.all(16),
+            decoration: BoxDecoration(
+              color: Colors.white,
+              borderRadius: BorderRadius.circular(16),
+              boxShadow: [
+                BoxShadow(
+                  color: Colors.black.withAlpha(10),
+                  blurRadius: 6,
+                  spreadRadius: 0,
+                  offset: const Offset(0, 2),
                 ),
               ],
             ),
-          ),
-        
-        const SizedBox(height: 16),
-        // Add visualization
-        _buildMurmurVisualization(),
-      ],
-    ),
-  );
-}
-
-String _getSampleRange() {
-  if (_recordedAudioData == null || _recordedAudioData!.isEmpty) return "N/A";
-  
-  ByteData byteData = ByteData(_recordedAudioData!.length);
-  for (int i = 0; i < _recordedAudioData!.length; i++) {
-    byteData.setUint8(i, _recordedAudioData![i]);
+            child: Column(
+              children: [
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: [
+                    Icon(Icons.volume_down, color: AppTheme.primaryColor),
+                    Expanded(
+                      child: Slider(
+                        value: _playbackVolume,
+                        min: 0.1,
+                        max: 1.0,
+                        divisions: 9,
+                        onChanged: (value) {
+                          setState(() {
+                            _playbackVolume = value;
+                          });
+                          if (_isPlaying) {
+                            _audioPlayer.setVolume(_playbackVolume);
+                          }
+                        },
+                        activeColor: AppTheme.primaryColor,
+                      ),
+                    ),
+                    Icon(Icons.volume_up, color: AppTheme.primaryColor),
+                  ],
+                ),
+                const SizedBox(height: 8),
+                IconButton(
+                  icon: Icon(
+                    _isPlaying ? Icons.pause_circle : Icons.play_circle,
+                    size: 64,
+                    color: AppTheme.primaryColor,
+                  ),
+                  onPressed: () => _playPreviewRecording(),
+                ),
+              ],
+            ),
+          ).animate().fadeIn(duration: 500.ms, delay: 200.ms),
+                  
+          const SizedBox(height: 24),
+          // Add visualization
+          _buildMurmurVisualization(),
+        ],
+      ),
+    );
   }
-  
-  int min = 32767;
-  int max = -32768;
-  
-  for (int i = 0; i < _recordedAudioData!.length; i += 2) {
-    if (i + 1 < _recordedAudioData!.length) {
-      int sample = byteData.getInt16(i, Endian.little);
-      if (sample < min) min = sample;
-      if (sample > max) max = sample;
-    }
-  }
-  
-  return "$min to $max";
-}
-
-double _calculateMean() {
-  if (_recordedAudioData == null || _recordedAudioData!.isEmpty) return 0.0;
-  
-  ByteData byteData = ByteData(_recordedAudioData!.length);
-  for (int i = 0; i < _recordedAudioData!.length; i++) {
-    byteData.setUint8(i, _recordedAudioData![i]);
-  }
-  
-  double sum = 0.0;
-  int count = 0;
-  
-  for (int i = 0; i < _recordedAudioData!.length; i += 2) {
-    if (i + 1 < _recordedAudioData!.length) {
-      int sample = byteData.getInt16(i, Endian.little);
-      sum += sample;
-      count++;
-    }
-  }
-  
-  return count > 0 ? sum / count : 0.0;
-}
-
-double _calculateDCOffset() {
-  return _calculateMean(); // DC offset is the mean value
-}
-
-double _calculateSignalVariation() {
-  if (_recordedAudioData == null || _recordedAudioData!.isEmpty) return 0.0;
-  
-  ByteData byteData = ByteData(_recordedAudioData!.length);
-  for (int i = 0; i < _recordedAudioData!.length; i++) {
-    byteData.setUint8(i, _recordedAudioData![i]);
-  }
-  
-  double mean = _calculateMean();
-  double sumSquaredDiffs = 0.0;
-  int count = 0;
-  
-  for (int i = 0; i < _recordedAudioData!.length; i += 2) {
-    if (i + 1 < _recordedAudioData!.length) {
-      int sample = byteData.getInt16(i, Endian.little);
-      double diff = sample - mean;
-      sumSquaredDiffs += diff * diff;
-      count++;
-    }
-  }
-  
-  return count > 0 ? math.sqrt(sumSquaredDiffs / count) : 0.0;
-}
-
-// Add this method to the MurmurRecordState to add a Debug Mode toggle
-
-
 
   Widget _buildInitialContent() {
-    return Column(
-      mainAxisSize: MainAxisSize.min,
-      children: [
-        Container(
-          width: 120,
-          height: 120,
-          decoration: BoxDecoration(
-            shape: BoxShape.circle,
-            color: Colors.blue[700]!.withAlpha(26),
+    return Container(
+      margin: const EdgeInsets.symmetric(vertical: 40),
+      width: double.infinity, // Take full width of parent
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        crossAxisAlignment: CrossAxisAlignment.center, // Center children horizontally
+        children: [
+          Container(
+            width: 120,
+            height: 120,
+            decoration: BoxDecoration(
+              shape: BoxShape.circle,
+              color: AppTheme.primaryColor.withAlpha(26),
+            ),
+            child: Icon(
+              Icons.mic_none,
+              color: AppTheme.primaryColor,
+              size: 48,
+            ),
+          ).animate().fadeIn(duration: 500.ms),
+          const SizedBox(height: 24),
+          Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 32),
+            child: Text(
+              "Tap the button below to start recording heart sounds",
+              style: GoogleFonts.inter(
+                fontSize: 16,
+                color: AppTheme.textSecondary,
+              ),
+              textAlign: TextAlign.center,
+            ),
           ),
-          child: Icon(
-            Icons.mic_none,
-            color: Colors.blue[700],
-            size: 48,
+          const SizedBox(height: 12),
+          Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 32),
+            child: Text(
+              "Make sure the stethoscope is placed properly",
+              style: GoogleFonts.inter(
+                fontSize: 14,
+                color: AppTheme.textLight,
+              ),
+              textAlign: TextAlign.center,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+  @override
+  Widget build(BuildContext context) {
+    return BackButtonHandler(
+      strategy: BackButtonHandlingStrategy.normal,
+      child: Scaffold(
+        appBar: AppBar(
+          title: Text(
+            widget.preselectedPatientId != null 
+                ? "Record Heart Sounds"
+                : "Heart Sound Recorder",
+            style: GoogleFonts.inter(
+              fontSize: 20,
+              fontWeight: FontWeight.w600,
+              color: AppTheme.textPrimary,
+            ),
+          ),
+          elevation: 0,
+          backgroundColor: Colors.white,
+          foregroundColor: AppTheme.textPrimary,
+          leading: IconButton(
+            icon: const Icon(Icons.arrow_back_ios, size: 20),
+            onPressed: () {
+              _handleBackButton();
+            },
           ),
         ),
-        const SizedBox(height: 24),
-        Text(
-          "Tap the button below to start recording heart sounds",
-          style: TextStyle(
-            fontSize: 16,
-            color: Colors.grey[600],
+        body: SafeArea(
+          child: Stack(
+            children: [
+              Column(
+                children: [
+                  // Waveform and Recording Status
+                  Container(
+                    width: double.infinity,
+                    padding: const EdgeInsets.all(24),
+                    decoration: BoxDecoration(
+                      color: Colors.white,
+                      borderRadius: const BorderRadius.only(
+                        bottomLeft: Radius.circular(24),
+                        bottomRight: Radius.circular(24),
+                      ),
+                      boxShadow: [
+                        BoxShadow(
+                          color: Colors.black.withAlpha(13),
+                          blurRadius: 10,
+                          offset: const Offset(0, 5),
+                        ),
+                      ],
+                    ),
+                    child: Consumer<BLEManager>(
+                      builder: (context, bleManager, child) {
+                        return Column(
+                          children: [
+                            _buildWaveform(context, bleManager).animate().fadeIn(duration: 500.ms),
+                            const SizedBox(height: 16),
+                            _buildRecordingStatus().animate().fadeIn(duration: 500.ms, delay: 200.ms),
+                          ],
+                        );
+                      },
+                    ),
+                  ),
+                  
+                  // Main Content Area
+                  Expanded(
+                    child: SingleChildScrollView(
+                      physics: const BouncingScrollPhysics(),
+                      child: Center(
+                        child: AnimatedSwitcher(
+                          duration: const Duration(milliseconds: 300),
+                          child: _buildMainContent(),
+                        ),
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+              
+              // Processing overlay
+              if (_isProcessing)
+                Container(
+                  color: Colors.black.withAlpha(40),
+                  child: Center(
+                    child: Card(
+                      elevation: 4,
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(16),
+                      ),
+                      child: Padding(
+                        padding: const EdgeInsets.symmetric(horizontal: 32, vertical: 24),
+                        child: Column(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            CircularProgressIndicator(
+                              valueColor: AlwaysStoppedAnimation<Color>(AppTheme.primaryColor),
+                            ),
+                            const SizedBox(height: 16),
+                            Text(
+                              'Processing...',
+                              style: GoogleFonts.inter(
+                                fontSize: 16,
+                                fontWeight: FontWeight.w500,
+                                color: AppTheme.textPrimary,
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                    ),
+                  ),
+                ),
+            ],
           ),
         ),
-        const SizedBox(height: 12),
-        Text(
-          "Make sure the stethoscope is placed properly",
-          style: TextStyle(
-            fontSize: 14,
-            color: Colors.grey[500],
-          ),
-        ),
-      ],
+        floatingActionButton: _buildFloatingActionButton(),
+        floatingActionButtonLocation: FloatingActionButtonLocation.centerFloat,
+      ),
     );
   }
 
@@ -2000,10 +1834,18 @@ double _calculateSignalVariation() {
     if (_isRecording) {
       return FloatingActionButton.extended(
         onPressed: _stopRecording,
-        backgroundColor: Colors.red,
-        label: const Text("Stop Recording"),
-        icon: const Icon(Icons.stop),
-      );
+        backgroundColor: AppTheme.errorColor,
+        label: Text(
+          "Stop Recording",
+          style: GoogleFonts.inter(
+            fontSize: 16,
+            fontWeight: FontWeight.w600,
+            color: Colors.white,
+          ),
+        ),
+        icon: const Icon(Icons.stop, color: Colors.white),
+        elevation: 2,
+      ).animate().fadeIn(duration: 300.ms);
     } else if (_hasRecordingCompleted) {
       return Row(
         mainAxisSize: MainAxisSize.min,
@@ -2018,32 +1860,54 @@ double _calculateSignalVariation() {
                 _hasRecordingCompleted = false;
                 _recordedAudioData = null;
                 _isPlaying = false;
-                _murmurProbability = 0.0;
-                _murmurType = 'None';
               });
             },
-            backgroundColor: Colors.red,
-            label: const Text("Discard"),
-            icon: const Icon(Icons.delete),
+            backgroundColor: AppTheme.errorColor,
+            label: Text(
+              "Discard",
+              style: GoogleFonts.inter(
+                fontSize: 16,
+                fontWeight: FontWeight.w600,
+                color: Colors.white,
+              ),
+            ),
+            icon: const Icon(Icons.delete, color: Colors.white),
             heroTag: null,
+            elevation: 2,
           ),
           const SizedBox(width: 16),
           FloatingActionButton.extended(
             onPressed: _showSaveRecordingDialog,
-            backgroundColor: Colors.green,
-            label: const Text("Save Recording"),
-            icon: const Icon(Icons.save),
+            backgroundColor: AppTheme.successColor,
+            label: Text(
+              "Save Recording",
+              style: GoogleFonts.inter(
+                fontSize: 16,
+                fontWeight: FontWeight.w600,
+                color: Colors.white,
+              ),
+            ),
+            icon: const Icon(Icons.save, color: Colors.white),
             heroTag: null,
+            elevation: 2,
           ),
         ],
-      );
+      ).animate().fadeIn(duration: 300.ms);
     } else {
       return FloatingActionButton.extended(
         onPressed: _startRecording,
-        backgroundColor: Colors.blue[700],
-        label: const Text("Start Recording"),
-        icon: const Icon(Icons.mic),
-      );
+        backgroundColor: AppTheme.primaryColor,
+        label: Text(
+          "Start Recording",
+          style: GoogleFonts.inter(
+            fontSize: 16,
+            fontWeight: FontWeight.w600,
+            color: Colors.white,
+          ),
+        ),
+        icon: const Icon(Icons.mic, color: Colors.white),
+        elevation: 2,
+      ).animate().fadeIn(duration: 300.ms);
     }
   }
 }
