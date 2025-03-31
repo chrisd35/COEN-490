@@ -1,14 +1,22 @@
 import 'package:flutter/material.dart';
 import 'package:firebase_database/firebase_database.dart';
 import 'package:firebase_auth/firebase_auth.dart';
+import 'package:google_fonts/google_fonts.dart';
+import 'package:flutter_animate/flutter_animate.dart';
 import '/utils/models.dart';
 import '../../../utils/navigation_service.dart';
 import '../../../utils/app_routes.dart';
 import '../../../widgets/back_button.dart';
+
 class PatientCard extends StatelessWidget {
   final DatabaseReference _database = FirebaseDatabase.instance.ref();
   
-  // Add key parameter using super, but remove const since _database is non-constant
+  // Design constants
+  static final Color primaryColor = const Color(0xFF1D557E);
+  static final Color backgroundColor = const Color(0xFFF5F7FA);
+  static final Color textPrimaryColor = const Color(0xFF263238);
+  static final Color textSecondaryColor = const Color(0xFF546E7A);
+
   PatientCard({super.key});
 
   @override
@@ -18,18 +26,18 @@ class PatientCard extends StatelessWidget {
     return BackButtonHandler(
       strategy: BackButtonHandlingStrategy.normal,
       child: Scaffold(
-        backgroundColor: Colors.grey[50],
+        backgroundColor: backgroundColor,
         body: SafeArea(
           child: Column(
             children: [
-              // Custom App Bar
+              // Redesigned App Bar
               Container(
-                padding: const EdgeInsets.symmetric(horizontal: 8.0, vertical: 8.0),
+                padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
                 decoration: BoxDecoration(
                   color: Colors.white,
                   boxShadow: [
                     BoxShadow(
-                      color: Colors.black.withAlpha(13), // Using withAlpha(13) instead of withOpacity(0.05)
+                      color: Colors.black.withAlpha(13),
                       blurRadius: 10,
                       offset: const Offset(0, 2),
                     ),
@@ -41,12 +49,13 @@ class PatientCard extends StatelessWidget {
                       icon: const Icon(Icons.arrow_back_ios_new, size: 20),
                       onPressed: () => NavigationService.goBack(),
                     ),
-                    const Expanded(
+                    Expanded(
                       child: Text(
                         'Patient Records',
-                        style: TextStyle(
+                        style: GoogleFonts.inter(
                           fontSize: 18,
                           fontWeight: FontWeight.w600,
+                          color: textPrimaryColor,
                         ),
                         textAlign: TextAlign.center,
                       ),
@@ -54,7 +63,7 @@ class PatientCard extends StatelessWidget {
                     IconButton(
                       icon: Icon(
                         Icons.person_add_rounded,
-                        color: Theme.of(context).primaryColor,
+                        color: primaryColor,
                       ),
                       onPressed: () => NavigationService.navigateTo(AppRoutes.addPatient),
                     ),
@@ -105,18 +114,20 @@ class PatientCard extends StatelessWidget {
       child: Column(
         mainAxisAlignment: MainAxisAlignment.center,
         children: [
-          const CircularProgressIndicator(),
+          CircularProgressIndicator(
+            color: primaryColor,
+          ),
           const SizedBox(height: 16),
           Text(
             'Loading patients...',
-            style: TextStyle(
+            style: GoogleFonts.inter(
               fontSize: 16,
-              color: Colors.grey[600],
+              color: textSecondaryColor,
             ),
           ),
         ],
       ),
-    );
+    ).animate().fadeIn(duration: 300.ms);
   }
 
   Widget _buildErrorState(String error) {
@@ -132,27 +143,27 @@ class PatientCard extends StatelessWidget {
               color: Colors.red[400],
             ),
             const SizedBox(height: 16),
-            const Text(
+            Text(
               'Something went wrong',
-              style: TextStyle(
+              style: GoogleFonts.inter(
                 fontSize: 18,
                 fontWeight: FontWeight.bold,
-                color: Colors.black87,
+                color: textPrimaryColor,
               ),
             ),
             const SizedBox(height: 8),
             Text(
               error,
               textAlign: TextAlign.center,
-              style: TextStyle(
+              style: GoogleFonts.inter(
                 fontSize: 14,
-                color: Colors.grey[600],
+                color: textSecondaryColor,
               ),
             ),
           ],
         ),
       ),
-    );
+    ).animate().fadeIn(duration: 300.ms);
   }
 
   Widget _buildEmptyState(BuildContext context) {
@@ -165,38 +176,38 @@ class PatientCard extends StatelessWidget {
             Container(
               padding: const EdgeInsets.all(16),
               decoration: BoxDecoration(
-                color: Colors.blue[50],
+                color: primaryColor.withAlpha(26),
                 shape: BoxShape.circle,
               ),
-              child: const Icon(
+              child: Icon(
                 Icons.people_outline_rounded,
                 size: 48,
-                color: Colors.blue,
+                color: primaryColor,
               ),
             ),
             const SizedBox(height: 24),
-            const Text(
+            Text(
               'No Patients Yet',
-              style: TextStyle(
+              style: GoogleFonts.inter(
                 fontSize: 20,
                 fontWeight: FontWeight.bold,
-                color: Colors.black87,
+                color: textPrimaryColor,
               ),
             ),
             const SizedBox(height: 8),
             Text(
               'Add your first patient to get started',
               textAlign: TextAlign.center,
-              style: TextStyle(
+              style: GoogleFonts.inter(
                 fontSize: 16,
-                color: Colors.grey[600],
+                color: textSecondaryColor,
               ),
             ),
             const SizedBox(height: 24),
             ElevatedButton(
               onPressed: () => NavigationService.navigateTo(AppRoutes.addPatient),
               style: ElevatedButton.styleFrom(
-                backgroundColor: Theme.of(context).primaryColor,
+                backgroundColor: primaryColor,
                 foregroundColor: Colors.white,
                 elevation: 0,
                 shape: RoundedRectangleBorder(
@@ -204,9 +215,9 @@ class PatientCard extends StatelessWidget {
                 ),
                 padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 12),
               ),
-              child: const Text(
+              child: Text(
                 'Add Patient',
-                style: TextStyle(
+                style: GoogleFonts.inter(
                   fontSize: 16,
                   fontWeight: FontWeight.w600,
                 ),
@@ -215,7 +226,7 @@ class PatientCard extends StatelessWidget {
           ],
         ),
       ),
-    );
+    ).animate().fadeIn(duration: 300.ms);
   }
 
   Widget _buildPatientsList(BuildContext context, List<Patient> patients) {
@@ -254,8 +265,8 @@ class PatientCard extends StatelessWidget {
                     decoration: BoxDecoration(
                       gradient: LinearGradient(
                         colors: [
-                          Theme.of(context).primaryColor,
-                          Theme.of(context).primaryColor.withAlpha(179), // Using withAlpha(179) instead of withOpacity(0.7)
+                          primaryColor,
+                          primaryColor.withAlpha(179),
                         ],
                         begin: Alignment.topLeft,
                         end: Alignment.bottomRight,
@@ -265,7 +276,7 @@ class PatientCard extends StatelessWidget {
                     child: Center(
                       child: Text(
                         initials,
-                        style: const TextStyle(
+                        style: GoogleFonts.inter(
                           color: Colors.white,
                           fontSize: 18,
                           fontWeight: FontWeight.bold,
@@ -280,18 +291,18 @@ class PatientCard extends StatelessWidget {
                       children: [
                         Text(
                           patient.fullName,
-                          style: const TextStyle(
+                          style: GoogleFonts.inter(
                             fontSize: 16,
                             fontWeight: FontWeight.w600,
-                            color: Colors.black87,
+                            color: textPrimaryColor,
                           ),
                         ),
                         const SizedBox(height: 4),
                         Text(
                           'Medical Card: ${patient.medicalCardNumber}',
-                          style: TextStyle(
+                          style: GoogleFonts.inter(
                             fontSize: 14,
-                            color: Colors.grey[600],
+                            color: textSecondaryColor,
                           ),
                         ),
                       ],
@@ -306,6 +317,9 @@ class PatientCard extends StatelessWidget {
               ),
             ),
           ),
+        ).animate().fadeIn(
+          duration: 300.ms, 
+          delay: Duration(milliseconds: 100 * index)
         );
       },
     );

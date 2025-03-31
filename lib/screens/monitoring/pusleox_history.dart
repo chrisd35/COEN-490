@@ -316,20 +316,7 @@ class _PulseOxHistoryState extends State<PulseOxHistory> with SingleTickerProvid
                                 color: AppTheme.textSecondary,
                               ),
                             ),
-                            const SizedBox(height: 16),
-                            ElevatedButton.icon(
-                              onPressed: () => NavigationService.goBack(),
-                              icon: const Icon(Icons.monitor_heart),
-                              label: const Text('Record New Session'),
-                              style: ElevatedButton.styleFrom(
-                                backgroundColor: AppTheme.primaryColor,
-                                foregroundColor: Colors.white,
-                                padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-                                shape: RoundedRectangleBorder(
-                                  borderRadius: BorderRadius.circular(12),
-                                ),
-                              ),
-                            ),
+                         
                           ],
                         ),
                       )
