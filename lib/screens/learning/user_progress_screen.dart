@@ -1,9 +1,134 @@
-// lib/screens/learning/user_progress_screen.dart
-
 import 'package:flutter/material.dart';
 import 'package:firebase_auth/firebase_auth.dart';
+import 'package:google_fonts/google_fonts.dart';
+import 'package:flutter_animate/flutter_animate.dart';
 import '../../utils/learning_center_models.dart';
 import '../../utils/learning_center_service.dart';
+
+// Design constants to maintain consistency with other screens
+class LearningProgressTheme {
+  // Main color palette - aligned with the app theme
+  static const Color primaryColor = Color(0xFF1D557E);  // Main blue
+  static const Color secondaryColor = Color(0xFFE6EDF7); // Light blue background
+  static const Color accentColor = Color(0xFF2E86C1);   // Medium blue for accents
+  
+  // Status colors
+  static const Color successColor = Color(0xFF2E7D32); // Darker green
+  static const Color warningColor = Color(0xFFF57F17); // Amber
+  static const Color errorColor = Color(0xFFD32F2F);   // Dark red
+  
+  // Text colors
+  static const Color textPrimary = Color(0xFF263238);
+  static const Color textSecondary = Color(0xFF546E7A);
+  static const Color textLight = Color(0xFF78909C);
+  
+  // Category colors
+  static final List<Color> categoryColors = [
+    const Color(0xFF1D557E),  // Primary blue
+    const Color(0xFF2E86C1),  // Medium blue
+    const Color(0xFF3498DB),  // Light blue
+    const Color(0xFF0D47A1),  // Deep blue
+  ];
+  
+  // Shadows
+  static final cardShadow = BoxShadow(
+    color: Colors.black.withAlpha(18),
+    blurRadius: 12,
+    spreadRadius: 0,
+    offset: const Offset(0, 3),
+  );
+  
+  static final subtleShadow = BoxShadow(
+    color: Colors.black.withAlpha(10),
+    blurRadius: 6,
+    spreadRadius: 0,
+    offset: const Offset(0, 2),
+  );
+  
+  // Text styles
+  static final TextStyle headingStyle = GoogleFonts.inter(
+    fontSize: 22,
+    fontWeight: FontWeight.bold,
+    color: textPrimary,
+    letterSpacing: -0.3,
+    height: 1.3,
+  );
+  
+  static final TextStyle subheadingStyle = GoogleFonts.inter(
+    fontSize: 18,
+    fontWeight: FontWeight.w600,
+    color: textPrimary,
+    letterSpacing: -0.2,
+    height: 1.4,
+  );
+  
+  static final TextStyle cardTitleStyle = GoogleFonts.inter(
+    fontSize: 16,
+    fontWeight: FontWeight.w600,
+    color: textPrimary,
+    letterSpacing: -0.2,
+    height: 1.3,
+  );
+  
+  static final TextStyle bodyStyle = GoogleFonts.inter(
+    fontSize: 14,
+    fontWeight: FontWeight.normal,
+    color: textPrimary,
+    height: 1.5,
+  );
+  
+  static final TextStyle emphasisStyle = GoogleFonts.inter(
+    fontSize: 14,
+    fontWeight: FontWeight.w500,
+    color: textPrimary,
+    height: 1.5,
+  );
+  
+  static final TextStyle captionStyle = GoogleFonts.inter(
+    fontSize: 12,
+    fontWeight: FontWeight.normal,
+    color: textSecondary,
+    height: 1.5,
+  );
+  
+  static final TextStyle buttonTextStyle = GoogleFonts.inter(
+    fontSize: 15,
+    fontWeight: FontWeight.w600,
+    letterSpacing: 0.1,
+    height: 1.3,
+  );
+  
+  // Animation durations
+  static const Duration defaultAnimDuration = Duration(milliseconds: 300);
+  static const Duration quickAnimDuration = Duration(milliseconds: 150);
+  
+  // Border radius
+  static final BorderRadius borderRadius = BorderRadius.circular(16);
+  static final BorderRadius chipRadius = BorderRadius.circular(12);
+  static final BorderRadius buttonRadius = BorderRadius.circular(12);
+  
+  // Get color for score
+  static Color getScoreColor(double score) {
+    if (score >= 90) return const Color(0xFF43A047); // Green
+    if (score >= 70) return const Color(0xFF1E88E5); // Blue
+    if (score >= 50) return const Color(0xFFFF9800); // Orange
+    return const Color(0xFFE53935); // Red
+  }
+  
+  // Get color for difficulty
+  static Color getDifficultyColor(String difficulty) {
+    switch (difficulty.toLowerCase()) {
+      case 'easy':
+        return const Color(0xFF43A047); // Green
+      case 'medium':
+        return const Color(0xFFFF9800); // Orange
+      case 'hard':
+        return const Color(0xFFE53935); // Red
+      default:
+        return primaryColor;
+    }
+  }
+}
 
 class UserProgressScreen extends StatefulWidget {
   const UserProgressScreen({super.key});
@@ -39,42 +164,106 @@ class _UserProgressScreenState extends State<UserProgressScreen> with SingleTick
   void _showResetConfirmationDialog() {
     showDialog(
       context: context,
-      builder: (BuildContext context) {
-        return AlertDialog(
+      builder: (BuildContext dialogContext) {
+        return Dialog(
           shape: RoundedRectangleBorder(
-            borderRadius: BorderRadius.circular(16),
+            borderRadius: BorderRadius.circular(20),
           ),
-          title: Row(
-            children: const [
-              Icon(Icons.warning_amber_rounded, color: Colors.orange),
-              SizedBox(width: 8),
-              Text('Reset Progress'),
-            ],
-          ),
-          content: const Text(
-            'This will delete all your learning progress and quiz results. '
-            'This action cannot be undone. Are you sure you want to continue?'
-          ),
-          actions: [
-            TextButton(
-              onPressed: () => Navigator.of(context).pop(),
-              child: const Text('Cancel'),
-            ),
-            ElevatedButton(
-              onPressed: () {
-                _resetProgress();
-                Navigator.of(context).pop();
-              },
-              style: ElevatedButton.styleFrom(
-                backgroundColor: Colors.red,
-                foregroundColor: Colors.white,
-                shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(8),
+          elevation: 0,
+          backgroundColor: Colors.transparent,
+          child: Container(
+            padding: const EdgeInsets.all(24),
+            decoration: BoxDecoration(
+              color: Colors.white,
+              borderRadius: BorderRadius.circular(20),
+              boxShadow: [
+                BoxShadow(
+                  color: Colors.black.withAlpha(26),
+                  blurRadius: 20,
+                  offset: const Offset(0, 10),
                 ),
-              ),
-              child: const Text('Reset'),
+              ],
             ),
-          ],
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Icon(
+                  Icons.warning_amber_rounded,
+                  size: 48,
+                  color: LearningProgressTheme.warningColor,
+                ).animate().shake(duration: 700.ms),
+                const SizedBox(height: 16),
+                Text(
+                  'Reset Progress?',
+                  style: GoogleFonts.inter(
+                    fontSize: 20,
+                    fontWeight: FontWeight.bold,
+                    color: LearningProgressTheme.textPrimary,
+                  ),
+                ),
+                const SizedBox(height: 16),
+                Text(
+                  'This will delete all your learning progress and quiz results. '
+                  'This action cannot be undone.',
+                  textAlign: TextAlign.center,
+                  style: GoogleFonts.inter(
+                    fontSize: 16,
+                    color: LearningProgressTheme.textSecondary,
+                    height: 1.5,
+                  ),
+                ),
+                const SizedBox(height: 24),
+                Row(
+                  children: [
+                    Expanded(
+                      child: TextButton(
+                        onPressed: () => Navigator.pop(dialogContext),
+                        style: TextButton.styleFrom(
+                          padding: const EdgeInsets.symmetric(vertical: 14),
+                          shape: RoundedRectangleBorder(
+                            borderRadius: LearningProgressTheme.buttonRadius,
+                          ),
+                        ),
+                        child: Text(
+                          'CANCEL',
+                          style: GoogleFonts.inter(
+                            fontSize: 15,
+                            fontWeight: FontWeight.w600,
+                            color: LearningProgressTheme.textSecondary,
+                          ),
+                        ),
+                      ),
+                    ),
+                    const SizedBox(width: 16),
+                    Expanded(
+                      child: ElevatedButton(
+                        onPressed: () {
+                          Navigator.pop(dialogContext);
+                          _resetProgress();
+                        },
+                        style: ElevatedButton.styleFrom(
+                          backgroundColor: LearningProgressTheme.errorColor,
+                          foregroundColor: Colors.white,
+                          elevation: 0,
+                          padding: const EdgeInsets.symmetric(vertical: 14),
+                          shape: RoundedRectangleBorder(
+                            borderRadius: LearningProgressTheme.buttonRadius,
+                          ),
+                        ),
+                        child: Text(
+                          'RESET',
+                          style: GoogleFonts.inter(
+                            fontSize: 15,
+                            fontWeight: FontWeight.w600,
+                          ),
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+              ],
+            ),
+          ),
         );
       },
     );
@@ -83,15 +272,7 @@ class _UserProgressScreenState extends State<UserProgressScreen> with SingleTick
   Future<void> _resetProgress() async {
     try {
       // Show loading indicator
-      showDialog(
-        context: context,
-        barrierDismissible: false,
-        builder: (BuildContext context) {
-          return const Center(
-            child: CircularProgressIndicator(),
-          );
-        },
-      );
+      _showLoadingDialog('Resetting progress...');
       
       await _learningService.resetUserProgress(_userId);
       
@@ -111,12 +292,9 @@ class _UserProgressScreenState extends State<UserProgressScreen> with SingleTick
       
       // Show success message
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: Text('Your progress has been reset successfully'),
-            backgroundColor: Colors.green,
-            behavior: SnackBarBehavior.floating,
-          ),
+        _showSnackBar(
+          'Your progress has been reset successfully',
+          isSuccess: true,
         );
       }
     } catch (e) {
@@ -127,35 +305,120 @@ class _UserProgressScreenState extends State<UserProgressScreen> with SingleTick
       
       // Show error message
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text('Error resetting progress: $e'),
-            backgroundColor: Colors.red,
-            behavior: SnackBarBehavior.floating,
-          ),
+        _showSnackBar(
+          'Error resetting progress: $e',
+          isError: true,
         );
       }
     }
   }
 
+  void _showLoadingDialog(String message) {
+    showDialog(
+      context: context,
+      barrierDismissible: false,
+      builder: (BuildContext dialogContext) {
+        return Dialog(
+          backgroundColor: Colors.white,
+          elevation: 0,
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(16),
+          ),
+          child: Padding(
+            padding: const EdgeInsets.all(20),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                CircularProgressIndicator(
+                  color: LearningProgressTheme.primaryColor,
+                ),
+                const SizedBox(height: 20),
+                Text(
+                  message,
+                  style: GoogleFonts.inter(
+                    fontSize: 16,
+                    color: LearningProgressTheme.textPrimary,
+                  ),
+                ),
+              ],
+            ),
+          ),
+        );
+      },
+    );
+  }
+
+  void _showSnackBar(String message, {bool isError = false, bool isSuccess = false}) {
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Text(
+          message,
+          style: GoogleFonts.inter(
+            fontSize: 14,
+            color: Colors.white,
+          ),
+        ),
+        backgroundColor: isError
+            ? LearningProgressTheme.errorColor
+            : isSuccess
+                ? LearningProgressTheme.successColor
+                : LearningProgressTheme.primaryColor,
+        behavior: SnackBarBehavior.floating,
+        margin: const EdgeInsets.all(16),
+        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(12),
+        ),
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
+      backgroundColor: LearningProgressTheme.secondaryColor,
       appBar: AppBar(
-        title: const Text(
+        backgroundColor: Colors.white,
+        foregroundColor: LearningProgressTheme.textPrimary,
+        elevation: 0,
+        centerTitle: false,
+        title: Text(
           'My Learning Progress',
-          style: TextStyle(fontWeight: FontWeight.w600),
+          style: GoogleFonts.inter(
+            fontSize: 20,
+            fontWeight: FontWeight.w600,
+            color: LearningProgressTheme.textPrimary,
+            letterSpacing: -0.3,
+          ),
         ),
-        elevation: 2,
         actions: [
-          IconButton(
-            icon: const Icon(Icons.refresh),
-            tooltip: 'Reset Progress',
-            onPressed: _showResetConfirmationDialog,
+          Container(
+            margin: const EdgeInsets.only(right: 8),
+            decoration: BoxDecoration(
+              color: LearningProgressTheme.secondaryColor,
+              borderRadius: BorderRadius.circular(12),
+            ),
+            child: IconButton(
+              icon: Icon(
+                Icons.refresh_rounded,
+                color: LearningProgressTheme.primaryColor,
+              ),
+              tooltip: 'Reset Progress',
+              onPressed: _showResetConfirmationDialog,
+            ),
           ),
         ],
         bottom: TabBar(
           controller: _tabController,
+          indicatorColor: LearningProgressTheme.primaryColor,
+          indicatorWeight: 3,
+          labelStyle: GoogleFonts.inter(
+            fontSize: 16,
+            fontWeight: FontWeight.w600,
+            letterSpacing: -0.1,
+          ),
+          labelColor: LearningProgressTheme.primaryColor,
+          unselectedLabelColor: LearningProgressTheme.textSecondary,
           tabs: const [
             Tab(text: 'Overview'),
             Tab(text: 'Quiz Results'),
@@ -181,40 +444,72 @@ class _UserProgressScreenState extends State<UserProgressScreen> with SingleTick
       ]),
       builder: (context, snapshot) {
         if (snapshot.connectionState == ConnectionState.waiting) {
-          return const Center(
-            child: CircularProgressIndicator(),
+          return Center(
+            child: CircularProgressIndicator(
+              color: LearningProgressTheme.primaryColor,
+            ),
           );
         }
         
         if (snapshot.hasError) {
           return Center(
-            child: Column(
-              mainAxisAlignment: MainAxisAlignment.center,
-              children: [
-                Text(
-                  'Error loading progress: ${snapshot.error}',
-                  style: TextStyle(color: Colors.red),
-                  textAlign: TextAlign.center,
-                ),
-                const SizedBox(height: 16),
-                ElevatedButton(
-                  onPressed: () {
-                    setState(() {
-                      _userProgressFuture = _learningService.getUserProgress(_userId);
-                      _topicsFuture = _learningService.getLearningTopics();
-                      _quizzesFuture = _learningService.getQuizzes();
-                    });
-                  },
-                  child: const Text('Retry'),
-                ),
-              ],
+            child: Padding(
+              padding: const EdgeInsets.all(24.0),
+              child: Column(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  Icon(
+                    Icons.error_outline_rounded,
+                    size: 48,
+                    color: LearningProgressTheme.errorColor.withAlpha(200),
+                  ),
+                  const SizedBox(height: 16),
+                  Text(
+                    'Error loading progress data',
+                    style: LearningProgressTheme.subheadingStyle,
+                    textAlign: TextAlign.center,
+                  ),
+                  const SizedBox(height: 8),
+                  Text(
+                    '${snapshot.error}',
+                    style: LearningProgressTheme.bodyStyle.copyWith(
+                      color: LearningProgressTheme.textSecondary,
+                    ),
+                    textAlign: TextAlign.center,
+                  ),
+                  const SizedBox(height: 24),
+                  ElevatedButton.icon(
+                    onPressed: () {
+                      setState(() {
+                        _userProgressFuture = _learningService.getUserProgress(_userId);
+                        _topicsFuture = _learningService.getLearningTopics();
+                        _quizzesFuture = _learningService.getQuizzes();
+                      });
+                    },
+                    icon: const Icon(Icons.refresh_rounded),
+                    label: const Text('Retry'),
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: LearningProgressTheme.primaryColor,
+                      foregroundColor: Colors.white,
+                      elevation: 0,
+                      padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 12),
+                      shape: RoundedRectangleBorder(
+                        borderRadius: LearningProgressTheme.buttonRadius,
+                      ),
+                    ),
+                  ),
+                ],
+              ),
             ),
           );
         }
         
         if (!snapshot.hasData) {
-          return const Center(
-            child: Text('No progress data available'),
+          return Center(
+            child: Text(
+              'No progress data available',
+              style: LearningProgressTheme.bodyStyle,
+            ),
           );
         }
         
@@ -259,56 +554,51 @@ class _UserProgressScreenState extends State<UserProgressScreen> with SingleTick
               _quizzesFuture = _learningService.getQuizzes();
             });
           },
+          color: LearningProgressTheme.primaryColor,
           child: SingleChildScrollView(
             physics: const AlwaysScrollableScrollPhysics(),
             child: Padding(
-              padding: const EdgeInsets.all(16.0),
+              padding: const EdgeInsets.all(24.0),
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   _buildProgressSummaryCard(
                     topicCompletionPercentage,
                     averageScore,
-                  ),
+                  ).animate().fadeIn(duration: 500.ms, delay: 100.ms),
                   
                   const SizedBox(height: 24),
                   
                   // Topic progress
-                  const Text(
+                  Text(
                     'Topic Progress',
-                    style: TextStyle(
-                      fontSize: 18,
-                      fontWeight: FontWeight.bold,
-                    ),
-                  ),
+                    style: LearningProgressTheme.subheadingStyle,
+                  ).animate().fadeIn(duration: 500.ms, delay: 200.ms),
                   const SizedBox(height: 16),
-                  _buildTopicProgressCard(topics, userProgress),
+                  _buildTopicProgressCard(topics, userProgress)
+                      .animate().fadeIn(duration: 500.ms, delay: 300.ms),
                   
                   const SizedBox(height: 24),
                   
                   // Recently accessed topics
-                  const Text(
+                  Text(
                     'Recently Accessed Topics',
-                    style: TextStyle(
-                      fontSize: 18,
-                      fontWeight: FontWeight.bold,
-                    ),
-                  ),
+                    style: LearningProgressTheme.subheadingStyle,
+                  ).animate().fadeIn(duration: 500.ms, delay: 400.ms),
                   const SizedBox(height: 16),
-                  _buildRecentTopicsCard(lastAccessedTopics, topics),
+                  _buildRecentTopicsCard(lastAccessedTopics, topics)
+                      .animate().fadeIn(duration: 500.ms, delay: 500.ms),
                   
                   const SizedBox(height: 24),
                   
                   // Quiz progress
-                  const Text(
+                  Text(
                     'Quiz Progress',
-                    style: TextStyle(
-                      fontSize: 18,
-                      fontWeight: FontWeight.bold,
-                    ),
-                  ),
+                    style: LearningProgressTheme.subheadingStyle,
+                  ).animate().fadeIn(duration: 500.ms, delay: 600.ms),
                   const SizedBox(height: 16),
-                  _buildQuizProgressCard(quizzes, bestQuizResults),
+                  _buildQuizProgressCard(quizzes, bestQuizResults)
+                      .animate().fadeIn(duration: 500.ms, delay: 700.ms),
                   
                   const SizedBox(height: 16),
                 ],
@@ -328,32 +618,61 @@ class _UserProgressScreenState extends State<UserProgressScreen> with SingleTick
       ]),
       builder: (context, snapshot) {
         if (snapshot.connectionState == ConnectionState.waiting) {
-          return const Center(
-            child: CircularProgressIndicator(),
+          return Center(
+            child: CircularProgressIndicator(
+              color: LearningProgressTheme.primaryColor,
+            ),
           );
         }
         
         if (snapshot.hasError) {
           return Center(
-            child: Column(
-              mainAxisAlignment: MainAxisAlignment.center,
-              children: [
-                Text(
-                  'Error loading quiz results: ${snapshot.error}',
-                  style: TextStyle(color: Colors.red),
-                  textAlign: TextAlign.center,
-                ),
-                const SizedBox(height: 16),
-                ElevatedButton(
-                  onPressed: () {
-                    setState(() {
-                      _userProgressFuture = _learningService.getUserProgress(_userId);
-                      _quizzesFuture = _learningService.getQuizzes();
-                    });
-                  },
-                  child: const Text('Retry'),
-                ),
-              ],
+            child: Padding(
+              padding: const EdgeInsets.all(24.0),
+              child: Column(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  Icon(
+                    Icons.error_outline_rounded,
+                    size: 48,
+                    color: LearningProgressTheme.errorColor.withAlpha(200),
+                  ),
+                  const SizedBox(height: 16),
+                  Text(
+                    'Error loading quiz results',
+                    style: LearningProgressTheme.subheadingStyle,
+                    textAlign: TextAlign.center,
+                  ),
+                  const SizedBox(height: 8),
+                  Text(
+                    '${snapshot.error}',
+                    style: LearningProgressTheme.bodyStyle.copyWith(
+                      color: LearningProgressTheme.textSecondary,
+                    ),
+                    textAlign: TextAlign.center,
+                  ),
+                  const SizedBox(height: 24),
+                  ElevatedButton.icon(
+                    onPressed: () {
+                      setState(() {
+                        _userProgressFuture = _learningService.getUserProgress(_userId);
+                        _quizzesFuture = _learningService.getQuizzes();
+                      });
+                    },
+                    icon: const Icon(Icons.refresh_rounded),
+                    label: const Text('Retry'),
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: LearningProgressTheme.primaryColor,
+                      foregroundColor: Colors.white,
+                      elevation: 0,
+                      padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 12),
+                      shape: RoundedRectangleBorder(
+                        borderRadius: LearningProgressTheme.buttonRadius,
+                      ),
+                    ),
+                  ),
+                ],
+              ),
             ),
           );
         }
@@ -366,29 +685,39 @@ class _UserProgressScreenState extends State<UserProgressScreen> with SingleTick
             child: Column(
               mainAxisAlignment: MainAxisAlignment.center,
               children: [
-                const Icon(
-                  Icons.quiz,
+                Icon(
+                  Icons.quiz_rounded,
                   size: 48,
-                  color: Colors.grey,
+                  color: Colors.grey.withAlpha(180),
                 ),
                 const SizedBox(height: 16),
-                const Text(
+                Text(
                   'You haven\'t taken any quizzes yet',
-                  style: TextStyle(fontSize: 16),
+                  style: LearningProgressTheme.cardTitleStyle,
                   textAlign: TextAlign.center,
                 ),
                 const SizedBox(height: 8),
-                const Text(
+                Text(
                   'Complete quizzes to see your results here',
-                  style: TextStyle(color: Colors.grey),
+                  style: LearningProgressTheme.captionStyle,
                   textAlign: TextAlign.center,
                 ),
                 const SizedBox(height: 24),
-                ElevatedButton(
+                ElevatedButton.icon(
                   onPressed: () {
                     Navigator.of(context).pop();
                   },
-                  child: const Text('Go to Learning Center'),
+                  icon: const Icon(Icons.menu_book_rounded),
+                  label: const Text('Go to Learning Center'),
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: LearningProgressTheme.primaryColor,
+                    foregroundColor: Colors.white,
+                    elevation: 0,
+                    padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 12),
+                    shape: RoundedRectangleBorder(
+                      borderRadius: LearningProgressTheme.buttonRadius,
+                    ),
+                  ),
                 ),
               ],
             ),
@@ -400,7 +729,7 @@ class _UserProgressScreenState extends State<UserProgressScreen> with SingleTick
           ..sort((a, b) => b.timestamp.compareTo(a.timestamp));
         
         return ListView.builder(
-          padding: const EdgeInsets.all(16),
+          padding: const EdgeInsets.all(24),
           itemCount: results.length,
           itemBuilder: (context, index) {
             final result = results[index];
@@ -418,7 +747,9 @@ class _UserProgressScreenState extends State<UserProgressScreen> with SingleTick
               ),
             );
             
-            return _buildQuizResultCard(result, quiz);
+            return _buildQuizResultCard(result, quiz, index)
+                .animate().fadeIn(duration: 400.ms, delay: Duration(milliseconds: 100 * index))
+                .slideY(begin: 0.1, end: 0);
           },
         );
       },
@@ -430,36 +761,36 @@ class _UserProgressScreenState extends State<UserProgressScreen> with SingleTick
     double averageScore,
   ) {
     return Card(
-      elevation: 2,
+      elevation: 0,
       shape: RoundedRectangleBorder(
-        borderRadius: BorderRadius.circular(16),
+        borderRadius: LearningProgressTheme.borderRadius,
       ),
+      color: Colors.white,
       child: Padding(
-        padding: const EdgeInsets.all(16.0),
+        padding: const EdgeInsets.all(20.0),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            const Text(
+            Text(
               'Learning Summary',
-              style: TextStyle(
-                fontSize: 18,
-                fontWeight: FontWeight.bold,
-              ),
+              style: LearningProgressTheme.cardTitleStyle,
             ),
             
-            const SizedBox(height: 16),
+            const SizedBox(height: 20),
             
             Row(
               children: [
                 _buildSummaryItem(
                   'Topics Completed',
                   '$topicCompletionPercentage%',
-                  Colors.blue,
+                  LearningProgressTheme.primaryColor,
+                  Icons.book_rounded,
                 ),
                 _buildSummaryItem(
                   'Avg. Quiz Score',
                   '${averageScore.toStringAsFixed(1)}%',
-                  _getScoreColor(averageScore),
+                  LearningProgressTheme.getScoreColor(averageScore),
+                  Icons.quiz_rounded,
                 ),
               ],
             ),
@@ -476,12 +807,13 @@ class _UserProgressScreenState extends State<UserProgressScreen> with SingleTick
     final completedTopicIds = userProgress.completedTopics;
     
     return Card(
-      elevation: 2,
+      elevation: 0,
       shape: RoundedRectangleBorder(
-        borderRadius: BorderRadius.circular(16),
+        borderRadius: LearningProgressTheme.borderRadius,
       ),
+      color: Colors.white,
       child: Padding(
-        padding: const EdgeInsets.all(16.0),
+        padding: const EdgeInsets.all(20.0),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
@@ -490,52 +822,78 @@ class _UserProgressScreenState extends State<UserProgressScreen> with SingleTick
               children: [
                 Text(
                   'Completed: ${completedTopicIds.length}/${topics.length}',
-                  style: TextStyle(
-                    fontWeight: FontWeight.w500,
-                  ),
+                  style: LearningProgressTheme.emphasisStyle,
                 ),
-                Text(
-                  '${(completedTopicIds.length / topics.length * 100).toStringAsFixed(1)}%',
-                  style: TextStyle(
-                    fontWeight: FontWeight.bold,
-                    color: Theme.of(context).primaryColor,
+                Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                  decoration: BoxDecoration(
+                    color: LearningProgressTheme.primaryColor.withAlpha(26),
+                    borderRadius: BorderRadius.circular(12),
+                  ),
+                  child: Text(
+                    '${(completedTopicIds.length / (topics.isEmpty ? 1 : topics.length) * 100).toStringAsFixed(1)}%',
+                    style: GoogleFonts.inter(
+                      fontSize: 14,
+                      fontWeight: FontWeight.w600,
+                      color: LearningProgressTheme.primaryColor,
+                    ),
                   ),
                 ),
               ],
             ),
             
-            const SizedBox(height: 8),
+            const SizedBox(height: 16),
             
             // Progress bar
-            LinearProgressIndicator(
-              value: topics.isEmpty ? 0 : completedTopicIds.length / topics.length,
-              backgroundColor: Colors.grey[200],
-              valueColor: AlwaysStoppedAnimation<Color>(
-                Theme.of(context).primaryColor,
+            ClipRRect(
+              borderRadius: BorderRadius.circular(4),
+              child: LinearProgressIndicator(
+                value: topics.isEmpty ? 0 : completedTopicIds.length / topics.length,
+                backgroundColor: Colors.grey.withAlpha(30),
+                valueColor: AlwaysStoppedAnimation<Color>(
+                  LearningProgressTheme.primaryColor,
+                ),
+                minHeight: 8,
               ),
             ),
             
-            const SizedBox(height: 16),
+            const SizedBox(height: 20),
             
             // Topic list
             ...topics.map((topic) {
               final isCompleted = completedTopicIds.contains(topic.id);
               
               return Padding(
-                padding: const EdgeInsets.only(bottom: 8.0),
+                padding: const EdgeInsets.only(bottom: 12.0),
                 child: Row(
                   children: [
-                    Icon(
-                      isCompleted ? Icons.check_circle : Icons.radio_button_unchecked,
-                      color: isCompleted ? Colors.green : Colors.grey,
-                      size: 20,
+                    Container(
+                      width: 24,
+                      height: 24,
+                      decoration: BoxDecoration(
+                        color: isCompleted
+                            ? LearningProgressTheme.successColor.withAlpha(20)
+                            : Colors.grey.withAlpha(30),
+                        shape: BoxShape.circle,
+                      ),
+                      child: Icon(
+                        isCompleted ? Icons.check_rounded : Icons.circle_outlined,
+                        color: isCompleted
+                            ? LearningProgressTheme.successColor
+                            : Colors.grey,
+                        size: 16,
+                      ),
                     ),
-                    const SizedBox(width: 8),
+                    const SizedBox(width: 12),
                     Expanded(
                       child: Text(
                         topic.title,
-                        style: TextStyle(
+                        style: GoogleFonts.inter(
+                          fontSize: 14,
                           fontWeight: isCompleted ? FontWeight.w500 : FontWeight.normal,
+                          color: isCompleted
+                              ? LearningProgressTheme.textPrimary
+                              : LearningProgressTheme.textSecondary,
                         ),
                       ),
                     ),
@@ -555,27 +913,39 @@ class _UserProgressScreenState extends State<UserProgressScreen> with SingleTick
   ) {
     if (lastAccessedTopics.isEmpty) {
       return Card(
-        elevation: 2,
+        elevation: 0,
         shape: RoundedRectangleBorder(
-          borderRadius: BorderRadius.circular(16),
+          borderRadius: LearningProgressTheme.borderRadius,
         ),
+        color: Colors.white,
         child: Padding(
-          padding: const EdgeInsets.all(16.0),
+          padding: const EdgeInsets.all(20.0),
           child: Center(
-            child: Column(
-              children: const [
-                Icon(
-                  Icons.history,
-                  size: 32,
-                  color: Colors.grey,
-                ),
-                SizedBox(height: 8),
-                Text(
-                  'No recently accessed topics',
-                  style: TextStyle(color: Colors.grey),
-                  textAlign: TextAlign.center,
-                ),
-              ],
+            child: Padding(
+              padding: const EdgeInsets.all(16.0),
+              child: Column(
+                children: [
+                  Icon(
+                    Icons.history_rounded,
+                    size: 40,
+                    color: Colors.grey.withAlpha(150),
+                  ),
+                  const SizedBox(height: 12),
+                  Text(
+                    'No recently accessed topics',
+                    style: LearningProgressTheme.emphasisStyle.copyWith(
+                      color: LearningProgressTheme.textSecondary,
+                    ),
+                    textAlign: TextAlign.center,
+                  ),
+                  const SizedBox(height: 4),
+                  Text(
+                    'Topics you view will appear here',
+                    style: LearningProgressTheme.captionStyle,
+                    textAlign: TextAlign.center,
+                  ),
+                ],
+              ),
             ),
           ),
         ),
@@ -586,12 +956,13 @@ class _UserProgressScreenState extends State<UserProgressScreen> with SingleTick
     final recentTopics = lastAccessedTopics.take(5).toList();
     
     return Card(
-      elevation: 2,
+      elevation: 0,
       shape: RoundedRectangleBorder(
-        borderRadius: BorderRadius.circular(16),
+        borderRadius: LearningProgressTheme.borderRadius,
       ),
+      color: Colors.white,
       child: Padding(
-        padding: const EdgeInsets.all(16.0),
+        padding: const EdgeInsets.all(20.0),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: recentTopics.map((entry) {
@@ -609,41 +980,39 @@ class _UserProgressScreenState extends State<UserProgressScreen> with SingleTick
             );
             
             return Padding(
-              padding: const EdgeInsets.only(bottom: 12.0),
+              padding: const EdgeInsets.only(bottom: 16.0),
               child: Row(
                 children: [
                   Container(
-                    width: 36,
-                    height: 36,
+                    width: 40,
+                    height: 40,
                     decoration: BoxDecoration(
-                      color: Theme.of(context).primaryColor.withAlpha(30),
+                      color: LearningProgressTheme.primaryColor.withAlpha(20),
                       shape: BoxShape.circle,
                     ),
                     child: Center(
                       child: Icon(
-                        Icons.menu_book,
-                        color: Theme.of(context).primaryColor,
+                        Icons.menu_book_rounded,
+                        color: LearningProgressTheme.primaryColor,
                         size: 20,
                       ),
                     ),
                   ),
-                  const SizedBox(width: 12),
+                  const SizedBox(width: 16),
                   Expanded(
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
                         Text(
                           topic.title,
-                          style: TextStyle(
-                            fontWeight: FontWeight.w500,
-                          ),
+                          style: LearningProgressTheme.emphasisStyle,
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
                         ),
+                        const SizedBox(height: 2),
                         Text(
                           'Last accessed: ${_formatDate(accessDate)}',
-                          style: TextStyle(
-                            fontSize: 12,
-                            color: Colors.grey[600],
-                          ),
+                          style: LearningProgressTheme.captionStyle,
                         ),
                       ],
                     ),
@@ -663,33 +1032,39 @@ class _UserProgressScreenState extends State<UserProgressScreen> with SingleTick
   ) {
     if (bestQuizResults.isEmpty) {
       return Card(
-        elevation: 2,
+        elevation: 0,
         shape: RoundedRectangleBorder(
-          borderRadius: BorderRadius.circular(16),
+          borderRadius: LearningProgressTheme.borderRadius,
         ),
+        color: Colors.white,
         child: Padding(
-          padding: const EdgeInsets.all(16.0),
+          padding: const EdgeInsets.all(20.0),
           child: Center(
-            child: Column(
-              children: const [
-                Icon(
-                  Icons.quiz,
-                  size: 32,
-                  color: Colors.grey,
-                ),
-                SizedBox(height: 8),
-                Text(
-                  'No quizzes completed yet',
-                  style: TextStyle(color: Colors.grey),
-                  textAlign: TextAlign.center,
-                ),
-                SizedBox(height: 4),
-                Text(
-                  'Complete quizzes to see your progress',
-                  style: TextStyle(color: Colors.grey, fontSize: 12),
-                  textAlign: TextAlign.center,
-                ),
-              ],
+            child: Padding(
+              padding: const EdgeInsets.all(16.0),
+              child: Column(
+                children: [
+                  Icon(
+                    Icons.quiz_rounded,
+                    size: 40,
+                    color: Colors.grey.withAlpha(150),
+                  ),
+                  const SizedBox(height: 12),
+                  Text(
+                    'No quizzes completed yet',
+                    style: LearningProgressTheme.emphasisStyle.copyWith(
+                      color: LearningProgressTheme.textSecondary,
+                    ),
+                    textAlign: TextAlign.center,
+                  ),
+                  const SizedBox(height: 4),
+                  Text(
+                    'Complete quizzes to see your progress',
+                    style: LearningProgressTheme.captionStyle,
+                    textAlign: TextAlign.center,
+                  ),
+                ],
+              ),
             ),
           ),
         ),
@@ -701,12 +1076,13 @@ class _UserProgressScreenState extends State<UserProgressScreen> with SingleTick
     final totalQuizzes = quizzes.length;
     
     return Card(
-      elevation: 2,
+      elevation: 0,
       shape: RoundedRectangleBorder(
-        borderRadius: BorderRadius.circular(16),
+        borderRadius: LearningProgressTheme.borderRadius,
       ),
+      color: Colors.white,
       child: Padding(
-        padding: const EdgeInsets.all(16.0),
+        padding: const EdgeInsets.all(20.0),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
@@ -715,32 +1091,42 @@ class _UserProgressScreenState extends State<UserProgressScreen> with SingleTick
               children: [
                 Text(
                   'Completed: $completedQuizzes/$totalQuizzes',
-                  style: TextStyle(
-                    fontWeight: FontWeight.w500,
-                  ),
+                  style: LearningProgressTheme.emphasisStyle,
                 ),
-                Text(
-                  '${(completedQuizzes / totalQuizzes * 100).toStringAsFixed(1)}%',
-                  style: TextStyle(
-                    fontWeight: FontWeight.bold,
-                    color: Theme.of(context).primaryColor,
+                Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                  decoration: BoxDecoration(
+                    color: LearningProgressTheme.primaryColor.withAlpha(26),
+                    borderRadius: BorderRadius.circular(12),
+                  ),
+                  child: Text(
+                    '${(completedQuizzes / (totalQuizzes == 0 ? 1 : totalQuizzes) * 100).toStringAsFixed(1)}%',
+                    style: GoogleFonts.inter(
+                      fontSize: 14,
+                      fontWeight: FontWeight.w600,
+                      color: LearningProgressTheme.primaryColor,
+                    ),
                   ),
                 ),
               ],
             ),
             
-            const SizedBox(height: 8),
+            const SizedBox(height: 16),
             
             // Progress bar
-            LinearProgressIndicator(
-              value: totalQuizzes > 0 ? completedQuizzes / totalQuizzes : 0,
-              backgroundColor: Colors.grey[200],
-              valueColor: AlwaysStoppedAnimation<Color>(
-                Theme.of(context).primaryColor,
+            ClipRRect(
+              borderRadius: BorderRadius.circular(4),
+              child: LinearProgressIndicator(
+                value: totalQuizzes > 0 ? completedQuizzes / totalQuizzes : 0,
+                backgroundColor: Colors.grey.withAlpha(30),
+                valueColor: AlwaysStoppedAnimation<Color>(
+                  LearningProgressTheme.primaryColor,
+                ),
+                minHeight: 8,
               ),
             ),
             
-            const SizedBox(height: 16),
+            const SizedBox(height: 20),
             
             // Quiz list with highest scores
             ...quizzes.map((quiz) {
@@ -748,36 +1134,52 @@ class _UserProgressScreenState extends State<UserProgressScreen> with SingleTick
               final bestScore = hasResult ? bestQuizResults[quiz.id]!.score : 0.0;
               
               return Padding(
-                padding: const EdgeInsets.only(bottom: 8.0),
+                padding: const EdgeInsets.only(bottom: 12.0),
                 child: Row(
                   children: [
-                    Icon(
-                      hasResult ? Icons.check_circle : Icons.radio_button_unchecked,
-                      color: hasResult ? Colors.green : Colors.grey,
-                      size: 20,
+                    Container(
+                      width: 24,
+                      height: 24,
+                      decoration: BoxDecoration(
+                        color: hasResult
+                            ? LearningProgressTheme.successColor.withAlpha(20)
+                            : Colors.grey.withAlpha(30),
+                        shape: BoxShape.circle,
+                      ),
+                      child: Icon(
+                        hasResult ? Icons.check_rounded : Icons.circle_outlined,
+                        color: hasResult
+                            ? LearningProgressTheme.successColor
+                            : Colors.grey,
+                        size: 16,
+                      ),
                     ),
-                    const SizedBox(width: 8),
+                    const SizedBox(width: 12),
                     Expanded(
                       child: Text(
                         quiz.title,
-                        style: TextStyle(
+                        style: GoogleFonts.inter(
+                          fontSize: 14,
                           fontWeight: hasResult ? FontWeight.w500 : FontWeight.normal,
+                          color: hasResult
+                              ? LearningProgressTheme.textPrimary
+                              : LearningProgressTheme.textSecondary,
                         ),
                       ),
                     ),
                     if (hasResult)
                       Container(
-                        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+                        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
                         decoration: BoxDecoration(
-                          color: _getScoreColor(bestScore).withAlpha(40),
+                          color: LearningProgressTheme.getScoreColor(bestScore).withAlpha(20),
                           borderRadius: BorderRadius.circular(12),
                         ),
                         child: Text(
                           '${bestScore.toStringAsFixed(1)}%',
-                          style: TextStyle(
+                          style: GoogleFonts.inter(
                             fontSize: 12,
-                            fontWeight: FontWeight.w500,
-                            color: _getScoreColor(bestScore),
+                            fontWeight: FontWeight.w600,
+                            color: LearningProgressTheme.getScoreColor(bestScore),
                           ),
                         ),
                       ),
@@ -791,15 +1193,16 @@ class _UserProgressScreenState extends State<UserProgressScreen> with SingleTick
     );
   }
 
-  Widget _buildQuizResultCard(QuizResult result, Quiz quiz) {
+  Widget _buildQuizResultCard(QuizResult result, Quiz quiz, int index) {
     return Card(
+      elevation: 0,
       margin: const EdgeInsets.only(bottom: 16),
       shape: RoundedRectangleBorder(
-        borderRadius: BorderRadius.circular(12),
+        borderRadius: BorderRadius.circular(16),
       ),
-      elevation: 2,
+      color: Colors.white,
       child: Padding(
-        padding: const EdgeInsets.all(16.0),
+        padding: const EdgeInsets.all(20.0),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
@@ -809,83 +1212,113 @@ class _UserProgressScreenState extends State<UserProgressScreen> with SingleTick
                 Expanded(
                   child: Text(
                     quiz.title,
-                    style: const TextStyle(
-                      fontWeight: FontWeight.bold,
-                      fontSize: 16,
-                    ),
+                    style: LearningProgressTheme.cardTitleStyle,
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
                   ),
                 ),
                 Text(
                   _formatDate(result.timestamp),
-                  style: TextStyle(
-                    fontSize: 14,
-                    color: Colors.grey[600],
-                  ),
+                  style: LearningProgressTheme.captionStyle,
                 ),
               ],
             ),
             
-            const SizedBox(height: 4),
+            const SizedBox(height: 12),
             
             // Quiz category and difficulty
-            Row(
+            Wrap(
+              spacing: 8,
+              runSpacing: 8,
               children: [
                 Container(
-                  padding: const EdgeInsets.symmetric(
-                    horizontal: 8,
-                    vertical: 2,
-                  ),
+                  padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
                   decoration: BoxDecoration(
-                    color: Colors.blue.withAlpha(40),
+                    color: LearningProgressTheme.primaryColor.withAlpha(20),
                     borderRadius: BorderRadius.circular(12),
                   ),
                   child: Text(
                     quiz.category,
-                    style: const TextStyle(
+                    style: GoogleFonts.inter(
                       fontSize: 12,
-                      color: Colors.blue,
+                      fontWeight: FontWeight.w500,
+                      color: LearningProgressTheme.primaryColor,
                     ),
                   ),
                 ),
-                const SizedBox(width: 8),
                 Container(
-                  padding: const EdgeInsets.symmetric(
-                    horizontal: 8,
-                    vertical: 2,
-                  ),
+                  padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
                   decoration: BoxDecoration(
-                    color: _getDifficultyColor(quiz.difficulty).withAlpha(40),
+                    color: LearningProgressTheme.getDifficultyColor(quiz.difficulty).withAlpha(20),
                     borderRadius: BorderRadius.circular(12),
                   ),
                   child: Text(
                     quiz.difficulty,
-                    style: TextStyle(
+                    style: GoogleFonts.inter(
                       fontSize: 12,
-                      color: _getDifficultyColor(quiz.difficulty),
+                      fontWeight: FontWeight.w500,
+                      color: LearningProgressTheme.getDifficultyColor(quiz.difficulty),
                     ),
                   ),
                 ),
               ],
             ),
             
-            const Divider(height: 24),
+            const Padding(
+              padding: EdgeInsets.symmetric(vertical: 16.0),
+              child: Divider(height: 1),
+            ),
             
-            // Score details - removed the "View Details" button
-            Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
+            // Score details
+            Row(
               children: [
-                Text(
-                  'Score: ${result.score.toStringAsFixed(1)}%',
-                  style: TextStyle(
-                    fontSize: 16,
-                    fontWeight: FontWeight.bold,
-                    color: _getScoreColor(result.score),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        'Score',
+                        style: LearningProgressTheme.captionStyle,
+                      ),
+                      const SizedBox(height: 4),
+                      Text(
+                        '${result.score.toStringAsFixed(1)}%',
+                        style: GoogleFonts.inter(
+                          fontSize: 20,
+                          fontWeight: FontWeight.bold,
+                          color: LearningProgressTheme.getScoreColor(result.score),
+                        ),
+                      ),
+                    ],
                   ),
                 ),
-                const SizedBox(height: 4),
-                Text(
-                  'Correct: ${result.correctAnswers}/${result.totalQuestions}',
-                  style: const TextStyle(fontSize: 14),
+                
+                Container(
+                  height: 40,
+                  width: 1,
+                  color: Colors.grey.withAlpha(50),
+                  margin: const EdgeInsets.symmetric(horizontal: 16),
+                ),
+                
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        'Correct Answers',
+                        style: LearningProgressTheme.captionStyle,
+                      ),
+                      const SizedBox(height: 4),
+                      Text(
+                        '${result.correctAnswers}/${result.totalQuestions}',
+                        style: GoogleFonts.inter(
+                          fontSize: 18,
+                          fontWeight: FontWeight.w600,
+                          color: LearningProgressTheme.textPrimary,
+                        ),
+                      ),
+                    ],
+                  ),
                 ),
               ],
             ),
@@ -895,52 +1328,47 @@ class _UserProgressScreenState extends State<UserProgressScreen> with SingleTick
     );
   }
 
-  Widget _buildSummaryItem(String label, String value, Color color) {
+  Widget _buildSummaryItem(String label, String value, Color color, IconData icon) {
     return Expanded(
-      child: Column(
-        children: [
-          Text(
-            value,
-            style: TextStyle(
-              fontSize: 24,
-              fontWeight: FontWeight.bold,
+      child: Container(
+        decoration: BoxDecoration(
+          color: color.withAlpha(15),
+          borderRadius: BorderRadius.circular(16),
+        ),
+        padding: const EdgeInsets.all(16),
+        child: Column(
+          children: [
+            Icon(
+              icon,
               color: color,
+              size: 28,
             ),
-          ),
-          const SizedBox(height: 4),
-          Text(
-            label,
-            style: TextStyle(
-              fontSize: 14,
-              color: Colors.grey[600],
+            const SizedBox(height: 12),
+            Text(
+              value,
+              style: GoogleFonts.inter(
+                fontSize: 20,
+                fontWeight: FontWeight.bold,
+                color: color,
+              ),
             ),
-          ),
-        ],
+            const SizedBox(height: 4),
+            Text(
+              label,
+              style: GoogleFonts.inter(
+                fontSize: 12,
+                color: LearningProgressTheme.textSecondary,
+                height: 1.3,
+              ),
+              textAlign: TextAlign.center,
+            ),
+          ],
+        ),
       ),
     );
   }
 
   String _formatDate(DateTime date) {
     return '${date.month}/${date.day}/${date.year}';
-  }
-
-  Color _getScoreColor(double score) {
-    if (score >= 90) return Colors.green;
-    if (score >= 70) return Colors.blue;
-    if (score >= 50) return Colors.orange;
-    return Colors.red;
-  }
-
-  Color _getDifficultyColor(String difficulty) {
-    switch (difficulty.toLowerCase()) {
-      case 'easy':
-        return Colors.green;
-      case 'medium':
-        return Colors.orange;
-      case 'hard':
-        return Colors.red;
-      default:
-        return Colors.blue;
-    }
   }
 }
