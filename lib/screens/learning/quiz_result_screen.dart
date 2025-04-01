@@ -1,6 +1,124 @@
 import 'package:flutter/material.dart';
+import 'package:google_fonts/google_fonts.dart';
+import 'package:flutter_animate/flutter_animate.dart';
 import '../../utils/learning_center_models.dart';
 import '../../utils/app_routes.dart';
+
+
+// Using the same theme class from the Quiz screens
+class QuizResultTheme {
+  // Main color palette
+  static const Color primaryColor = Color(0xFF1D557E);  // Main blue
+  static const Color secondaryColor = Color(0xFFE6EDF7); // Light blue background
+  static const Color accentColor = Color(0xFF2E86C1);   // Medium blue for accents
+  
+  // Result colors
+  static const Color excellentColor = Color(0xFF4CAF50); // Green for excellent
+  static const Color goodColor = Color(0xFF2196F3);      // Blue for good
+  static const Color averageColor = Color(0xFFFF9800);   // Orange for average
+  static const Color poorColor = Color(0xFFE53935);      // Red for poor
+  
+  // Text colors
+  static const Color textPrimary = Color(0xFF263238);
+  static const Color textSecondary = Color(0xFF546E7A);
+  static const Color textLight = Color(0xFF78909C);
+  
+  // Shadows
+  static final cardShadow = BoxShadow(
+    color: Colors.black.withAlpha(18),
+    blurRadius: 12,
+    spreadRadius: 0,
+    offset: const Offset(0, 3),
+  );
+  
+  static final subtleShadow = BoxShadow(
+    color: Colors.black.withAlpha(10),
+    blurRadius: 6,
+    spreadRadius: 0,
+    offset: const Offset(0, 2),
+  );
+  
+  // Text styles
+  static final TextStyle headingStyle = GoogleFonts.inter(
+    fontSize: 22,
+    fontWeight: FontWeight.bold,
+    color: textPrimary,
+    letterSpacing: -0.3,
+    height: 1.3,
+  );
+  
+  static final TextStyle subheadingStyle = GoogleFonts.inter(
+    fontSize: 18,
+    fontWeight: FontWeight.w600,
+    color: textPrimary,
+    letterSpacing: -0.2,
+    height: 1.4,
+  );
+  
+  static final TextStyle cardTitleStyle = GoogleFonts.inter(
+    fontSize: 16,
+    fontWeight: FontWeight.w600,
+    color: textPrimary,
+    letterSpacing: -0.2,
+    height: 1.3,
+  );
+  
+  static final TextStyle bodyStyle = GoogleFonts.inter(
+    fontSize: 15,
+    fontWeight: FontWeight.normal,
+    color: textPrimary,
+    letterSpacing: -0.1,
+    height: 1.5,
+  );
+  
+  static final TextStyle emphasisStyle = GoogleFonts.inter(
+    fontSize: 14,
+    fontWeight: FontWeight.w500,
+    color: textPrimary,
+    height: 1.5,
+  );
+  
+  static final TextStyle captionStyle = GoogleFonts.inter(
+    fontSize: 12,
+    fontWeight: FontWeight.normal,
+    color: textSecondary,
+    height: 1.5,
+  );
+  
+  static final TextStyle buttonTextStyle = GoogleFonts.inter(
+    fontSize: 14,
+    fontWeight: FontWeight.w600,
+    letterSpacing: 0.1,
+    height: 1.3,
+  );
+  
+  // Border radius
+  static final BorderRadius borderRadius = BorderRadius.circular(16);
+  static final BorderRadius chipRadius = BorderRadius.circular(12);
+  static final BorderRadius buttonRadius = BorderRadius.circular(12);
+  
+  // Get color for score
+  static Color getScoreColor(double score) {
+    if (score >= 90) return excellentColor;
+    if (score >= 70) return goodColor;
+    if (score >= 50) return averageColor;
+    return poorColor;
+  }
+  
+  // Get color for difficulty
+  static Color getDifficultyColor(String difficulty) {
+    switch (difficulty.toLowerCase()) {
+      case 'easy':
+        return excellentColor;
+      case 'medium':
+        return averageColor;
+      case 'hard':
+        return poorColor;
+      default:
+        return accentColor;
+    }
+  }
+}
 
 class QuizResultScreen extends StatelessWidget {
   final Quiz quiz;
@@ -18,53 +136,57 @@ class QuizResultScreen extends StatelessWidget {
     this.isTimeUp = false,
   });
 
-@override
-Widget build(BuildContext context) {
-  return PopScope(
-    // Using PopScope with onPopInvokedWithResult instead of deprecated onPopInvoked
-    canPop: false,
-    onPopInvokedWithResult: (didPop, dynamic _) {
-      // If didPop is true, the pop already happened and we shouldn't navigate
-      if (!didPop) {
-        // Go back to the quiz screen (single pop)
-        Navigator.of(context).pop();
-      }
-      // Return false to prevent the default pop behavior
-    },
-    child: Scaffold(
-      backgroundColor: Colors.grey[50],
-      appBar: AppBar(
-        title: const Text(
-          'Quiz Results',
-          style: TextStyle(fontWeight: FontWeight.w600),
-        ),
-        elevation: 0,
-        automaticallyImplyLeading: false,
-        actions: [
-          Padding(
-            padding: const EdgeInsets.only(right: 8.0),
-            child: IconButton(
-              icon: const Icon(Icons.home),
-              tooltip: 'Return to Learning Center',
-              onPressed: () {
-                // Navigate to the learning center screen
-                Navigator.of(context).popUntil(
-                  (route) => route.settings.name == AppRoutes.learningCenter
-                );
-              },
+  @override
+  Widget build(BuildContext context) {
+    return PopScope(
+      canPop: false,
+      onPopInvokedWithResult: (didPop, dynamic _) {
+        if (!didPop) {
+          Navigator.of(context).pop();
+        }
+      },
+      child: Scaffold(
+        backgroundColor: QuizResultTheme.secondaryColor,
+        appBar: AppBar(
+          backgroundColor: Colors.white,
+          foregroundColor: QuizResultTheme.textPrimary,
+          elevation: 0,
+          centerTitle: false,
+          title: Text(
+            'Quiz Results',
+            style: GoogleFonts.inter(
+              fontSize: 20,
+              fontWeight: FontWeight.w600,
+              color: QuizResultTheme.textPrimary,
+              letterSpacing: -0.3,
             ),
           ),
-        ],
-      ),
+          automaticallyImplyLeading: false,
+          actions: [
+            Padding(
+              padding: const EdgeInsets.only(right: 8.0),
+              child: IconButton(
+                icon: const Icon(Icons.home_rounded),
+                tooltip: 'Return to Learning Center',
+                onPressed: () {
+                  Navigator.of(context).popUntil(
+                    (route) => route.settings.name == AppRoutes.learningCenter
+                  );
+                },
+              ),
+            ),
+          ],
+        ),
         body: SingleChildScrollView(
+          physics: const BouncingScrollPhysics(),
           child: Column(
             children: [
-              _buildResultHeader(context),
-              _buildScoreCards(context),
-              _buildFeedbackMessage(context),
-              _buildStatisticsSection(context),
+              _buildResultHeader(context).animate().fadeIn(duration: 800.ms),
+              _buildScoreCards(context).animate().fadeIn(duration: 800.ms, delay: 200.ms),
+              _buildFeedbackMessage(context).animate().fadeIn(duration: 800.ms, delay: 400.ms),
+              _buildStatisticsSection(context).animate().fadeIn(duration: 800.ms, delay: 600.ms),
               _buildAnswersList(context),
-              _buildActionButtons(context),
+              _buildActionButtons(context).animate().fadeIn(duration: 800.ms, delay: 800.ms),
             ],
           ),
         ),
@@ -73,16 +195,16 @@ Widget build(BuildContext context) {
   }
 
   Widget _buildResultHeader(BuildContext context) {
-    final scoreColor = _getScoreColor(result.score);
+    final scoreColor = QuizResultTheme.getScoreColor(result.score);
     
     return Container(
       width: double.infinity,
-      padding: const EdgeInsets.only(top: 20, bottom: 32, left: 24, right: 24),
+      padding: const EdgeInsets.only(top: 32, bottom: 40, left: 24, right: 24),
       decoration: BoxDecoration(
         gradient: LinearGradient(
           colors: [
-            scoreColor.withAlpha(179), // 0.7 * 255 ≈ 179
-            scoreColor.withAlpha(128), // 0.5 * 255 ≈ 128
+            scoreColor.withAlpha(160),
+            scoreColor.withAlpha(100),
           ],
           begin: Alignment.topCenter,
           end: Alignment.bottomCenter,
@@ -93,7 +215,7 @@ Widget build(BuildContext context) {
         ),
         boxShadow: [
           BoxShadow(
-            color: scoreColor.withAlpha(77), // 0.3 * 255 ≈ 77
+            color: scoreColor.withAlpha(50),
             blurRadius: 10,
             offset: const Offset(0, 4),
           ),
@@ -110,27 +232,28 @@ Widget build(BuildContext context) {
                 vertical: 8,
               ),
               decoration: BoxDecoration(
-                color: Colors.white.withAlpha(77), // 0.3 * 255 ≈ 77
+                color: Colors.white.withAlpha(60),
                 borderRadius: BorderRadius.circular(16),
                 border: Border.all(
-                  color: Colors.white.withAlpha(128), // 0.5 * 255 ≈ 128
+                  color: Colors.white.withAlpha(100),
                   width: 1,
                 ),
               ),
               child: Row(
                 mainAxisSize: MainAxisSize.min,
-                children: const [
-                  Icon(
-                    Icons.timer_off,
+                children: [
+                  const Icon(
+                    Icons.timer_off_rounded,
                     color: Colors.white,
                     size: 20,
                   ),
-                  SizedBox(width: 8),
+                  const SizedBox(width: 8),
                   Text(
                     'Time\'s Up!',
-                    style: TextStyle(
+                    style: GoogleFonts.inter(
                       color: Colors.white,
                       fontWeight: FontWeight.bold,
+                      fontSize: 16,
                     ),
                   ),
                 ],
@@ -146,9 +269,9 @@ Widget build(BuildContext context) {
                 height: 140,
                 decoration: BoxDecoration(
                   shape: BoxShape.circle,
-                  color: Colors.white.withAlpha(51), // 0.2 * 255 ≈ 51
+                  color: Colors.white.withAlpha(40),
                   border: Border.all(
-                    color: Colors.white.withAlpha(204), // 0.8 * 255 ≈ 204
+                    color: Colors.white.withAlpha(180),
                     width: 2,
                   ),
                 ),
@@ -157,19 +280,21 @@ Widget build(BuildContext context) {
                 children: [
                   Text(
                     '${result.score.toStringAsFixed(1)}%',
-                    style: const TextStyle(
+                    style: GoogleFonts.inter(
                       fontSize: 42,
                       fontWeight: FontWeight.bold,
                       color: Colors.white,
+                      height: 1.2,
                     ),
                   ),
                   const SizedBox(height: 4),
                   Text(
                     _getResultMessage(result.score),
-                    style: const TextStyle(
+                    style: GoogleFonts.inter(
                       fontSize: 18,
                       fontWeight: FontWeight.w500,
                       color: Colors.white,
+                      letterSpacing: -0.2,
                     ),
                   ),
                 ],
@@ -177,20 +302,20 @@ Widget build(BuildContext context) {
             ],
           ),
           
-          const SizedBox(height: 24),
+          const SizedBox(height: 28),
           
           // Quiz title and completion info
           Container(
             padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 12),
             decoration: BoxDecoration(
-              color: Colors.white.withAlpha(51), // 0.2 * 255 ≈ 51
-              borderRadius: BorderRadius.circular(12),
+              color: Colors.white.withAlpha(40),
+              borderRadius: BorderRadius.circular(16),
             ),
             child: Column(
               children: [
                 Text(
                   quiz.title,
-                  style: const TextStyle(
+                  style: GoogleFonts.inter(
                     fontSize: 18,
                     fontWeight: FontWeight.bold,
                     color: Colors.white,
@@ -200,7 +325,7 @@ Widget build(BuildContext context) {
                 const SizedBox(height: 4),
                 Text(
                   'Completed on ${_formatDate(result.timestamp)}',
-                  style: const TextStyle(
+                  style: GoogleFonts.inter(
                     fontSize: 14,
                     color: Colors.white,
                   ),
@@ -213,88 +338,93 @@ Widget build(BuildContext context) {
     );
   }
 
-  Widget _buildScoreCards(BuildContext context) {
+Widget _buildScoreCards(BuildContext context) {
     // Calculate statistics
     int correct = result.correctAnswers;
     int incorrect = result.totalQuestions - result.correctAnswers;
     
     return Padding(
-      padding: const EdgeInsets.symmetric(horizontal: 16.0, vertical: 8.0),
+      padding: const EdgeInsets.fromLTRB(24, 24, 24, 8),
       child: Row(
         children: [
           _buildMetricCard(
             'Correct',
             correct.toString(),
-            Icons.check_circle_outline,
-            Colors.green,
-            context,
+            Icons.check_circle_outline_rounded,
+            QuizResultTheme.excellentColor,
           ),
-          const SizedBox(width: 8),
+          const SizedBox(width: 12),
           _buildMetricCard(
             'Incorrect',
             incorrect.toString(),
-            Icons.cancel_outlined,
-            Colors.red,
-            context,
+            Icons.close,  // Alternative 1
+            QuizResultTheme.poorColor,
           ),
-          const SizedBox(width: 8),
+          const SizedBox(width: 12),
           _buildMetricCard(
             'Total',
             result.totalQuestions.toString(),
-            Icons.quiz_outlined,
-            Colors.blue,
-            context,
+            Icons.quiz_rounded,
+            QuizResultTheme.accentColor,
           ),
         ],
       ),
     );
   }
-
+  
   Widget _buildMetricCard(
     String label,
     String value,
     IconData icon,
     Color color,
-    BuildContext context,
   ) {
     return Expanded(
-      child: Card(
-        elevation: 0,
-        shape: RoundedRectangleBorder(
-          borderRadius: BorderRadius.circular(12),
-          side: BorderSide(
-            color: Colors.grey.withAlpha(26), // 0.1 * 255 ≈ 26
-            width: 1,
-          ),
+      child: Container(
+        padding: const EdgeInsets.symmetric(vertical: 16),
+        decoration: BoxDecoration(
+          color: Colors.white,
+          borderRadius: QuizResultTheme.borderRadius,
+          boxShadow: [
+            BoxShadow(
+              color: Colors.black.withAlpha(5),
+              blurRadius: 6, 
+              spreadRadius: 1,
+              offset: const Offset(0, 2),
+            ),
+          ],
         ),
-        child: Padding(
-          padding: const EdgeInsets.symmetric(vertical: 16.0),
-          child: Column(
-            mainAxisAlignment: MainAxisAlignment.center,
-            children: [
-              Icon(
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            Container(
+              padding: const EdgeInsets.all(8),
+              decoration: BoxDecoration(
+                color: color.withAlpha(20),
+                shape: BoxShape.circle,
+              ),
+              child: Icon(
                 icon,
                 color: color,
-                size: 28,
+                size: 20,
               ),
-              const SizedBox(height: 8),
-              Text(
-                value,
-                style: TextStyle(
-                  fontSize: 22,
-                  fontWeight: FontWeight.bold,
-                  color: color,
-                ),
+            ),
+            const SizedBox(height: 8),
+            Text(
+              value,
+              style: GoogleFonts.inter(
+                fontSize: 20,
+                fontWeight: FontWeight.bold,
+                color: color,
               ),
-              Text(
-                label,
-                style: TextStyle(
-                  fontSize: 13,
-                  color: Colors.grey[600],
-                ),
+            ),
+            Text(
+              label,
+              style: GoogleFonts.inter(
+                fontSize: 13,
+                color: QuizResultTheme.textSecondary,
               ),
-            ],
-          ),
+            ),
+          ],
         ),
       ),
     );
@@ -307,70 +437,67 @@ Widget build(BuildContext context) {
     
     if (result.score >= 90) {
       message = 'Excellent! You have a strong understanding of this topic.';
-      icon = Icons.emoji_events;
-      color = Colors.amber;
+      icon = Icons.emoji_events_rounded;
+      color = QuizResultTheme.excellentColor;
     } else if (result.score >= 70) {
       message = 'Good job! You have a good grasp of the material.';
-      icon = Icons.thumb_up;
-      color = Colors.blue;
+      icon = Icons.thumb_up_rounded;
+      color = QuizResultTheme.goodColor;
     } else if (result.score >= 50) {
       message = 'You\'re making progress. Review the material to improve your score.';
-      icon = Icons.trending_up;
-      color = Colors.orange;
+      icon = Icons.trending_up_rounded;
+      color = QuizResultTheme.averageColor;
     } else {
       message = 'Keep practicing. Review the learning materials and try again.';
-      icon = Icons.refresh;
-      color = Colors.red;
+      icon = Icons.refresh_rounded;
+      color = QuizResultTheme.poorColor;
     }
     
-    return Card(
-      margin: const EdgeInsets.all(16),
-      shape: RoundedRectangleBorder(
-        borderRadius: BorderRadius.circular(16),
-      ),
-      elevation: 0,
-      child: Padding(
-        padding: const EdgeInsets.all(16.0),
-        child: Row(
-          children: [
-            Container(
-              padding: const EdgeInsets.all(12),
-              decoration: BoxDecoration(
-                color: color.withAlpha(26), // 0.1 * 255 ≈ 26
-                shape: BoxShape.circle,
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(24, 8, 24, 16),
+      child: Card(
+        elevation: 0,
+        shape: RoundedRectangleBorder(
+          borderRadius: QuizResultTheme.borderRadius,
+        ),
+        color: Colors.white,
+        child: Padding(
+          padding: const EdgeInsets.all(20),
+          child: Row(
+            children: [
+              Container(
+                padding: const EdgeInsets.all(12),
+                decoration: BoxDecoration(
+                  color: color.withAlpha(20),
+                  shape: BoxShape.circle,
+                ),
+                child: Icon(
+                  icon,
+                  size: 24,
+                  color: color,
+                ),
               ),
-              child: Icon(
-                icon,
-                size: 28,
-                color: color,
-              ),
-            ),
-            const SizedBox(width: 16),
-            Expanded(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(
-                    'Feedback',
-                    style: TextStyle(
-                      fontWeight: FontWeight.bold,
-                      color: Colors.grey[800],
-                      fontSize: 16,
+              const SizedBox(width: 16),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      'Feedback',
+                      style: QuizResultTheme.cardTitleStyle,
                     ),
-                  ),
-                  const SizedBox(height: 4),
-                  Text(
-                    message,
-                    style: TextStyle(
-                      fontSize: 14,
-                      color: Colors.grey[700],
-                      height: 1.3,
+                    const SizedBox(height: 4),
+                    Text(
+                      message,
+                      style: QuizResultTheme.bodyStyle.copyWith(
+                        color: QuizResultTheme.textSecondary,
+                      ),
                     ),
-                  ),
-                ],
+                  ],
+                ),
               ),
-            ),
-          ],
+            ],
+          ),
         ),
       ),
     );
@@ -381,63 +508,58 @@ Widget build(BuildContext context) {
     int correct = result.correctAnswers;
     
     return Padding(
-      padding: const EdgeInsets.symmetric(horizontal: 16.0, vertical: 8.0),
+      padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 8),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          _buildSectionHeader(context, 'Performance Statistics'),
-          const SizedBox(height: 8),
+          _buildSectionHeader('Performance Statistics'),
+          const SizedBox(height: 12),
           Card(
             elevation: 0,
             shape: RoundedRectangleBorder(
-              borderRadius: BorderRadius.circular(16),
-              side: BorderSide(
-                color: Colors.grey.withAlpha(26), // 0.1 * 255 ≈ 26
-                width: 1,
-              ),
+              borderRadius: QuizResultTheme.borderRadius,
             ),
+            color: Colors.white,
             child: Padding(
-              padding: const EdgeInsets.all(16.0),
+              padding: const EdgeInsets.all(20),
               child: Column(
                 children: [
                   // Time taken
                   _buildInfoRow(
                     title: 'Time Taken:',
                     value: _formatDuration(result.timeTaken),
-                    icon: Icons.access_time,
-                    iconColor: Colors.orange,
+                    icon: Icons.access_time_rounded,
+                    iconColor: QuizResultTheme.accentColor,
                   ),
-                  const SizedBox(height: 8),
+                  const SizedBox(height: 12),
                   
                   // Difficulty 
                   _buildInfoRow(
                     title: 'Difficulty:',
                     value: quiz.difficulty,
-                    icon: Icons.speed,
-                    iconColor: _getDifficultyColor(quiz.difficulty),
+                    icon: Icons.speed_rounded,
+                    iconColor: QuizResultTheme.getDifficultyColor(quiz.difficulty),
                   ),
-                  const SizedBox(height: 8),
+                  const SizedBox(height: 12),
                   
                   // Category
                   _buildInfoRow(
                     title: 'Category:',
                     value: quiz.category,
-                    icon: Icons.category,
-                    iconColor: Colors.purple,
+                    icon: Icons.category_rounded,
+                    iconColor: QuizResultTheme.accentColor,
                   ),
                   
-                  // Summary text instead of chart
-                  Padding(
-                    padding: const EdgeInsets.symmetric(vertical: 16.0),
-                    child: Text(
-                      'You answered $correct out of ${result.totalQuestions} questions correctly.',
-                      style: TextStyle(
-                        fontSize: 16,
-                        fontWeight: FontWeight.w500,
-                        color: Colors.grey[800],
-                      ),
-                      textAlign: TextAlign.center,
-                    ),
+                  const Padding(
+                    padding: EdgeInsets.symmetric(vertical: 16),
+                    child: Divider(height: 1),
+                  ),
+                  
+                  // Summary text
+                  Text(
+                    'You answered $correct out of ${result.totalQuestions} questions correctly.',
+                    style: QuizResultTheme.emphasisStyle,
+                    textAlign: TextAlign.center,
                   ),
                 ],
               ),
@@ -456,66 +578,54 @@ Widget build(BuildContext context) {
   }) {
     return Row(
       children: [
-        Icon(
-          icon,
-          size: 18,
-          color: iconColor,
+        Container(
+          width: 32,
+          height: 32,
+          decoration: BoxDecoration(
+            color: iconColor.withAlpha(20),
+            shape: BoxShape.circle,
+          ),
+          child: Icon(
+            icon,
+            size: 16,
+            color: iconColor,
+          ),
         ),
-        const SizedBox(width: 8),
+        const SizedBox(width: 12),
         Text(
           title,
-          style: const TextStyle(
-            fontSize: 14,
-            fontWeight: FontWeight.w500,
-          ),
+          style: QuizResultTheme.emphasisStyle,
         ),
         const SizedBox(width: 4),
         Expanded(
           child: Text(
             value,
-            style: const TextStyle(
-              fontSize: 14,
-            ),
+            style: QuizResultTheme.bodyStyle,
+            textAlign: TextAlign.right,
           ),
         ),
       ],
     );
   }
 
-  Widget _buildSectionHeader(BuildContext context, String title) {
+  Widget _buildSectionHeader(String title) {
     return Padding(
-      padding: const EdgeInsets.symmetric(vertical: 8.0, horizontal: 4.0),
-      child: Row(
-        children: [
-          Container(
-            width: 4,
-            height: 16,
-            decoration: BoxDecoration(
-              color: Theme.of(context).primaryColor,
-              borderRadius: BorderRadius.circular(2),
-            ),
-          ),
-          const SizedBox(width: 8),
-          Text(
-            title,
-            style: const TextStyle(
-              fontSize: 16,
-              fontWeight: FontWeight.bold,
-            ),
-          ),
-        ],
+      padding: const EdgeInsets.only(left: 4, bottom: 4),
+      child: Text(
+        title,
+        style: QuizResultTheme.subheadingStyle,
       ),
     );
   }
 
   Widget _buildAnswersList(BuildContext context) {
     return Padding(
-      padding: const EdgeInsets.symmetric(horizontal: 16.0, vertical: 8.0),
+      padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 8),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          _buildSectionHeader(context, 'Question Summary'),
-          const SizedBox(height: 8),
+          _buildSectionHeader('Question Summary'),
+          const SizedBox(height: 12),
           ...List.generate(questions.length, (index) {
             final question = questions[index];
             final userAnswer = userAnswers[question.id];
@@ -523,7 +633,6 @@ Widget build(BuildContext context) {
             final isSkipped = userAnswer == null;
             
             return _buildAnswerItem(
-              context: context,
               questionNumber: index + 1,
               question: question.question,
               isCorrect: isCorrect,
@@ -532,6 +641,7 @@ Widget build(BuildContext context) {
                   ? 'Not answered'
                   : question.options[userAnswer],
               correctAnswer: question.options[question.correctAnswerIndex],
+              index: index,
             );
           }),
         ],
@@ -540,19 +650,19 @@ Widget build(BuildContext context) {
   }
 
   Widget _buildAnswerItem({
-    required BuildContext context,
     required int questionNumber,
     required String question,
     required bool isCorrect,
     required bool isSkipped,
     required String userAnswer,
     required String correctAnswer,
+    required int index,
   }) {
     final Color statusColor = isSkipped
-        ? Colors.amber
+        ? QuizResultTheme.averageColor
         : isCorrect
-            ? Colors.green
-            : Colors.red;
+            ? QuizResultTheme.excellentColor
+            : QuizResultTheme.poorColor;
     
     final String statusText = isSkipped
         ? 'Skipped'
@@ -561,24 +671,20 @@ Widget build(BuildContext context) {
             : 'Incorrect';
     
     final IconData statusIcon = isSkipped
-        ? Icons.help_outline
+        ? Icons.help_outline_rounded
         : isCorrect
-            ? Icons.check_circle_outline
+            ? Icons.check_circle_outline_rounded
             : Icons.cancel_outlined;
     
     return Card(
-      margin: const EdgeInsets.only(bottom: 10),
+      margin: const EdgeInsets.only(bottom: 12),
       elevation: 0,
       shape: RoundedRectangleBorder(
-        borderRadius: BorderRadius.circular(12),
-        side: BorderSide(
-          color: statusColor.withAlpha(128), // 0.5 * 255 ≈ 128
-          width: 1,
-        ),
+        borderRadius: QuizResultTheme.borderRadius,
       ),
-      color: statusColor.withAlpha(13), // 0.05 * 255 ≈ 13
+      color: statusColor.withAlpha(10),
       child: Padding(
-        padding: const EdgeInsets.all(16),
+        padding: const EdgeInsets.all(20),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
@@ -591,7 +697,7 @@ Widget build(BuildContext context) {
                   width: 32,
                   height: 32,
                   decoration: BoxDecoration(
-                    color: statusColor.withAlpha(26), // 0.1 * 255 ≈ 26
+                    color: statusColor.withAlpha(20),
                     shape: BoxShape.circle,
                     border: Border.all(
                       color: statusColor,
@@ -601,7 +707,7 @@ Widget build(BuildContext context) {
                   child: Center(
                     child: Text(
                       questionNumber.toString(),
-                      style: TextStyle(
+                      style: GoogleFonts.inter(
                         color: statusColor,
                         fontWeight: FontWeight.bold,
                       ),
@@ -624,7 +730,7 @@ Widget build(BuildContext context) {
                           const SizedBox(width: 4),
                           Text(
                             statusText,
-                            style: TextStyle(
+                            style: GoogleFonts.inter(
                               fontSize: 14,
                               fontWeight: FontWeight.w500,
                               color: statusColor,
@@ -635,10 +741,7 @@ Widget build(BuildContext context) {
                       const SizedBox(height: 4),
                       Text(
                         question,
-                        style: const TextStyle(
-                          fontWeight: FontWeight.w500,
-                          fontSize: 15,
-                        ),
+                        style: QuizResultTheme.emphasisStyle,
                       ),
                     ],
                   ),
@@ -646,13 +749,9 @@ Widget build(BuildContext context) {
               ],
             ),
             
-            // Divider
-            Padding(
-              padding: const EdgeInsets.symmetric(vertical: 12.0),
-              child: Divider(
-                color: statusColor.withAlpha(51), // 0.2 * 255 ≈ 51
-                height: 1,
-              ),
+            const Padding(
+              padding: EdgeInsets.symmetric(vertical: 12),
+              child: Divider(height: 1),
             ),
             
             // User answer
@@ -660,32 +759,33 @@ Widget build(BuildContext context) {
               Row(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  const Text(
+                  Text(
                     'Your answer: ',
-                    style: TextStyle(
-                      color: Colors.grey,
+                    style: GoogleFonts.inter(
+                      color: QuizResultTheme.textSecondary,
                       fontSize: 13,
+                      fontWeight: FontWeight.w500,
                     ),
                   ),
                   const SizedBox(width: 4),
                   Expanded(
                     child: Text(
                       userAnswer,
-                      style: TextStyle(
+                      style: GoogleFonts.inter(
                         fontSize: 14,
                         fontWeight: FontWeight.w500,
-                        color: isCorrect ? Colors.green : Colors.red,
+                        color: isCorrect ? QuizResultTheme.excellentColor : QuizResultTheme.poorColor,
                       ),
                     ),
                   ),
                 ],
               ),
             ] else ...[
-              const Text(
+              Text(
                 'You did not answer this question',
-                style: TextStyle(
+                style: GoogleFonts.inter(
                   fontSize: 14,
-                  color: Colors.amber,
+                  color: QuizResultTheme.averageColor,
                   fontStyle: FontStyle.italic,
                 ),
               ),
@@ -697,21 +797,22 @@ Widget build(BuildContext context) {
               Row(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  const Text(
+                  Text(
                     'Correct answer: ',
-                    style: TextStyle(
-                      color: Colors.grey,
+                    style: GoogleFonts.inter(
+                      color: QuizResultTheme.textSecondary,
                       fontSize: 13,
+                      fontWeight: FontWeight.w500,
                     ),
                   ),
                   const SizedBox(width: 4),
                   Expanded(
                     child: Text(
                       correctAnswer,
-                      style: const TextStyle(
+                      style: GoogleFonts.inter(
                         fontSize: 14,
                         fontWeight: FontWeight.w500,
-                        color: Colors.green,
+                        color: QuizResultTheme.excellentColor,
                       ),
                     ),
                   ),
@@ -721,68 +822,63 @@ Widget build(BuildContext context) {
           ],
         ),
       ),
-    );
+    ).animate().fadeIn(duration: 400.ms, delay: Duration(milliseconds: 100 * index + 800));
   }
 
   Widget _buildActionButtons(BuildContext context) {
-  return Padding(
-    padding: const EdgeInsets.symmetric(vertical: 24.0, horizontal: 16.0),
-    child: Row(
-      children: [
-        Expanded(
-          child: OutlinedButton.icon(
-            onPressed: () {
-              // Navigate directly to the quiz list screen
-              Navigator.of(context).pushNamedAndRemoveUntil(
-                AppRoutes.quizList, 
-                (route) => route.settings.name == AppRoutes.learningCenter || route.isFirst
-              );
-            },
-            icon: const Icon(Icons.list),
-            label: const Text('Quiz List'),
-            style: OutlinedButton.styleFrom(
-              padding: const EdgeInsets.symmetric(
-                vertical: 12,
+    return Padding(
+      padding: const EdgeInsets.symmetric(vertical: 24, horizontal: 24),
+      child: Row(
+        children: [
+          Expanded(
+            child: OutlinedButton.icon(
+              onPressed: () {
+                Navigator.of(context).pushNamedAndRemoveUntil(
+                  AppRoutes.quizList, 
+                  (route) => route.settings.name == AppRoutes.learningCenter || route.isFirst
+                );
+              },
+              icon: const Icon(Icons.list_rounded),
+              label: const Text('Quiz List'),
+              style: OutlinedButton.styleFrom(
+                foregroundColor: QuizResultTheme.primaryColor,
+                padding: const EdgeInsets.symmetric(vertical: 14),
+                shape: RoundedRectangleBorder(
+                  borderRadius: QuizResultTheme.buttonRadius,
+                ),
+                side: BorderSide(
+                  color: QuizResultTheme.primaryColor.withAlpha(100),
+                ),
               ),
-              shape: RoundedRectangleBorder(
-                borderRadius: BorderRadius.circular(8),
-              ),
-              alignment: Alignment.center,
             ),
           ),
-        ),
-        const SizedBox(width: 12),
-        Expanded(
-          child: ElevatedButton.icon(
-            onPressed: () {
-              // Pop back to the quiz screen
-              Navigator.of(context).pop();
-              
-              // Send the same quiz data to restart it
-              Navigator.of(context).pushReplacementNamed(
-                AppRoutes.quiz,
-                arguments: {'quiz': quiz}
-              );
-            },
-            icon: const Icon(Icons.replay),
-            label: const Text('Try Again'),
-            style: ElevatedButton.styleFrom(
-              padding: const EdgeInsets.symmetric(
-                vertical: 12,
+          const SizedBox(width: 16),
+          Expanded(
+            child: ElevatedButton.icon(
+              onPressed: () {
+                Navigator.of(context).pop();
+                Navigator.of(context).pushReplacementNamed(
+                  AppRoutes.quiz,
+                  arguments: {'quiz': quiz}
+                );
+              },
+              icon: const Icon(Icons.replay_rounded),
+              label: const Text('Try Again'),
+              style: ElevatedButton.styleFrom(
+                backgroundColor: QuizResultTheme.primaryColor,
+                foregroundColor: Colors.white,
+                elevation: 0,
+                padding: const EdgeInsets.symmetric(vertical: 14),
+                shape: RoundedRectangleBorder(
+                  borderRadius: QuizResultTheme.buttonRadius,
+                ),
               ),
-              elevation: 0,
-              backgroundColor: Theme.of(context).primaryColor,
-              shape: RoundedRectangleBorder(
-                borderRadius: BorderRadius.circular(8),
-              ),
-              alignment: Alignment.center,
             ),
           ),
-        ),
-      ],
-    ),
-  );
-}
+        ],
+      ),
+    );
+  }
 
   String _formatDate(DateTime date) {
     final months = [
@@ -806,25 +902,5 @@ Widget build(BuildContext context) {
     if (score >= 60) return 'Not Bad';
     if (score >= 50) return 'Keep Learning';
     return 'Try Again';
-  }
-
-  Color _getScoreColor(double score) {
-    if (score >= 90) return Colors.green;
-    if (score >= 70) return Colors.blue;
-    if (score >= 50) return Colors.orange;
-    return Colors.red;
-  }
-  
-  Color _getDifficultyColor(String difficulty) {
-    switch (difficulty.toLowerCase()) {
-      case 'easy':
-        return Colors.green;
-      case 'medium':
-        return Colors.orange;
-      case 'hard':
-        return Colors.red;
-      default:
-        return Colors.blue;
-    }
   }
 }

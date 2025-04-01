@@ -1,11 +1,158 @@
 import 'package:flutter/material.dart';
 import 'package:firebase_auth/firebase_auth.dart';
+import 'package:google_fonts/google_fonts.dart';
+import 'package:flutter_animate/flutter_animate.dart';
 import '../../utils/learning_center_models.dart';
 import '../../utils/learning_center_service.dart';
 import 'quiz_screen.dart';
 import 'package:logging/logging.dart' as logging;
 
 final _logger = logging.Logger('QuizListScreen');
+
+// Design constants to maintain consistency with other screens
+class QuizTheme {
+  // Main color palette
+  static const Color primaryColor = Color(0xFF1D557E);  // Main blue
+  static const Color secondaryColor = Color(0xFFE6EDF7); // Light blue background
+  static const Color accentColor = Color(0xFF2E86C1);   // Medium blue for accents
+  
+  // Category colors
+  static const Color ecgColor = Color(0xFFF44336);      // Red for ECG
+  static const Color pulseOxColor = Color(0xFF2196F3);  // Blue for PulseOx 
+  static const Color murmurColor = Color(0xFF00ACC1);   // Cyan for Heart Murmurs
+  static const Color generalColor = Color(0xFF009688); // Teal for general quizzes
+  
+  // Difficulty colors
+  static const Color easyColor = Color(0xFF4CAF50);     // Green for easy
+  static const Color mediumColor = Color(0xFFFF9800);   // Orange for medium
+  static const Color hardColor = Color(0xFFE53935);     // Red for hard
+  
+  // Score colors
+  static const Color excellentColor = Color(0xFF43A047); // Dark green
+  static const Color goodColor = Color(0xFF1E88E5);      // Medium blue
+  static const Color averageColor = Color(0xFFFF9800);   // Orange
+  static const Color poorColor = Color(0xFFE53935);      // Red
+  
+  // Text colors
+  static const Color textPrimary = Color(0xFF263238);
+  static const Color textSecondary = Color(0xFF546E7A);
+  static const Color textLight = Color(0xFF78909C);
+  
+  // Shadows
+  static final cardShadow = BoxShadow(
+    color: Colors.black.withAlpha(18),
+    blurRadius: 12,
+    spreadRadius: 0,
+    offset: const Offset(0, 3),
+  );
+  
+  static final subtleShadow = BoxShadow(
+    color: Colors.black.withAlpha(10),
+    blurRadius: 6,
+    spreadRadius: 0,
+    offset: const Offset(0, 2),
+  );
+  
+  // Text styles
+  static final TextStyle headingStyle = GoogleFonts.inter(
+    fontSize: 22,
+    fontWeight: FontWeight.bold,
+    color: textPrimary,
+    letterSpacing: -0.3,
+    height: 1.3,
+  );
+  
+  static final TextStyle subheadingStyle = GoogleFonts.inter(
+    fontSize: 18,
+    fontWeight: FontWeight.w600,
+    color: textPrimary,
+    letterSpacing: -0.2,
+    height: 1.4,
+  );
+  
+  static final TextStyle cardTitleStyle = GoogleFonts.inter(
+    fontSize: 16,
+    fontWeight: FontWeight.w600,
+    color: textPrimary,
+    letterSpacing: -0.2,
+    height: 1.3,
+  );
+  
+  static final TextStyle bodyStyle = GoogleFonts.inter(
+    fontSize: 15,
+    fontWeight: FontWeight.normal,
+    color: textPrimary,
+    letterSpacing: -0.1,
+    height: 1.5,
+  );
+  
+  static final TextStyle emphasisStyle = GoogleFonts.inter(
+    fontSize: 14,
+    fontWeight: FontWeight.w500,
+    color: textPrimary,
+    height: 1.5,
+  );
+  
+  static final TextStyle captionStyle = GoogleFonts.inter(
+    fontSize: 12,
+    fontWeight: FontWeight.normal,
+    color: textSecondary,
+    height: 1.5,
+  );
+  
+  static final TextStyle chipTextStyle = GoogleFonts.inter(
+    fontSize: 13,
+    fontWeight: FontWeight.w500,
+    color: primaryColor,
+  );
+  
+  static final TextStyle buttonTextStyle = GoogleFonts.inter(
+    fontSize: 14,
+    fontWeight: FontWeight.w600,
+    letterSpacing: 0.1,
+  );
+  
+  // Border radius
+  static final BorderRadius borderRadius = BorderRadius.circular(16);
+  static final BorderRadius chipRadius = BorderRadius.circular(12);
+  static final BorderRadius buttonRadius = BorderRadius.circular(12);
+  
+  // Get color for category
+  static Color getCategoryColor(String category) {
+    switch (category) {
+      case 'ECG':
+        return ecgColor;
+      case 'PulseOx':
+        return pulseOxColor;
+      case 'Heart Murmurs':
+        return murmurColor;
+      default:
+        return generalColor;
+    }
+  }
+  
+  // Get color for difficulty
+  static Color getDifficultyColor(String difficulty) {
+    switch (difficulty.toLowerCase()) {
+      case 'easy':
+        return easyColor;
+      case 'medium':
+        return mediumColor;
+      case 'hard':
+        return hardColor;
+      default:
+        return accentColor;
+    }
+  }
+  
+  // Get color for score
+  static Color getScoreColor(double score) {
+    if (score >= 90) return excellentColor;
+    if (score >= 70) return goodColor;
+    if (score >= 50) return averageColor;
+    return poorColor;
+  }
+}
 
 class QuizListScreen extends StatefulWidget {
   const QuizListScreen({super.key});
@@ -21,11 +168,18 @@ class _QuizListScreenState extends State<QuizListScreen> {
   String _selectedCategory = 'All';
   
   final List<String> _categories = ['All', 'ECG', 'PulseOx', 'Heart Murmurs'];
+  final ScrollController _scrollController = ScrollController();
   
   @override
   void initState() {
     super.initState();
     _refreshData();
+  }
+  
+  @override
+  void dispose() {
+    _scrollController.dispose();
+    super.dispose();
   }
   
   Future<void> _refreshData() async {
@@ -35,22 +189,52 @@ class _QuizListScreenState extends State<QuizListScreen> {
     );
   }
 
+  void _showSnackBar(String message) {
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Text(
+          message,
+          style: GoogleFonts.inter(
+            fontSize: 14,
+            color: Colors.white,
+          ),
+        ),
+        backgroundColor: QuizTheme.primaryColor,
+        behavior: SnackBarBehavior.floating,
+        margin: const EdgeInsets.all(16),
+        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(12),
+        ),
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: Colors.grey[50],
+      backgroundColor: QuizTheme.secondaryColor,
       appBar: AppBar(
-        title: const Text(
-          'Assessment Quizzes',
-          style: TextStyle(fontWeight: FontWeight.w600),
-        ),
+        backgroundColor: Colors.white,
+        foregroundColor: QuizTheme.textPrimary,
         elevation: 0,
+        centerTitle: false,
+        title: Text(
+          'Assessment Quizzes',
+          style: GoogleFonts.inter(
+            fontSize: 20,
+            fontWeight: FontWeight.w600,
+            color: QuizTheme.textPrimary,
+            letterSpacing: -0.3,
+          ),
+        ),
       ),
       body: RefreshIndicator(
         onRefresh: () async {
           await _refreshData();
           setState(() {});
         },
+        color: QuizTheme.primaryColor,
         child: Column(
           children: [
             _buildCategoryFilter(),
@@ -65,26 +249,25 @@ class _QuizListScreenState extends State<QuizListScreen> {
 
   Widget _buildCategoryFilter() {
     return Container(
-      padding: const EdgeInsets.symmetric(vertical: 12, horizontal: 16),
-      color: Theme.of(context).appBarTheme.backgroundColor,
+      padding: const EdgeInsets.all(20),
+      color: Colors.white,
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Padding(
-            padding: const EdgeInsets.only(left: 8.0, bottom: 8.0),
-            child: Text(
-              'Filter by category',
-              style: TextStyle(
-                fontWeight: FontWeight.w500,
-                fontSize: 14,
-                color: Colors.white.withAlpha(230), // 0.9 * 255 ≈ 230
-              ),
-            ),
+          Text(
+            'Filter by category',
+            style: QuizTheme.emphasisStyle,
           ),
-          SingleChildScrollView(
-            scrollDirection: Axis.horizontal,
-            child: Row(
-              children: _categories.map(_buildFilterChip).toList(),
+          const SizedBox(height: 12),
+          SizedBox(
+            height: 36,
+            child: ListView.builder(
+              scrollDirection: Axis.horizontal,
+              itemCount: _categories.length,
+              itemBuilder: (context, index) => Padding(
+                padding: const EdgeInsets.only(right: 8),
+                child: _buildFilterChip(_categories[index]),
+              ),
             ),
           ),
         ],
@@ -94,38 +277,39 @@ class _QuizListScreenState extends State<QuizListScreen> {
 
   Widget _buildFilterChip(String category) {
     final isSelected = _selectedCategory == category;
+    final Color categoryColor = category == 'All' 
+        ? QuizTheme.primaryColor 
+        : QuizTheme.getCategoryColor(category);
     
-    return Padding(
-      padding: const EdgeInsets.only(right: 8),
-      child: FilterChip(
-        label: Text(
-          category,
-          style: TextStyle(
-            fontWeight: isSelected ? FontWeight.w500 : FontWeight.normal,
-            fontSize: 13,
-          ),
+    return FilterChip(
+      label: Text(
+        category,
+        style: GoogleFonts.inter(
+          fontSize: 13,
+          fontWeight: isSelected ? FontWeight.w600 : FontWeight.normal,
+          color: isSelected ? categoryColor : QuizTheme.textSecondary,
         ),
-        selected: isSelected,
-        backgroundColor: Colors.white,
-        selectedColor: Theme.of(context).primaryColor.withAlpha(40),
-        checkmarkColor: Theme.of(context).primaryColor,
-        shape: RoundedRectangleBorder(
-          borderRadius: BorderRadius.circular(16),
-          side: BorderSide(
-            color: isSelected 
-                ? Theme.of(context).primaryColor.withAlpha(60) 
-                : Colors.grey.withAlpha(30),
-            width: 1,
-          ),
-        ),
-        materialTapTargetSize: MaterialTapTargetSize.shrinkWrap,
-        visualDensity: VisualDensity.compact,
-        onSelected: (selected) {
-          setState(() {
-            _selectedCategory = category;
-          });
-        },
       ),
+      selected: isSelected,
+      backgroundColor: Colors.white,
+      selectedColor: categoryColor.withAlpha(20),
+      checkmarkColor: categoryColor,
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.circular(16),
+        side: BorderSide(
+          color: isSelected 
+              ? categoryColor.withAlpha(60) 
+              : Colors.grey.withAlpha(40),
+          width: isSelected ? 1.5 : 1,
+        ),
+      ),
+      materialTapTargetSize: MaterialTapTargetSize.shrinkWrap,
+      visualDensity: VisualDensity.compact,
+      onSelected: (selected) {
+        setState(() {
+          _selectedCategory = category;
+        });
+      },
     );
   }
 
@@ -137,8 +321,10 @@ class _QuizListScreenState extends State<QuizListScreen> {
       ]),
       builder: (context, snapshot) {
         if (snapshot.connectionState == ConnectionState.waiting) {
-          return const Center(
-            child: CircularProgressIndicator(),
+          return Center(
+            child: CircularProgressIndicator(
+              color: QuizTheme.primaryColor,
+            ),
           );
         }
         
@@ -150,25 +336,23 @@ class _QuizListScreenState extends State<QuizListScreen> {
                 mainAxisAlignment: MainAxisAlignment.center,
                 children: [
                   Icon(
-                    Icons.error_outline,
-                    size: 64,
-                    color: Colors.red[300],
+                    Icons.error_outline_rounded,
+                    size: 48,
+                    color: Colors.red.withAlpha(200),
                   ),
                   const SizedBox(height: 16),
-                  const Text(
+                  Text(
                     'Error loading quizzes',
-                    style: TextStyle(
-                      fontSize: 18,
-                      fontWeight: FontWeight.bold,
-                    ),
+                    style: QuizTheme.cardTitleStyle,
                     textAlign: TextAlign.center,
                   ),
                   const SizedBox(height: 8),
                   Text(
                     snapshot.error.toString(),
-                    style: TextStyle(
-                      color: Colors.red[700],
+                    style: GoogleFonts.inter(
                       fontSize: 14,
+                      color: Colors.red[700],
+                      height: 1.5,
                     ),
                     textAlign: TextAlign.center,
                   ),
@@ -179,15 +363,15 @@ class _QuizListScreenState extends State<QuizListScreen> {
                         _refreshData();
                       });
                     },
-                    icon: const Icon(Icons.refresh),
+                    icon: const Icon(Icons.refresh_rounded),
                     label: const Text('Retry'),
                     style: ElevatedButton.styleFrom(
-                      padding: const EdgeInsets.symmetric(
-                        horizontal: 24,
-                        vertical: 12,
-                      ),
+                      backgroundColor: QuizTheme.primaryColor,
+                      foregroundColor: Colors.white,
+                      elevation: 0,
+                      padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 12),
                       shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(8),
+                        borderRadius: QuizTheme.buttonRadius,
                       ),
                     ),
                   ),
@@ -198,8 +382,11 @@ class _QuizListScreenState extends State<QuizListScreen> {
         }
         
         if (!snapshot.hasData) {
-          return const Center(
-            child: Text('No quizzes available'),
+          return Center(
+            child: Text(
+              'No quizzes available',
+              style: QuizTheme.bodyStyle,
+            ),
           );
         }
         
@@ -222,17 +409,14 @@ class _QuizListScreenState extends State<QuizListScreen> {
                 mainAxisAlignment: MainAxisAlignment.center,
                 children: [
                   Icon(
-                    Icons.quiz_outlined,
+                    Icons.quiz_rounded,
                     size: 64,
-                    color: Colors.grey[400],
+                    color: Colors.grey.withAlpha(150),
                   ),
                   const SizedBox(height: 16),
                   Text(
                     'No quizzes available in the "$_selectedCategory" category',
-                    style: const TextStyle(
-                      fontSize: 16,
-                      fontWeight: FontWeight.w500,
-                    ),
+                    style: QuizTheme.cardTitleStyle,
                     textAlign: TextAlign.center,
                   ),
                   const SizedBox(height: 24),
@@ -242,15 +426,16 @@ class _QuizListScreenState extends State<QuizListScreen> {
                         _selectedCategory = 'All';
                       });
                     },
-                    icon: const Icon(Icons.filter_list_off),
+                    icon: const Icon(Icons.filter_list_off_rounded),
                     label: const Text('Show All Categories'),
                     style: OutlinedButton.styleFrom(
-                      padding: const EdgeInsets.symmetric(
-                        horizontal: 20,
-                        vertical: 12,
+                      foregroundColor: QuizTheme.primaryColor,
+                      padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
+                      side: BorderSide(
+                        color: QuizTheme.primaryColor.withAlpha(100),
                       ),
                       shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(8),
+                        borderRadius: QuizTheme.buttonRadius,
                       ),
                     ),
                   ),
@@ -270,7 +455,8 @@ class _QuizListScreenState extends State<QuizListScreen> {
         }
         
         return ListView.builder(
-          padding: const EdgeInsets.all(16),
+          controller: _scrollController,
+          padding: const EdgeInsets.all(24),
           itemCount: quizzesByCategory.length,
           itemBuilder: (context, categoryIndex) {
             final category = quizzesByCategory.keys.toList()[categoryIndex];
@@ -279,28 +465,26 @@ class _QuizListScreenState extends State<QuizListScreen> {
             return Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                // Category header
+                // Category header (only show if not filtering by a specific category)
                 if (_selectedCategory == 'All') ...[
-                  Padding(
-                    padding: const EdgeInsets.only(bottom: 12.0, top: 8.0, left: 4.0),
-                    child: Row(
-                      children: [
-                        _getCategoryIcon(category),
-                        const SizedBox(width: 8),
-                        Text(
-                          category,
-                          style: const TextStyle(
-                            fontWeight: FontWeight.bold,
-                            fontSize: 18,
-                          ),
-                        ),
-                      ],
-                    ),
-                  ),
+                  Row(
+                    children: [
+                      _getCategoryIcon(category),
+                      const SizedBox(width: 12),
+                      Text(
+                        category,
+                        style: QuizTheme.subheadingStyle,
+                      ),
+                    ],
+                  ).animate().fadeIn(duration: 500.ms, delay: Duration(milliseconds: 100 * categoryIndex)),
+                  const SizedBox(height: 16),
                 ],
                 
                 // Quizzes in this category
-                ...categoryQuizzes.map((quiz) {
+                ...categoryQuizzes.asMap().entries.map((entry) {
+                  final int quizIndex = entry.key;
+                  final Quiz quiz = entry.value;
+                  
                   // Check if user has taken this quiz
                   final quizResults = userProgress.quizResults
                       .where((result) => result.quizId == quiz.id)
@@ -322,10 +506,12 @@ class _QuizListScreenState extends State<QuizListScreen> {
                     hasAttempted,
                     attempts,
                     bestScore,
+                    categoryIndex,
+                    quizIndex,
                   );
                 }),
                 
-                const SizedBox(height: 8),
+                const SizedBox(height: 24),
               ],
             );
           },
@@ -336,35 +522,31 @@ class _QuizListScreenState extends State<QuizListScreen> {
 
   Widget _getCategoryIcon(String category) {
     IconData iconData;
-    Color iconColor;
+    final Color iconColor = QuizTheme.getCategoryColor(category);
     
     switch (category) {
       case 'ECG':
-        iconData = Icons.monitor_heart;
-        iconColor = Colors.redAccent;
+        iconData = Icons.monitor_heart_rounded;
         break;
       case 'PulseOx':
-        iconData = Icons.bloodtype;
-        iconColor = Colors.blueAccent;
+        iconData = Icons.bloodtype_rounded;
         break;
       case 'Heart Murmurs':
-        iconData = Icons.hearing;
-        iconColor = Colors.purpleAccent;
+        iconData = Icons.hearing_rounded;
         break;
       default:
-        iconData = Icons.quiz;
-        iconColor = Colors.teal;
+        iconData = Icons.quiz_rounded;
     }
     
     return Container(
-      padding: const EdgeInsets.all(6),
+      padding: const EdgeInsets.all(10),
       decoration: BoxDecoration(
-        color: iconColor.withAlpha(26), // 0.1 * 255 ≈ 26
+        color: iconColor.withAlpha(20),
         shape: BoxShape.circle,
       ),
       child: Icon(
         iconData,
-        size: 18,
+        size: 20,
         color: iconColor,
       ),
     );
@@ -375,212 +557,207 @@ class _QuizListScreenState extends State<QuizListScreen> {
     bool hasAttempted,
     int attempts,
     double bestScore,
+    int categoryIndex,
+    int quizIndex,
   ) {
-    // Color based on difficulty
-    Color difficultyColor;
-    switch (quiz.difficulty.toLowerCase()) {
-      case 'easy':
-        difficultyColor = Colors.green;
-        break;
-      case 'medium':
-        difficultyColor = Colors.orange;
-        break;
-      case 'hard':
-        difficultyColor = Colors.red;
-        break;
-      default:
-        difficultyColor = Colors.blue;
-    }
+    // Get colors based on quiz properties
+    final Color categoryColor = QuizTheme.getCategoryColor(quiz.category);
+    final Color difficultyColor = QuizTheme.getDifficultyColor(quiz.difficulty);
     
     return Card(
-      margin: const EdgeInsets.only(bottom: 12),
+      elevation: 0,
+      margin: const EdgeInsets.only(bottom: 16),
       shape: RoundedRectangleBorder(
-        borderRadius: BorderRadius.circular(12),
-        side: BorderSide(color: Colors.grey.withAlpha(30), width: 0.5),
+        borderRadius: QuizTheme.borderRadius,
       ),
-      elevation: 0.5,
+      color: Colors.white,
       child: InkWell(
-        borderRadius: BorderRadius.circular(12),
+        borderRadius: QuizTheme.borderRadius,
         onTap: () => _navigateToQuiz(quiz),
-        child: Padding(
-          padding: const EdgeInsets.all(16.0),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              // Quiz title and difficulty badge
-              Row(
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            // Header with title and difficulty
+            Container(
+              padding: const EdgeInsets.all(20),
+              decoration: BoxDecoration(
+                border: Border(
+                  bottom: BorderSide(
+                    color: Colors.grey.withAlpha(40),
+                    width: 1,
+                  ),
+                ),
+              ),
+              child: Row(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   Expanded(
                     child: Text(
                       quiz.title,
-                      style: const TextStyle(
-                        fontWeight: FontWeight.bold,
-                        fontSize: 16,
-                      ),
+                      style: QuizTheme.cardTitleStyle,
                     ),
                   ),
                   const SizedBox(width: 8),
                   Container(
                     padding: const EdgeInsets.symmetric(
-                      horizontal: 8,
+                      horizontal: 10,
                       vertical: 4,
                     ),
                     decoration: BoxDecoration(
-                      color: difficultyColor.withAlpha(30),
+                      color: difficultyColor.withAlpha(20),
                       borderRadius: BorderRadius.circular(12),
                     ),
                     child: Text(
                       quiz.difficulty,
-                      style: TextStyle(
-                        color: difficultyColor,
-                        fontWeight: FontWeight.w500,
+                      style: GoogleFonts.inter(
                         fontSize: 12,
+                        fontWeight: FontWeight.w600,
+                        color: difficultyColor,
                       ),
                     ),
                   ),
                 ],
               ),
-              
-              const SizedBox(height: 8),
-              
-              // Description
-              Text(
-                quiz.description,
-                maxLines: 2,
-                overflow: TextOverflow.ellipsis,
-                style: TextStyle(
-                  fontSize: 14,
-                  color: Colors.grey[700],
-                  height: 1.3,
-                ),
-              ),
-              
-              const SizedBox(height: 12),
-              
-              // Quiz metrics cards
-              Row(
+            ),
+            
+            // Quiz details and stats
+            Padding(
+              padding: const EdgeInsets.all(20),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  _buildMetricCard(
-                    Icons.quiz_outlined,
-                    '${quiz.questions.length}',
-                    'Questions',
-                    Colors.blue,
+                  // Description
+                  Text(
+                    quiz.description,
+                    style: QuizTheme.bodyStyle.copyWith(
+                      color: QuizTheme.textSecondary,
+                    ),
+                    maxLines: 2,
+                    overflow: TextOverflow.ellipsis,
                   ),
-                  const SizedBox(width: 8),
-                  if (quiz.timeLimit > 0)
-                    _buildMetricCard(
-                      Icons.timer_outlined,
-                      '${quiz.timeLimit ~/ 60}',
-                      'Minutes',
-                      Colors.amber,
-                    ),
-                  if (hasAttempted) ...[
-                    const SizedBox(width: 8),
-                    _buildMetricCard(
-                      Icons.emoji_events_outlined,
-                      '${bestScore.toInt()}%',
-                      'Best Score',
-                      _getScoreColor(bestScore),
-                    ),
-                  ],
-                ],
-              ),
-              
-              const SizedBox(height: 16),
-              
-              // Action buttons
-              Row(
-                mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                children: [
-                  // Attempts badge
-                  if (hasAttempted)
-                    Container(
-                      padding: const EdgeInsets.symmetric(
-                        horizontal: 8, 
-                        vertical: 4,
+                  
+                  const SizedBox(height: 20),
+                  
+                  // Quiz metrics
+                  Row(
+                    children: [
+                      _buildMetricCard(
+                        Icons.quiz_rounded,
+                        '${quiz.questions.length}',
+                        'Questions',
+                        categoryColor,
                       ),
-                      decoration: BoxDecoration(
-                        color: Colors.grey[100],
-                        borderRadius: BorderRadius.circular(12),
-                        border: Border.all(
-                          color: Colors.grey[300]!,
-                          width: 0.5,
+                      const SizedBox(width: 12),
+                      if (quiz.timeLimit > 0)
+                        _buildMetricCard(
+                          Icons.timer_rounded,
+                          '${quiz.timeLimit ~/ 60}',
+                          'Minutes',
+                          QuizTheme.accentColor,
+                        ),
+                      if (hasAttempted) ...[
+                        const SizedBox(width: 12),
+                        _buildMetricCard(
+                          Icons.emoji_events_rounded,
+                          '${bestScore.toInt()}%',
+                          'Best Score',
+                          QuizTheme.getScoreColor(bestScore),
+                        ),
+                      ],
+                    ],
+                  ),
+                  
+                  const SizedBox(height: 20),
+                  
+                  // Action row
+                  Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                    children: [
+                      // Attempts info
+                      if (hasAttempted)
+                        Container(
+                          padding: const EdgeInsets.symmetric(
+                            horizontal: 12, 
+                            vertical: 6,
+                          ),
+                          decoration: BoxDecoration(
+                            color: Colors.grey.withAlpha(20),
+                            borderRadius: BorderRadius.circular(12),
+                          ),
+                          child: Row(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              Icon(
+                                Icons.history_rounded,
+                                size: 16,
+                                color: QuizTheme.textSecondary,
+                              ),
+                              const SizedBox(width: 6),
+                              Text(
+                                '$attempts ${attempts == 1 ? 'attempt' : 'attempts'}',
+                                style: GoogleFonts.inter(
+                                  fontSize: 13,
+                                  fontWeight: FontWeight.w500,
+                                  color: QuizTheme.textSecondary,
+                                ),
+                              ),
+                            ],
+                          ),
+                        )
+                      else
+                        const SizedBox.shrink(),
+                        
+                      // Start button
+                      ElevatedButton.icon(
+                        icon: Icon(
+                          hasAttempted ? Icons.replay_rounded : Icons.play_arrow_rounded,
+                          size: 18,
+                        ),
+                        label: Text(hasAttempted ? 'Retry Quiz' : 'Start Quiz'),
+                        onPressed: () => _navigateToQuiz(quiz),
+                        style: ElevatedButton.styleFrom(
+                          backgroundColor: QuizTheme.primaryColor,
+                          foregroundColor: Colors.white,
+                          elevation: 0,
+                          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
+                          shape: RoundedRectangleBorder(
+                            borderRadius: QuizTheme.buttonRadius,
+                          ),
                         ),
                       ),
-                      child: Row(
-                        mainAxisSize: MainAxisSize.min,
-                        children: [
-                          Icon(
-                            Icons.history,
-                            size: 14,
-                            color: Colors.grey[700],
-                          ),
-                          const SizedBox(width: 4),
-                          Text(
-                            '$attempts ${attempts == 1 ? 'attempt' : 'attempts'}',
-                            style: TextStyle(
-                              fontSize: 12,
-                              color: Colors.grey[800],
-                              fontWeight: FontWeight.w500,
-                            ),
-                          ),
-                        ],
-                      ),
-                    )
-                  else
-                    const SizedBox.shrink(),
-                    
-                  // Start button
-                  ElevatedButton.icon(
-                    icon: Icon(
-                      hasAttempted ? Icons.replay : Icons.play_arrow,
-                      size: 18,
-                    ),
-                    label: Text(hasAttempted ? 'Retry Quiz' : 'Start Quiz'),
-                    onPressed: () => _navigateToQuiz(quiz),
-                    style: ElevatedButton.styleFrom(
-                      padding: const EdgeInsets.symmetric(
-                        horizontal: 16,
-                        vertical: 8,
-                      ),
-                      shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(8),
-                      ),
-                    ),
+                    ],
                   ),
                 ],
               ),
-            ],
-          ),
+            ),
+          ],
         ),
       ),
-    );
+    ).animate().fadeIn(
+      duration: 400.ms,
+      delay: Duration(milliseconds: 100 * categoryIndex + 50 * quizIndex),
+    ).slideY(begin: 0.1, end: 0);
   }
 
   Widget _buildMetricCard(IconData icon, String value, String label, Color color) {
     return Expanded(
       child: Container(
-        padding: const EdgeInsets.symmetric(vertical: 8, horizontal: 8),
+        padding: const EdgeInsets.symmetric(vertical: 10, horizontal: 12),
         decoration: BoxDecoration(
-          color: color.withAlpha(20), // 0.08 * 255 ≈ 20
-          borderRadius: BorderRadius.circular(8),
-          border: Border.all(
-            color: color.withAlpha(51), // 0.2 * 255 ≈ 51
-            width: 0.5,
-          ),
+          color: color.withAlpha(15),
+          borderRadius: BorderRadius.circular(12),
         ),
         child: Row(
           children: [
             Container(
               padding: const EdgeInsets.all(6),
               decoration: BoxDecoration(
-                color: color.withAlpha(26), // 0.1 * 255 ≈ 26
+                color: color.withAlpha(26),
                 shape: BoxShape.circle,
               ),
               child: Icon(
                 icon,
-                size: 14,
+                size: 16,
                 color: color,
               ),
             ),
@@ -591,18 +768,22 @@ class _QuizListScreenState extends State<QuizListScreen> {
                 children: [
                   Text(
                     value,
-                    style: TextStyle(
+                    style: GoogleFonts.inter(
                       fontSize: 14,
                       fontWeight: FontWeight.bold,
-                      color: color.withAlpha(230), // 0.9 * 255 ≈ 230
+                      color: color,
                     ),
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
                   ),
                   Text(
                     label,
-                    style: TextStyle(
-                      fontSize: 10,
-                      color: color.withAlpha(179), // 0.7 * 255 ≈ 179
+                    style: GoogleFonts.inter(
+                      fontSize: 11,
+                      color: color.withAlpha(200),
                     ),
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
                   ),
                 ],
               ),
@@ -611,13 +792,6 @@ class _QuizListScreenState extends State<QuizListScreen> {
         ),
       ),
     );
-  }
-
-  Color _getScoreColor(double score) {
-    if (score >= 90) return Colors.green;
-    if (score >= 70) return Colors.blue;
-    if (score >= 50) return Colors.orange;
-    return Colors.red;
   }
 
   void _navigateToQuiz(Quiz quiz) {
